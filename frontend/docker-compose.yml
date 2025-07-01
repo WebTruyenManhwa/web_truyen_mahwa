@@ -1,0 +1,13 @@
+version: "3"
+services:
+  nextjs:
+    build: .
+    volumes:
+      - .:/app
+      - ./frontend/node_modules:/app/node_modules    # tránh lỗi node_modules của host vs container
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:3001/api
+    command: npm run dev

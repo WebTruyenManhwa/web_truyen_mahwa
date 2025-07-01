@@ -1,0 +1,49 @@
+services:
+  frontend:
+    build: ./frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - ./backend/public/uploads:/app/public/uploads
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:3001/api
+    depends_on:
+      - backend
+    command: npm run dev
+
+  backend:
+    build: ./backend
+    volumes:
+      - ./backend:/rails
+      - ./backend/tmp:/rails/tmp
+      
+      - ./backend/log:/rails/log
+    ports:
+      - "3001:3000"
+    stdin_open: true
+    tty: true 
+    environment:
+      - RAILS_ENV=development
+      - DATABASE_USERNAME=postgres
+      - DATABASE_PASSWORD=postgres
+      - DATABASE_HOST=db
+    depends_on:
+      - db
+    command: bash -c "bundle install && ./bin/rails server -b 0.0.0.0"
+
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=manga_reader_development
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data:
