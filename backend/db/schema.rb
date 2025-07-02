@@ -99,7 +99,11 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_01_055440) do
     t.integer "last_page"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "manga_id", null: false
+    t.datetime "last_read_at"
     t.index ["chapter_id"], name: "index_reading_histories_on_chapter_id"
+    t.index ["manga_id"], name: "index_reading_histories_on_manga_id"
+    t.index ["user_id", "manga_id", "chapter_id"], name: "index_reading_histories_on_user_manga_chapter", unique: true
     t.index ["user_id"], name: "index_reading_histories_on_user_id"
   end
 
@@ -128,5 +132,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_01_055440) do
   add_foreign_key "manga_genres", "genres"
   add_foreign_key "manga_genres", "mangas"
   add_foreign_key "reading_histories", "chapters"
+  add_foreign_key "reading_histories", "mangas"
   add_foreign_key "reading_histories", "users"
 end

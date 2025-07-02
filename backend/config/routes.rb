@@ -37,13 +37,11 @@ Rails.application.routes.draw do
           get :favorites, to: 'users#favorites'
           post 'favorites/:manga_id', to: 'users#toggle_favorite'
           get 'favorites/check/:manga_id', to: 'users#check_favorite'
-          get :history, to: 'users#reading_history'
-          post :history, to: 'users#add_to_history'
         end
       end
       
       resources :favorites, only: [:create, :destroy]
-      resources :reading_histories, only: [:create, :update]
+      resources :reading_histories, only: [:index, :create]
       resources :comments, only: [:index, :create, :destroy]
     end
   end

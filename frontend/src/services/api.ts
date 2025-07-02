@@ -233,13 +233,13 @@ export const userApi = {
 
   // Lấy lịch sử đọc truyện
   getReadingHistory: async () => {
-    const response = await api.get('/v1/users/history');
+    const response = await api.get('/v1/reading_histories');
     return response.data;
   },
 
   // Thêm vào lịch sử đọc truyện
   addToReadingHistory: async (mangaId: string | number, chapterId: string | number) => {
-    const response = await api.post('/v1/users/history', { mangaId, chapterId });
+    const response = await api.post('/v1/reading_histories', { manga_id: mangaId, chapter_id: chapterId });
     return response.data;
   },
 };

@@ -36,17 +36,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
-          // Xác thực token với backend
-          const currentUser = await userApi.getCurrentUser();
-          setUser(currentUser);
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setUser(null);
+          setIsLoading(false);
+          return;
         }
+
+        // Xác thực token với backend
+        const currentUser = await userApi.getCurrentUser();
+        setUser(currentUser);
+        localStorage.setItem('user', JSON.stringify(currentUser));
       } catch (error) {
         console.error('Failed to authenticate user:', error);
         // Token không hợp lệ, đăng xuất
-        userApi.logout();
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
         setUser(null);
       } finally {
         setIsLoading(false);

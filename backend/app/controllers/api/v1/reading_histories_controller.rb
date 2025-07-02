@@ -1,35 +1,34 @@
 module Api
   module V1
     class ReadingHistoriesController < BaseController
-      before_action :set_reading_history, only: [:update]
-      
-      def create
-        @reading_history = current_user.reading_histories.find_or_initialize_by(chapter_id: reading_history_params[:chapter_id])
-        @reading_history.last_page = reading_history_params[:last_page]
+      before_action :authenticate_user!
+
+      def index
+        @histories = current_user.reading_histories
+          .select('DISTINCT ON (manga_id) *')
+          .includes(:manga, :chapter)
+          .order('manga_id, last_read_at DESC')
         
-        if @reading_history.save
-          render json: @reading_history, status: :created
+        render json: @histories, each_serializer: ReadingHistorySerializer
+      end
+
+      def create
+        @history = current_user.reading_histories.find_or_initialize_by(
+          manga_id: params[:manga_id],
+          chapter_id: params[:chapter_id]
+        )
+        
+        if @history.save
+          render json: @history, serializer: ReadingHistorySerializer
         else
-          render json: { errors: @reading_history.errors }, status: :unprocessable_entity
+          render json: { errors: @history.errors.full_messages }, status: :unprocessable_entity
         end
       end
-      
-      def update
-        if @reading_history.update(reading_history_params)
-          render json: @reading_history
-        else
-          render json: { errors: @reading_history.errors }, status: :unprocessable_entity
-        end
-      end
-      
+
       private
-      
-      def set_reading_history
-        @reading_history = current_user.reading_histories.find(params[:id])
-      end
-      
+
       def reading_history_params
-        params.require(:reading_history).permit(:chapter_id, :last_page)
+        params.require(:reading_history).permit(:manga_id, :chapter_id)
       end
     end
   end
