@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { chapterApi, userApi } from "../../../../../services/api";
@@ -15,17 +15,26 @@ interface ChapterImage {
   url?: string;
 }
 
+interface ChapterSummary {
+  id: number;
+  number: number;
+  title: string;
+}
+
 interface Chapter {
   id: number;
   number: number;
   title: string;
+  view_count: number;
+  created_at: string;
+  updated_at: string;
   manga?: {
     id: number;
     title: string;
+    chapters?: ChapterSummary[];
   };
-  prevChapter?: { id: number; number: number } | null;
-  nextChapter?: { id: number; number: number } | null;
-  images?: ChapterImage[];
+  next_chapter?: ChapterSummary | null;
+  prev_chapter?: ChapterSummary | null;
   chapter_images?: ChapterImage[];
 }
 
@@ -41,10 +50,9 @@ interface Comment {
 }
 
 export default function ChapterReader() {
-  // Sử dụng useParams hook thay vì truy cập trực tiếp params
   const params = useParams();
   const mangaId = params.id as string;
-  const chapterNumber = params.chapterId as string;
+  const chapterId = params.chapterId as string;
   const { isAuthenticated } = useAuth();
   const [chapter, setChapter] = useState<Chapter | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -53,18 +61,76 @@ export default function ChapterReader() {
   const [commentText, setCommentText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [readingMode, setReadingMode] = useState<"vertical" | "horizontal">("vertical");
+  const [showBottomNav, setShowBottomNav] = useState(false);
+  const [allChapters, setAllChapters] = useState<ChapterSummary[]>([]);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Add click outside handler
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Thêm effect để theo dõi scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY;
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
+      
+      // Hiển thị navigation khi scroll xuống 20% trang
+      setShowBottomNav(scrollPosition > windowHeight * 0.2);
+
+      // Tính toán trang hiện tại dựa trên scroll position
+      const images = document.querySelectorAll('.chapter-image');
+      let currentImageIndex = 0;
+      
+      images.forEach((image, index) => {
+        const rect = image.getBoundingClientRect();
+        if (rect.top <= windowHeight / 2) {
+          currentImageIndex = index;
+        }
+      });
+      
+      setCurrentPage(currentImageIndex);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     const fetchChapter = async () => {
       try {
         setIsLoading(true);
-        const data = await chapterApi.getChapter(mangaId, chapterNumber);
-        console.log("Chapter data:", data); // Log dữ liệu để kiểm tra
+        const data = await chapterApi.getChapter(mangaId, chapterId);
+        console.log("Chapter data:", data);
         setChapter(data);
+
+        // Fetch tất cả chapters của manga
+        try {
+          const chapters = await chapterApi.getMangaChapters(mangaId);
+          // Sắp xếp chapters theo số thứ tự
+          const sortedChapters = [...chapters].sort((a, b) => a.number - b.number);
+          setAllChapters(sortedChapters);
+        } catch (err) {
+          console.error("Failed to fetch manga chapters:", err);
+        }
+
         // Thêm vào lịch sử đọc nếu đã đăng nhập
         if (isAuthenticated) {
           try {
-            await userApi.addToReadingHistory(mangaId, chapterNumber);
+            await userApi.addToReadingHistory(mangaId, chapterId);
           } catch (err) {
             console.error("Failed to add to reading history:", err);
           }
@@ -72,7 +138,7 @@ export default function ChapterReader() {
 
         // Fetch comments
         try {
-          const commentsData = await chapterApi.getChapterComments(mangaId, chapterNumber);
+          const commentsData = await chapterApi.getChapterComments(mangaId, chapterId);
           setComments(commentsData);
         } catch (err) {
           console.error("Failed to fetch comments:", err);
@@ -83,19 +149,23 @@ export default function ChapterReader() {
         
         // Fallback to mock data
         setChapter({
-          id: parseInt(chapterNumber),
+          id: parseInt(chapterId),
           number: 1088,
           title: "Cuộc chiến cuối cùng",
+          view_count: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
           manga: {
             id: parseInt(mangaId),
             title: "One Piece",
           },
-          prevChapter: {
+          prev_chapter: {
             id: 2,
             number: 1087,
+            title: "Chapter 1087"
           },
-          nextChapter: null,
-          images: [
+          next_chapter: null,
+          chapter_images: [
             {
               id: 1,
               position: 0,
@@ -119,7 +189,7 @@ export default function ChapterReader() {
     };
 
     fetchChapter();
-  }, [mangaId, chapterNumber, isAuthenticated]);
+  }, [mangaId, chapterId, isAuthenticated]);
 
   // Hàm debug để kiểm tra cấu trúc dữ liệu chapter
   useEffect(() => {
@@ -129,8 +199,7 @@ export default function ChapterReader() {
         number: chapter.number,
         title: chapter.title,
         manga: chapter.manga,
-        images: chapter.images,
-        chapter_images: chapter.chapter_images
+        images: chapter.chapter_images,
       });
     }
   }, [chapter]);
@@ -141,7 +210,7 @@ export default function ChapterReader() {
 
     try {
       setIsSubmitting(true);
-      const newComment = await chapterApi.addChapterComment(mangaId, chapterNumber, commentText);
+      const newComment = await chapterApi.addChapterComment(mangaId, chapterId, commentText);
       setComments([newComment, ...comments]);
       setCommentText("");
     } catch (err) {
@@ -187,10 +256,10 @@ export default function ChapterReader() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="max-w-[35rem] mx-auto px-2">
       {/* Top Navigation Bar */}
       <div className="bg-gray-800 p-4 rounded mb-4 sticky top-0 z-10">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-2">
+        <div className="flex flex-col space-y-3">
           <div className="flex items-center">
             <Link href={`/manga/${mangaId}`} className="text-gray-300 hover:text-red-500 mr-2">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -207,7 +276,7 @@ export default function ChapterReader() {
             </div>
           </div>
           
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap gap-2 items-center">
             <button
               onClick={toggleReadingMode}
               className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm flex items-center"
@@ -229,55 +298,73 @@ export default function ChapterReader() {
               )}
             </button>
             
-            {chapter.prevChapter && (
-              <Link
-                href={`/manga/${mangaId}/chapter/${chapter.prevChapter.id}`}
-                className="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm"
-              >
-                Chương trước
-              </Link>
-            )}
-            
-            <select
-              className="bg-gray-700 text-white px-3 py-1 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
-              defaultValue={chapterNumber}
-              onChange={(e) => {
-                if (e.target.value) {
-                  window.location.href = `/manga/${mangaId}/chapter/${e.target.value}`;
-                }
-              }}
-            >
-              <option value={chapterNumber}>Chapter {chapter.number || ""}</option>
-              {chapter.prevChapter && (
-                <option value={chapter.prevChapter.id}>
-                  Chapter {chapter.prevChapter.number}
-                </option>
+            <div className="flex flex-1 min-w-0 gap-2">
+              {chapter.prev_chapter && (
+                <Link
+                  href={`/manga/${mangaId}/chapter/${chapter.prev_chapter.id}`}
+                  className="bg-red-700 hover:bg-red-600 px-3 py-1 rounded text-sm whitespace-nowrap"
+                >
+                  Chương trước
+                </Link>
               )}
-              {chapter.nextChapter && (
-                <option value={chapter.nextChapter.id}>
-                  Chapter {chapter.nextChapter.number}
-                </option>
+              
+              <div className="relative flex-1 min-w-0" ref={dropdownRef}>
+                <button
+                  className="w-full bg-gray-700 text-white px-3 py-1 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-500 flex items-center justify-between"
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                >
+                  <span className="truncate">
+                    Chapter {chapter.number} - {chapter.title}
+                  </span>
+                  <svg
+                    className={`w-4 h-4 ml-2 transition-transform ${isDropdownOpen ? 'transform rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                
+                {isDropdownOpen && (
+                  <div className="absolute z-50 w-full mt-1 bg-gray-700 rounded shadow-lg">
+                    <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
+                      {allChapters.map((chap) => (
+                        <Link
+                          key={chap.id}
+                          href={`/manga/${mangaId}/chapter/${chap.id}`}
+                          className={`block px-3 py-2 text-sm hover:bg-gray-600 ${
+                            chap.id.toString() === chapterId ? 'bg-gray-600' : ''
+                          }`}
+                          onClick={() => setIsDropdownOpen(false)}
+                        >
+                          Chapter {chap.number} - {chap.title}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {chapter.next_chapter && (
+                <Link
+                  href={`/manga/${mangaId}/chapter/${chapter.next_chapter.id}`}
+                  className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm whitespace-nowrap"
+                >
+                  Chương sau
+                </Link>
               )}
-            </select>
-            
-            {chapter.nextChapter && (
-              <Link
-                href={`/manga/${mangaId}/chapter/${chapter.nextChapter.id}`}
-                className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm"
-              >
-                Chương sau
-              </Link>
-            )}
+            </div>
           </div>
         </div>
       </div>
       
       {/* Chapter Images */}
       <div className={`${readingMode === "vertical" ? "space-y-1" : "flex overflow-x-auto whitespace-nowrap pb-4"}`}>
-        {(chapter.images || chapter.chapter_images || []).map((image) => (
+        {(chapter.chapter_images || []).map((image, index) => (
           <div 
             key={image.id} 
-            className={`${readingMode === "horizontal" ? "inline-block mr-1" : ""}`}
+            className={`chapter-image ${readingMode === "horizontal" ? "inline-block mr-1" : ""}`}
           >
             <img
               src={getImageUrl(image)}
@@ -290,34 +377,34 @@ export default function ChapterReader() {
         ))}
       </div>
       
-      {/* Bottom Navigation */}
-      <div className="bg-gray-800 p-4 rounded mt-4 sticky bottom-0 z-10">
-        <div className="flex justify-between items-center">
-          <Link href={`/manga/${mangaId}`} className="text-gray-300 hover:text-red-500 text-sm">
-            Quay lại danh sách chương
-          </Link>
+      {/* Floating Navigation Buttons */}
+      {showBottomNav && (
+        <div className="fixed bottom-4 right-4 flex gap-2">
+          {currentPage > 0 && chapter.prev_chapter && (
+            <Link
+              href={`/manga/${mangaId}/chapter/${chapter.prev_chapter.id}`}
+              className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-full shadow-lg flex items-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+              </svg>
+              Chapter trước
+            </Link>
+          )}
           
-          <div className="flex items-center space-x-2">
-            {chapter.prevChapter && (
-              <Link
-                href={`/manga/${mangaId}/chapter/${chapter.prevChapter.id}`}
-                className="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm"
-              >
-                Chương trước
-              </Link>
-            )}
-            
-            {chapter.nextChapter && (
-              <Link
-                href={`/manga/${mangaId}/chapter/${chapter.nextChapter.id}`}
-                className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm"
-              >
-                Chương sau
-              </Link>
-            )}
-          </div>
+          {chapter.next_chapter && (
+            <Link
+              href={`/manga/${mangaId}/chapter/${chapter.next_chapter.id}`}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full shadow-lg flex items-center"
+            >
+              Chapter sau
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </Link>
+          )}
         </div>
-      </div>
+      )}
       
       {/* Comments Section */}
       <div className="mt-8">

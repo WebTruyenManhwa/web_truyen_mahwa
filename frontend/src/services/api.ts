@@ -80,6 +80,12 @@ export const chapterApi = {
     return response.data;
   },
 
+  // Lấy danh sách chapter của một manga
+  getMangaChapters: async (mangaId: string | number) => {
+    const response = await api.get(`/v1/mangas/${mangaId}/chapters`);
+    return response.data;
+  },
+
   // Lấy comments của một chapter
   getChapterComments: async (mangaId: string | number, chapterId: string | number) => {
     const response = await api.get(`/v1/chapters/${chapterId}/comments`);
