@@ -50,6 +50,7 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
   const [success, setSuccess] = useState(false);
   const [importUrl, setImportUrl] = useState("");
   const [isImporting, setIsImporting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     const fetchChapter = async () => {
@@ -395,6 +396,16 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
     }
   };
 
+  // Thêm hàm xóa tất cả ảnh
+  const handleDeleteAllImages = () => {
+    // Đánh dấu tất cả ảnh hiện tại để xóa
+    setImagesToDelete(currentImages.map(img => img.id));
+    // Xóa tất cả ảnh mới
+    setNewImages([]);
+    setNewImagesPreviews([]);
+    setShowDeleteConfirm(false);
+  };
+
   if (isFetching) {
     return (
       <div className="flex min-h-screen bg-gray-900">
@@ -485,8 +496,51 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
 
           {/* Quản lý hình ảnh theo vị trí */}
           <div className="mb-8">
-            <h3 className="text-lg font-medium mb-4">Quản lý hình ảnh theo vị trí</h3>
-            
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Quản lý hình ảnh theo vị trí</h3>
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                Xóa tất cả ảnh
+              </button>
+            </div>
+
+            {/* Modal xác nhận xóa */}
+            {showDeleteConfirm && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-gray-800 p-6 rounded-lg max-w-md w-full mx-4">
+                  <h4 className="text-xl font-bold mb-4">Xác nhận xóa</h4>
+                  <p className="text-gray-300 mb-6">
+                    Bạn có chắc chắn muốn xóa tất cả ảnh? Hành động này không thể hoàn tác.
+                  </p>
+                  <div className="flex justify-end space-x-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteAllImages}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      Xóa tất cả
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Input ẩn để upload ảnh cho vị trí cụ thể */}
             <input
               id="new-chapter-image"
