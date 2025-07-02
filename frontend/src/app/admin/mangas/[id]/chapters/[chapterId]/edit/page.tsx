@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import AdminSidebar from "@/components/admin/AdminSidebar";
-import { chapterApi, chapterImageApi } from "@/services/api";
+import AdminSidebar from "../../../../../../../components/admin/AdminSidebar";
+import { chapterApi, chapterImageApi } from "../../../../../../../services/api";
 
 // Định nghĩa interface cho ảnh chapter
 interface ChapterImage {
@@ -12,18 +12,23 @@ interface ChapterImage {
   position: number;
   url: string;
   image?: string;
+  is_external?: boolean;
+  external_url?: string;
 }
 
 // Định nghĩa interface cho ảnh mới
 interface NewImage {
-  file: File;
+  file?: File;
   position: number;
+  is_external?: boolean;
+  external_url?: string;
 }
 
 // Định nghĩa interface cho preview ảnh mới
 interface NewImagePreview {
   preview: string;
   position: number;
+  is_external?: boolean;
 }
 
 export default function EditChapter({ params }: { params: { id: string; chapterId: string } }) {
@@ -43,6 +48,8 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
   const [isFetching, setIsFetching] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [importUrl, setImportUrl] = useState("");
+  const [isImporting, setIsImporting] = useState(false);
 
   useEffect(() => {
     const fetchChapter = async () => {
@@ -201,11 +208,16 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
     
     // Kiểm tra trong ảnh mới
     const newImageIndex = newImages.findIndex(img => img.position === position);
-    if (newImageIndex !== -1) return { 
-      type: 'new' as const, 
-      image: newImages[newImageIndex],
-      preview: newImagesPreviews[newImageIndex]
-    };
+    if (newImageIndex !== -1) {
+      const newImage = newImages[newImageIndex];
+      const preview = newImagesPreviews[newImageIndex];
+      return { 
+        type: 'new' as const, 
+        image: newImage,
+        preview: preview,
+        is_external: newImage.is_external
+      };
+    }
     
     return null;
   };
@@ -235,7 +247,6 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
       chapterFormData.append("chapter[number]", number);
       
       console.log("Updating chapter basic info...");
-      // Cập nhật chapter trước
       await chapterApi.updateChapter(mangaId, chapterId, chapterFormData);
       
       // Xử lý xóa ảnh
@@ -257,37 +268,29 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
           const imageFormData = new FormData();
           imageFormData.append("chapter_image[position]", image.position.toString());
           await chapterImageApi.updateChapterImage(image.id, imageFormData);
-          console.log(`Updated position for image ${image.id} to ${image.position}`);
         } catch (err) {
           console.error(`Error updating position for image ${image.id}:`, err);
         }
       }
       
-      // Lấy danh sách ảnh hiện tại sau khi đã cập nhật
-      const updatedChapterData = await chapterApi.getChapter(mangaId, chapterId);
-      console.log("Fetched chapter data after updates:", updatedChapterData);
-      const existingPositions = new Set(
-        (updatedChapterData.chapter_images || []).map((img: ChapterImage) => img.position)
-      );
-      
-      // Thêm ảnh mới - chỉ thêm vào vị trí chưa có ảnh
+      // Thêm ảnh mới
       console.log("Adding new images...");
       for (const image of newImages) {
         try {
-          // Kiểm tra xem vị trí này đã có ảnh chưa
-          if (existingPositions.has(image.position)) {
-            console.log(`Skipping new image at position ${image.position} - position already has an image`);
-            continue;
+          const imageFormData = new FormData();
+          imageFormData.append("chapter_image[position]", image.position.toString());
+          
+          if (image.is_external && image.external_url) {
+            // Nếu là ảnh từ nguồn ngoài, gửi URL thay vì file
+            imageFormData.append("chapter_image[external_url]", image.external_url);
+            imageFormData.append("chapter_image[is_external]", "true");
+          } else if (image.file) {
+            // Nếu là file upload từ máy tính
+            imageFormData.append("chapter_image[image]", image.file);
+            imageFormData.append("chapter_image[is_external]", "false");
           }
           
-          const imageFormData = new FormData();
-          imageFormData.append("chapter_image[image]", image.file);
-          imageFormData.append("chapter_image[position]", image.position.toString());
           await chapterImageApi.addChapterImage(chapterId, imageFormData);
-          console.log(`Added new image at position ${image.position}`);
-          
-          // Đánh dấu vị trí này đã có ảnh
-          existingPositions.add(image.position);
         } catch (err) {
           console.error(`Error adding new image at position ${image.position}:`, err);
         }
@@ -300,27 +303,94 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
       
       // Tải lại dữ liệu chapter
       const response = await chapterApi.getChapter(mangaId, chapterId);
-      console.log("Final chapter data:", response);
       setTitle(response.title);
       setNumber(response.number.toString());
-      
-      // Sắp xếp ảnh theo position
-      const images = response.chapter_images || [];
-      console.log("Chapter images from API:", images);
-      const sortedImages = [...images].sort((a, b) => a.position - b.position);
-      console.log("Sorted images:", sortedImages);
-      setCurrentImages(sortedImages);
-      
+      setCurrentImages(response.chapter_images || []);
       setSuccess(true);
-      
-      // setTimeout(() => {
-      //   router.push(`/admin/mangas/${mangaId}`);
-      // }, 2000);
     } catch (err) {
       console.error("Failed to update chapter:", err);
       setError("Cập nhật chapter thất bại. Vui lòng thử lại sau.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Hàm xử lý import ảnh từ URL
+  const handleImportFromUrl = async () => {
+    if (!importUrl) {
+      setError("Vui lòng nhập URL chapter");
+      return;
+    }
+
+    setIsImporting(true);
+    setError("");
+
+    try {
+      // Lấy số chapter từ URL
+      const chapterMatch = importUrl.match(/chuong-(\d+)/);
+      if (!chapterMatch) {
+        throw new Error("URL không hợp lệ");
+      }
+      const chapterNum = chapterMatch[1];
+
+      // Tạo danh sách URL ảnh
+      const imageUrls: string[] = [];
+      let index = 1;
+      while (index <= 100) { // Giới hạn tối đa 100 ảnh
+        const paddedIndex = index.toString().padStart(3, '0');
+        const imageUrl = `https://img.henzz.xyz/mo-khoa-tim-em/chuong-${chapterNum}/${paddedIndex}.jpg`;
+        
+        try {
+          // Kiểm tra xem ảnh có tồn tại không
+          const response = await fetch(imageUrl, { method: 'HEAD' });
+          if (response.ok) {
+            imageUrls.push(imageUrl);
+            index++;
+          } else {
+            break; // Nếu không tìm thấy ảnh, dừng vòng lặp
+          }
+        } catch (error) {
+          break; // Nếu có lỗi, dừng vòng lặp
+        }
+      }
+
+      if (imageUrls.length === 0) {
+        throw new Error("Không tìm thấy ảnh nào từ URL này");
+      }
+
+      // Thêm ảnh vào state
+      let nextPosition = maxPosition;
+      const newImagesArray: NewImage[] = [];
+      const newPreviewsArray: NewImagePreview[] = [];
+
+      for (const imageUrl of imageUrls) {
+        // Thêm trực tiếp URL mà không tải ảnh về
+        newImagesArray.push({
+          position: nextPosition,
+          is_external: true,
+          external_url: imageUrl
+        });
+        
+        newPreviewsArray.push({
+          preview: imageUrl,
+          position: nextPosition,
+          is_external: true
+        });
+        
+        nextPosition++;
+      }
+
+      // Cập nhật state
+      setNewImages([...newImages, ...newImagesArray]);
+      setNewImagesPreviews([...newImagesPreviews, ...newPreviewsArray]);
+      setMaxPosition(Math.max(maxPosition, nextPosition));
+      setSuccess(true);
+      setImportUrl("");
+    } catch (error) {
+      console.error("Lỗi khi import ảnh:", error);
+      setError(error instanceof Error ? error.message : "Lỗi khi import ảnh từ URL");
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -436,8 +506,13 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
                     <div className="aspect-[2/3] relative">
                       {imageData ? (
                         <>
+                        {console.log(imageData.image.is_external)}
                           <img
-                            src={imageData.type === 'current' ? imageData.image.image.url : imageData.preview.preview}
+                            src={
+                              imageData.type === 'current' 
+                                ? (imageData.image.is_external ? imageData.image.external_url : imageData.image.image?.url)
+                                : (imageData.is_external ? imageData.image.external_url : imageData.preview.preview)
+                            }
                             alt={`Ảnh vị trí ${position}`}
                             className="w-full h-full object-contain rounded"
                             onError={(e) => {
@@ -545,6 +620,46 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
               <p className="mt-1 text-xs text-gray-500">
                 PNG, JPG, GIF, WEBP tối đa 5MB mỗi ảnh
               </p>
+            </div>
+          </div>
+
+          {/* Import ảnh từ URL */}
+          <div className="mb-8">
+            <h3 className="text-lg font-medium mb-4">Import ảnh từ URL</h3>
+            <p className="text-sm text-gray-400 mb-2">
+              Nhập URL chapter từ hentaivn.cx để import tất cả ảnh của chapter đó
+            </p>
+            
+            <div className="flex gap-4">
+              <input
+                type="text"
+                value={importUrl}
+                onChange={(e) => setImportUrl(e.target.value)}
+                placeholder="Ví dụ: https://hentaivn.cx/truyen-hentai/mo-khoa-tim-em/chuong-1/"
+                className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="button"
+                onClick={handleImportFromUrl}
+                disabled={isImporting}
+                className={`px-6 py-3 rounded-lg text-white ${
+                  isImporting
+                    ? "bg-blue-700 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-500"
+                }`}
+              >
+                {isImporting ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Đang import...
+                  </span>
+                ) : (
+                  "Import ảnh"
+                )}
+              </button>
             </div>
           </div>
 

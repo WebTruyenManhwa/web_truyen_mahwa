@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import AdminSidebar from "@/components/admin/AdminSidebar";
-import { chapterApi } from "@/services/api";
+import AdminSidebar from "../../../../../../components/admin/AdminSidebar";
+import { chapterApi } from "../../../../../../services/api";
 
 export default function CreateChapter({ params }: { params: { id: string } }) {
   const router = useRouter();

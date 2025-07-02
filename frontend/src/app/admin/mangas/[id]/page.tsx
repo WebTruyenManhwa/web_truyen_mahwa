@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import AdminSidebar from "@/components/admin/AdminSidebar";
-import { mangaApi, genreApi } from "@/services/api";
+import AdminSidebar from "../../../../components/admin/AdminSidebar";
+import { mangaApi, genreApi } from "../../../../services/api";
 
 export default function MangaDetailAdmin() {
   const params = useParams<{ id: string }>();

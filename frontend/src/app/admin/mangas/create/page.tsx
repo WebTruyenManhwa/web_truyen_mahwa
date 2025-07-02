@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import AdminSidebar from "@/components/admin/AdminSidebar";
+import AdminSidebar from "../../../../components/admin/AdminSidebar";
 import Link from "next/link";
-import { mangaApi, genreApi } from "@/services/api";
+import { mangaApi, genreApi } from "../../../../services/api";
 import { useRouter } from "next/navigation";
 
 export default function CreateManga() {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import AdminSidebar from "@/components/admin/AdminSidebar";
+import AdminSidebar from "../../../components/admin/AdminSidebar";
 
 // Mock data - sẽ được thay thế bằng API call thực tế
 const dashboardStats = {

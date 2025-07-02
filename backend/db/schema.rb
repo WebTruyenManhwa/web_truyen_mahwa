@@ -20,7 +20,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_01_055440) do
     t.integer "position"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "is_external", default: false
+    t.string "external_url"
     t.index ["chapter_id"], name: "index_chapter_images_on_chapter_id"
+    t.index ["is_external"], name: "index_chapter_images_on_is_external"
   end
 
   create_table "chapters", force: :cascade do |t|

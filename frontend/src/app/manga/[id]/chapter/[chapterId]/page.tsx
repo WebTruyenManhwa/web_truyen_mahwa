@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { chapterApi, userApi } from "../../.. /../../../../services/api";
+import { chapterApi, userApi } from "../../../../../services/api";
 import { useAuth } from "../../../../../hooks/useAuth";
 import { useParams } from "next/navigation";
 
@@ -11,6 +11,7 @@ interface ChapterImage {
   id: number;
   position: number;
   image?: string;
+  image_url?: string;
   url?: string;
 }
 
@@ -155,6 +156,17 @@ export default function ChapterReader() {
     setReadingMode(readingMode === "vertical" ? "horizontal" : "vertical");
   };
 
+  // Helper function to get the image URL from different possible sources
+  const getImageUrl = (image: ChapterImage): string => {
+    if (image.image_url) return image.image_url;
+    if (image.url) return image.url;
+    if (typeof image.image === 'string') return image.image;
+    if (typeof image.image === 'object' && image.image && 'url' in image.image) {
+      return (image.image as { url: string }).url || '';
+    }
+    return '';
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-96">
@@ -188,10 +200,10 @@ export default function ChapterReader() {
             <div>
               <h1 className="text-lg font-bold">
                 <Link href={`/manga/${mangaId}`} className="hover:text-red-500">
-                  {chapter?.title || "Đang tải..."}
+                  {chapter.manga?.title || "Đang tải..."}
                 </Link>
               </h1>
-              <p className="text-sm text-gray-400">Chapter {chapter?.number || ""} {chapter?.title ? `- ${chapter.title}` : ""}</p>
+              <p className="text-sm text-gray-400">Chapter {chapter.number || ""} {chapter.title ? `- ${chapter.title}` : ""}</p>
             </div>
           </div>
           
@@ -217,7 +229,7 @@ export default function ChapterReader() {
               )}
             </button>
             
-            {chapter?.prevChapter && (
+            {chapter.prevChapter && (
               <Link
                 href={`/manga/${mangaId}/chapter/${chapter.prevChapter.id}`}
                 className="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm"
@@ -235,20 +247,20 @@ export default function ChapterReader() {
                 }
               }}
             >
-              <option value={chapterNumber}>Chapter {chapter?.number || ""}</option>
-              {chapter?.prevChapter && (
+              <option value={chapterNumber}>Chapter {chapter.number || ""}</option>
+              {chapter.prevChapter && (
                 <option value={chapter.prevChapter.id}>
                   Chapter {chapter.prevChapter.number}
                 </option>
               )}
-              {chapter?.nextChapter && (
+              {chapter.nextChapter && (
                 <option value={chapter.nextChapter.id}>
                   Chapter {chapter.nextChapter.number}
                 </option>
               )}
             </select>
             
-            {chapter?.nextChapter && (
+            {chapter.nextChapter && (
               <Link
                 href={`/manga/${mangaId}/chapter/${chapter.nextChapter.id}`}
                 className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm"
@@ -262,19 +274,17 @@ export default function ChapterReader() {
       
       {/* Chapter Images */}
       <div className={`${readingMode === "vertical" ? "space-y-1" : "flex overflow-x-auto whitespace-nowrap pb-4"}`}>
-        {(chapter?.images || chapter?.chapter_images || []).map((image) => (
+        {(chapter.images || chapter.chapter_images || []).map((image) => (
           <div 
             key={image.id} 
             className={`${readingMode === "horizontal" ? "inline-block mr-1" : ""}`}
           >
-            {console.log("image", image.image)}
             <img
-              src={image.image.url || ""}
-              alt={`Chapter ${chapter?.number || ""} - Page ${image.position + 1}`}
+              src={getImageUrl(image)}
+              alt={`Chapter ${chapter.number || ""} - Page ${image.position + 1}`}
               width={800}
               height={1200}
               className="w-full h-auto"
-              priority={image.position < 3} // Chỉ ưu tiên tải 3 trang đầu tiên
             />
           </div>
         ))}
@@ -288,7 +298,7 @@ export default function ChapterReader() {
           </Link>
           
           <div className="flex items-center space-x-2">
-            {chapter?.prevChapter && (
+            {chapter.prevChapter && (
               <Link
                 href={`/manga/${mangaId}/chapter/${chapter.prevChapter.id}`}
                 className="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm"
@@ -297,7 +307,7 @@ export default function ChapterReader() {
               </Link>
             )}
             
-            {chapter?.nextChapter && (
+            {chapter.nextChapter && (
               <Link
                 href={`/manga/${mangaId}/chapter/${chapter.nextChapter.id}`}
                 className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm"

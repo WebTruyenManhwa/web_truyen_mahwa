@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import AdminSidebar from "@/components/admin/AdminSidebar";
-import { mangaApi } from "@/services/api";
+import AdminSidebar from "../../../components/admin/AdminSidebar";
+import { mangaApi } from "../../../services/api";
 
 interface Manga {
   id: number;

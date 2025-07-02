@@ -1,22 +1,26 @@
 module Api
   module V1
-    class ChapterImagesController < BaseController
-      skip_before_action :authenticate_user!, only: [:index]
-      before_action :set_chapter, only: [:index, :create, :bulk_create]
-      before_action :set_chapter_image, only: [:update, :destroy]
+    class ChapterImagesController < ApplicationController
+      before_action :set_chapter_image, only: [:show, :update, :destroy]
       
       def index
+        @chapter = Chapter.find(params[:chapter_id])
         @chapter_images = @chapter.chapter_images.ordered
         render json: @chapter_images
       end
       
+      def show
+        render json: @chapter_image
+      end
+      
       def create
-        @chapter_image = @chapter.chapter_images.new(chapter_image_params)
+        @chapter = Chapter.find(params[:chapter_id])
+        @chapter_image = @chapter.chapter_images.build(chapter_image_params)
         
         if @chapter_image.save
           render json: @chapter_image, status: :created
         else
-          render json: { errors: @chapter_image.errors }, status: :unprocessable_entity
+          render json: { errors: @chapter_image.errors.full_messages }, status: :unprocessable_entity
         end
       end
       
@@ -24,7 +28,7 @@ module Api
         if @chapter_image.update(chapter_image_params)
           render json: @chapter_image
         else
-          render json: { errors: @chapter_image.errors }, status: :unprocessable_entity
+          render json: { errors: @chapter_image.errors.full_messages }, status: :unprocessable_entity
         end
       end
       
@@ -50,23 +54,12 @@ module Api
       
       private
       
-      def set_chapter
-        @chapter = Chapter.find(params[:chapter_id])
-      end
-      
       def set_chapter_image
-        # Xử lý trường hợp shallow route (không có chapter_id)
-        if params[:chapter_id].present?
-          @chapter = Chapter.find(params[:chapter_id])
-          @chapter_image = @chapter.chapter_images.find(params[:id])
-        else
-          @chapter_image = ChapterImage.find(params[:id])
-          @chapter = @chapter_image.chapter
-        end
+        @chapter_image = ChapterImage.find(params[:id])
       end
       
       def chapter_image_params
-        params.require(:chapter_image).permit(:image, :position)
+        params.require(:chapter_image).permit(:image, :position, :is_external, :external_url)
       end
     end
   end

@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import AdminSidebar from "@/components/admin/AdminSidebar";
-import { mangaApi, chapterApi } from "@/services/api";
+import AdminSidebar from "../../../../../components/admin/AdminSidebar";
+import { mangaApi, chapterApi } from "../../../../../services/api";
 
 interface Chapter {
   id: number;
