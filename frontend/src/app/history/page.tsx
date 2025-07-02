@@ -102,8 +102,8 @@ export default function HistoryPage() {
               <div key={history.id} className="bg-gray-800 rounded-lg overflow-hidden w-full max-w-[200px]">
                 <Link href={`/manga/${history.manga.id}`} className="block relative">
                   <div className="aspect-[2/3] relative">
-                    <Image
-                      src={history.manga.cover_image || "/placeholder-image.jpg"}
+                    <img
+                      src={history.manga.cover_image.url || "/placeholder-image.jpg"}
                       alt={history.manga.title}
                       fill
                       className="object-cover"

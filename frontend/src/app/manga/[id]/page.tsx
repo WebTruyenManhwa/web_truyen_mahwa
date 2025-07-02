@@ -27,6 +27,9 @@ interface Manga {
   genres: string[];
   chapters: Chapter[];
   viewCount?: number;
+  rating?: number;
+  totalVotes?: number;
+  translationTeam?: string;
 }
 
 export default function MangaDetail({ params }: { params: { id: string } }) {
@@ -122,6 +125,19 @@ export default function MangaDetail({ params }: { params: { id: string } }) {
     }
   };
 
+  const renderRatingStars = () => {
+    const rating = manga?.rating || 0;
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <span key={i} className={`text-2xl ${i <= rating ? 'text-yellow-400' : 'text-gray-500'}`}>
+          ★
+        </span>
+      );
+    }
+    return stars;
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-96">
@@ -145,12 +161,12 @@ export default function MangaDetail({ params }: { params: { id: string } }) {
     <div>
       {/* Manga Info Section */}
       <div className="bg-gray-800 rounded-lg overflow-hidden mb-6">
-        <div className="md:flex">
-          {/* Cover Image */}
-          <div className="md:w-1/3 lg:w-1/4 p-4">
-            <div className="relative aspect-[2/3] rounded overflow-hidden">
-              <Image
-                src={manga.coverImage || "https://placehold.co/600x900/333/white?text=No+Image"}
+        <div className="md:flex gap-6 p-6">
+          {/* Left Column */}
+          <div className="md:w-1/4">
+            <div className="relative aspect-[2/3] rounded-lg overflow-hidden mb-4">
+              <img
+                src={manga.cover_image.url || "/placeholder-manga.jpg"}
                 alt={manga.title}
                 fill
                 className="object-cover"
@@ -158,39 +174,56 @@ export default function MangaDetail({ params }: { params: { id: string } }) {
               />
             </div>
             
+            {/* Rating Section */}
+            <div className="bg-gray-700/50 rounded-lg p-4 mb-4">
+              <div className="flex justify-center mb-2">
+                {renderRatingStars()}
+              </div>
+              <div className="text-center text-gray-300">
+                <span className="text-xl font-bold">{manga.rating?.toFixed(1) || "0.0"}</span>
+                <span className="text-sm"> / 5</span>
+                <span className="text-gray-400 text-sm block">
+                  của {manga.totalVotes || 0} lượt đánh giá
+                </span>
+              </div>
+            </div>
+
             {/* Action Buttons */}
-            <div className="mt-4 space-y-2">
+            <div className="space-y-2">
               <div className="grid grid-cols-2 gap-2">
-                <Link 
-                  href={`/manga/${manga.id}/chapter/${manga.chapters[manga.chapters.length - 1]?.id || 1}`}
-                  className="block bg-blue-600 hover:bg-blue-700 text-white text-center py-2 rounded"
-                >
+                <Link href={`/manga/${manga.id}/chapter/${manga.chapters[manga.chapters.length - 1]?.id || 1}`}
+                  className="block bg-blue-600 hover:bg-blue-700 text-white text-center py-2 rounded">
                   Chap đầu
                 </Link>
-                <Link 
-                  href={`/manga/${manga.id}/chapter/${manga.chapters[0]?.id || 1}`}
-                  className="block bg-red-600 hover:bg-red-700 text-white text-center py-2 rounded"
-                >
+                <Link href={`/manga/${manga.id}/chapter/${manga.chapters[0]?.id || 1}`}
+                  className="block bg-red-600 hover:bg-red-700 text-white text-center py-2 rounded">
                   Chap cuối
                 </Link>
               </div>
-              
-              <button
-                onClick={toggleFavorite}
+              <button onClick={toggleFavorite}
                 className={`block w-full text-center py-2 rounded ${
-                  isFavorite
-                    ? "bg-yellow-600 hover:bg-yellow-700 text-white"
-                    : "bg-gray-700 hover:bg-gray-600 text-white"
-                }`}
-              >
+                  isFavorite ? "bg-yellow-600 hover:bg-yellow-700" : "bg-gray-700 hover:bg-gray-600"
+                } text-white`}>
                 {isFavorite ? "Đã yêu thích" : "Thêm vào yêu thích"}
               </button>
             </div>
           </div>
           
-          {/* Manga Details */}
-          <div className="md:w-2/3 lg:w-3/4 p-4">
-            <h1 className="text-2xl md:text-3xl font-bold mb-2">{manga.title}</h1>
+          {/* Right Column */}
+          <div className="md:w-3/4 mt-6 md:mt-0">
+            <h1 className="text-3xl font-bold text-white mb-4">{manga.title}</h1>
+            
+            {/* Stats Row */}
+            <div className="flex flex-wrap gap-4 mb-6">
+              <div className="flex items-center">
+                <span className="text-gray-400">Nhóm dịch:</span>
+                <span className="ml-2 text-white">{manga.translationTeam || "Chưa có"}</span>
+              </div>
+              <div className="flex items-center">
+                <span className="text-gray-400">Lượt xem:</span>
+                <span className="ml-2 text-white">{manga.viewCount?.toLocaleString() || 0}</span>
+              </div>
+            </div>
             
             {/* Meta Info */}
             <div className="flex flex-wrap gap-2 mb-4">
