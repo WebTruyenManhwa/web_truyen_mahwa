@@ -70,6 +70,15 @@ export const mangaApi = {
     const response = await api.delete(`/v1/mangas/${id}`);
     return response.data;
   },
+
+  rateManga: async (mangaId: string | number, rating: number) => {
+    const response = await api.post(`/v1/mangas/${mangaId}/ratings`, {
+      rating: {
+        rating: rating
+      }
+    });
+    return response.data;
+  },
 };
 
 // API cho chapter

@@ -23,6 +23,8 @@ class User < ApplicationRecord
   has_many :reading_histories, dependent: :destroy
   has_many :read_chapters, through: :reading_histories, source: :chapter
   has_many :read_mangas, through: :reading_histories, source: :manga
+  has_many :ratings, dependent: :destroy
+  has_many :rated_mangas, through: :ratings, source: :manga
 
   # Validations
   validates :email, presence: true, uniqueness: { case_sensitive: false }

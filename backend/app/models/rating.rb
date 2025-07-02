@@ -11,6 +11,14 @@ class Rating < ApplicationRecord
   private
 
   def update_manga_rating
-    manga.update_rating_stats
+    # Tính lại rating trung bình và tổng số votes cho manga
+    manga_ratings = manga.ratings
+    total_votes = manga_ratings.count
+    average_rating = total_votes > 0 ? manga_ratings.average(:value).to_f : 0
+
+    manga.update_columns(
+      rating: average_rating,
+      total_votes: total_votes
+    )
   end
 end 

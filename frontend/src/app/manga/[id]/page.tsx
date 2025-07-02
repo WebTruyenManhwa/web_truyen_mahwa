@@ -41,6 +41,9 @@ export default function MangaDetail({ params }: { params: { id: string } }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [isFavorite, setIsFavorite] = useState(false);
+  const [userRating, setUserRating] = useState<number>(0);
+  const [isRating, setIsRating] = useState(false);
+  const [hoverRating, setHoverRating] = useState<number>(0);
 
   useEffect(() => {
     const fetchManga = async () => {
@@ -126,17 +129,51 @@ export default function MangaDetail({ params }: { params: { id: string } }) {
     }
   };
 
-  const renderRatingStars = () => {
-    const rating = manga?.rating || 0;
-    const stars = [];
-    for (let i = 1; i <= 5; i++) {
-      stars.push(
-        <span key={i} className={`text-2xl ${i <= rating ? 'text-yellow-400' : 'text-gray-500'}`}>
-          ★
-        </span>
-      );
+  const handleRate = async (rating: number) => {
+    if (!isAuthenticated) {
+      alert("Vui lòng đăng nhập để đánh giá");
+      return;
     }
-    return stars;
+
+    try {
+      setIsRating(true);
+      const response = await mangaApi.rateManga(mangaId, rating);
+      setManga(prev => prev ? {
+        ...prev,
+        rating: response.rating,
+        totalVotes: response.totalVotes
+      } : null);
+      setUserRating(rating);
+    } catch (err) {
+      console.error("Failed to rate manga:", err);
+      alert("Không thể đánh giá. Vui lòng thử lại sau.");
+    } finally {
+      setIsRating(false);
+    }
+  };
+
+  const renderRatingStars = () => {
+    return (
+      <div className="flex justify-center mb-2">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            onClick={() => handleRate(star)}
+            onMouseEnter={() => setHoverRating(star)}
+            onMouseLeave={() => setHoverRating(0)}
+            disabled={isRating}
+            className={`text-2xl transition-colors duration-200 ${
+              isRating ? 'cursor-not-allowed opacity-50' :
+              hoverRating >= star ? 'text-yellow-400' :
+              userRating >= star ? 'text-yellow-400' :
+              manga?.rating && manga.rating >= star ? 'text-yellow-400' : 'text-gray-500'
+            } hover:text-yellow-400`}
+          >
+            ★
+          </button>
+        ))}
+      </div>
+    );
   };
 
   if (isLoading) {
@@ -177,15 +214,20 @@ export default function MangaDetail({ params }: { params: { id: string } }) {
             
             {/* Rating Section */}
             <div className="bg-gray-700/50 rounded-lg p-4 mb-4">
-              <div className="flex justify-center mb-2">
-                {renderRatingStars()}
-              </div>
+              {renderRatingStars()}
               <div className="text-center text-gray-300">
-                <span className="text-xl font-bold">{manga.rating?.toFixed(1) || "0.0"}</span>
+                <span className="text-xl font-bold">
+                  {typeof manga.rating === 'number' ? manga.rating.toFixed(1) : "0.0"}
+                </span>
                 <span className="text-sm"> / 5</span>
                 <span className="text-gray-400 text-sm block">
                   của {manga.totalVotes || 0} lượt đánh giá
                 </span>
+                {isAuthenticated && userRating > 0 && (
+                  <span className="text-sm text-yellow-400 mt-2 block">
+                    Bạn đã đánh giá: {userRating}/5
+                  </span>
+                )}
               </div>
             </div>
 

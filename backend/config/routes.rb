@@ -26,6 +26,7 @@ Rails.application.routes.draw do
             end
           end
         end
+        resources :ratings, only: [:create, :update, :destroy], module: :mangas
       end
       
       resources :genres, only: [:index, :show, :create, :update, :destroy]
