@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { mangaApi } from "@/services/api";
-import { useAuth } from "@/hooks/useAuth";
-import { userApi } from "@/services/api";
+import { mangaApi } from "../../../services/api";
+import { useAuth } from "../../../hooks/useAuth";
+import { userApi } from "../../../services/api";
 
 interface Chapter {
   id: number;
@@ -43,6 +43,12 @@ export default function MangaDetail({ params }: { params: { id: string } }) {
       try {
         setIsLoading(true);
         const data = await mangaApi.getManga(mangaId);
+        
+        // Đảm bảo chapters được sắp xếp theo số chapter (từ cao xuống thấp)
+        if (data.chapters) {
+          data.chapters = data.chapters.sort((a, b) => b.number - a.number);
+        }
+        
         setManga(data);
         
         // Kiểm tra xem manga có trong danh sách yêu thích không
@@ -154,12 +160,20 @@ export default function MangaDetail({ params }: { params: { id: string } }) {
             
             {/* Action Buttons */}
             <div className="mt-4 space-y-2">
-              <Link 
-                href={`/manga/${manga.id}/chapter/${manga.chapters[0]?.id || 1}`}
-                className="block w-full bg-red-600 hover:bg-red-700 text-white text-center py-2 rounded"
-              >
-                Đọc ngay
-              </Link>
+              <div className="grid grid-cols-2 gap-2">
+                <Link 
+                  href={`/manga/${manga.id}/chapter/${manga.chapters[manga.chapters.length - 1]?.id || 1}`}
+                  className="block bg-blue-600 hover:bg-blue-700 text-white text-center py-2 rounded"
+                >
+                  Chap đầu
+                </Link>
+                <Link 
+                  href={`/manga/${manga.id}/chapter/${manga.chapters[0]?.id || 1}`}
+                  className="block bg-red-600 hover:bg-red-700 text-white text-center py-2 rounded"
+                >
+                  Chap cuối
+                </Link>
+              </div>
               
               <button
                 onClick={toggleFavorite}

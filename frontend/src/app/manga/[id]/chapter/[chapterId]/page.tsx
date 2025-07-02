@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { chapterApi, userApi } from "@/services/api";
-import { useAuth } from "@/hooks/useAuth";
+import { chapterApi, userApi } from "../../.. /../../../../services/api";
+import { useAuth } from "../../../../../hooks/useAuth";
 import { useParams } from "next/navigation";
 
 interface ChapterImage {

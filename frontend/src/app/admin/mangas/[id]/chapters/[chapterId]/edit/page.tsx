@@ -48,14 +48,16 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
     const fetchChapter = async () => {
       try {
         const response = await chapterApi.getChapter(mangaId, chapterId);
-        console.log("Chapter data:", response);
+        console.log("Initial chapter data:", response);
         
         setTitle(response.title);
         setNumber(response.number.toString());
         
         // Sắp xếp ảnh theo position
         const images = response.chapter_images || [];
+        console.log("Initial chapter images:", images);
         const sortedImages = [...images].sort((a, b) => a.position - b.position);
+        console.log("Initial sorted images:", sortedImages);
         setCurrentImages(sortedImages);
         
         // Tìm vị trí lớn nhất
@@ -263,6 +265,7 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
       
       // Lấy danh sách ảnh hiện tại sau khi đã cập nhật
       const updatedChapterData = await chapterApi.getChapter(mangaId, chapterId);
+      console.log("Fetched chapter data after updates:", updatedChapterData);
       const existingPositions = new Set(
         (updatedChapterData.chapter_images || []).map((img: ChapterImage) => img.position)
       );
@@ -297,12 +300,15 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
       
       // Tải lại dữ liệu chapter
       const response = await chapterApi.getChapter(mangaId, chapterId);
+      console.log("Final chapter data:", response);
       setTitle(response.title);
       setNumber(response.number.toString());
       
       // Sắp xếp ảnh theo position
       const images = response.chapter_images || [];
+      console.log("Chapter images from API:", images);
       const sortedImages = [...images].sort((a, b) => a.position - b.position);
+      console.log("Sorted images:", sortedImages);
       setCurrentImages(sortedImages);
       
       setSuccess(true);
@@ -423,6 +429,7 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {allPossiblePositions.map((position) => {
                 const imageData = getImageAtPosition(position);
+                console.log(`Position ${position} image data:`, imageData);
                 
                 return (
                   <div key={`position-${position}`} className="relative bg-gray-700 rounded-lg p-2">
@@ -430,9 +437,14 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
                       {imageData ? (
                         <>
                           <img
-                            src={imageData.type === 'current' ? imageData.image.url : imageData.preview.preview}
+                            src={imageData.type === 'current' ? imageData.image.image.url : imageData.preview.preview}
                             alt={`Ảnh vị trí ${position}`}
                             className="w-full h-full object-contain rounded"
+                            onError={(e) => {
+                              console.error(`Error loading image at position ${position}:`, e);
+                              console.log("Image data:", imageData);
+                              e.currentTarget.src = "/placeholder-image.jpg";
+                            }}
                           />
                           <div className="absolute top-0 left-0 bg-gray-800 text-white text-xs px-2 py-1 rounded-br">
                             Vị trí {position}

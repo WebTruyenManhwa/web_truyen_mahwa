@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { mangaApi, genreApi } from "@/services/api";
+import { mangaApi, genreApi } from "../services/api";
+import React from "react";
 
 interface Manga {
   id: number;

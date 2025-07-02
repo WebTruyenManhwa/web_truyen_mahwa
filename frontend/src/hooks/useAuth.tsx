@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { userApi } from '@/services/api';
+import { userApi } from '../services/api';
+import React from 'react';
 
 // Định nghĩa kiểu dữ liệu cho user
 interface User {
