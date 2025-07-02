@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { user, isAuthenticated, logout } = useAuth();
 
@@ -306,48 +307,64 @@ export default function Header() {
               </Link>
               
               <div className="border-t border-gray-800 pt-3 mt-3">
-                {isAuthenticated ? (
-                  <>
-                    <Link
-                      href="/profile"
-                      className="text-gray-300 hover:text-red-500 block py-1"
-                      onClick={() => setIsMenuOpen(false)}
+              {isAuthenticated ? (
+                <div
+                  className="relative"
+                  onMouseEnter={() => setIsDropdownOpen(true)}
+                  onMouseLeave={() => setIsDropdownOpen(false)}
+                >
+                  <button className="flex items-center text-gray-300 hover:text-white bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded-full text-sm">
+                    <span className="mr-1">{user?.username}</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
                     >
-                      Trang cá nhân
-                    </Link>
-                    <Link
-                      href="/favorites"
-                      className="text-gray-300 hover:text-red-500 block py-1"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Truyện yêu thích
-                    </Link>
-                    <Link
-                      href="/history"
-                      className="text-gray-300 hover:text-red-500 block py-1"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Lịch sử đọc
-                    </Link>
-                    {user?.role === 'admin' && (
+                      <path
+                        fillRule="evenodd"
+                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </button>
+                  {isDropdownOpen && (
+                    <div className="absolute right-0 mt-1 w-48 bg-gray-800 rounded-lg shadow-lg py-1 z-20 border border-gray-700">
                       <Link
-                        href="/admin/dashboard"
-                        className="text-gray-300 hover:text-red-500 block py-1"
-                        onClick={() => setIsMenuOpen(false)}
+                        href="/profile"
+                        className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
                       >
-                        Quản trị
+                        Trang cá nhân
                       </Link>
-                    )}
-                    <button
-                      onClick={() => {
-                        handleLogout();
-                        setIsMenuOpen(false);
-                      }}
-                      className="text-left text-gray-300 hover:text-red-500 block py-1 w-full"
-                    >
-                      Đăng xuất
-                    </button>
-                  </>
+                      <Link
+                        href="/favorites"
+                        className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
+                      >
+                        Truyện yêu thích
+                      </Link>
+                      <Link
+                        href="/history"
+                        className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
+                      >
+                        Lịch sử đọc
+                      </Link>
+                      {user?.role === 'admin' && (
+                        <Link
+                          href="/admin/dashboard"
+                          className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
+                        >
+                          Quản trị
+                        </Link>
+                      )}
+                      <button
+                        onClick={handleLogout}
+                        className="block w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
+                      >
+                        Đăng xuất
+                      </button>
+                    </div>
+                  )}
+                </div>
                 ) : (
                   <div className="flex flex-col space-y-2">
                     <Link

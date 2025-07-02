@@ -1,28 +1,31 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { chapterApi, userApi } from "@/services/api";
 import { useAuth } from "@/hooks/useAuth";
+import { useParams } from "next/navigation";
 
 interface ChapterImage {
   id: number;
   position: number;
-  image: string;
+  image?: string;
+  url?: string;
 }
 
 interface Chapter {
   id: number;
   number: number;
   title: string;
-  manga: {
+  manga?: {
     id: number;
     title: string;
   };
-  prevChapter: { id: number; number: number } | null;
-  nextChapter: { id: number; number: number } | null;
-  images: ChapterImage[];
+  prevChapter?: { id: number; number: number } | null;
+  nextChapter?: { id: number; number: number } | null;
+  images?: ChapterImage[];
+  chapter_images?: ChapterImage[];
 }
 
 interface Comment {
@@ -36,12 +39,11 @@ interface Comment {
   };
 }
 
-export default function ChapterReader({
-  params,
-}: {
-  params: { id: string; chapterId: string };
-}) {
-  const { id, chapterId } = params;
+export default function ChapterReader() {
+  // Sử dụng useParams hook thay vì truy cập trực tiếp params
+  const params = useParams();
+  const mangaId = params.id as string;
+  const chapterNumber = params.chapterId as string;
   const { isAuthenticated } = useAuth();
   const [chapter, setChapter] = useState<Chapter | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,13 +57,13 @@ export default function ChapterReader({
     const fetchChapter = async () => {
       try {
         setIsLoading(true);
-        const data = await chapterApi.getChapter(id, chapterId);
+        const data = await chapterApi.getChapter(mangaId, chapterNumber);
+        console.log("Chapter data:", data); // Log dữ liệu để kiểm tra
         setChapter(data);
-
         // Thêm vào lịch sử đọc nếu đã đăng nhập
         if (isAuthenticated) {
           try {
-            await userApi.addToReadingHistory(id, chapterId);
+            await userApi.addToReadingHistory(mangaId, chapterNumber);
           } catch (err) {
             console.error("Failed to add to reading history:", err);
           }
@@ -69,7 +71,7 @@ export default function ChapterReader({
 
         // Fetch comments
         try {
-          const commentsData = await chapterApi.getChapterComments(id, chapterId);
+          const commentsData = await chapterApi.getChapterComments(mangaId, chapterNumber);
           setComments(commentsData);
         } catch (err) {
           console.error("Failed to fetch comments:", err);
@@ -80,11 +82,11 @@ export default function ChapterReader({
         
         // Fallback to mock data
         setChapter({
-          id: parseInt(chapterId),
+          id: parseInt(chapterNumber),
           number: 1088,
           title: "Cuộc chiến cuối cùng",
           manga: {
-            id: parseInt(id),
+            id: parseInt(mangaId),
             title: "One Piece",
           },
           prevChapter: {
@@ -116,7 +118,21 @@ export default function ChapterReader({
     };
 
     fetchChapter();
-  }, [id, chapterId, isAuthenticated]);
+  }, [mangaId, chapterNumber, isAuthenticated]);
+
+  // Hàm debug để kiểm tra cấu trúc dữ liệu chapter
+  useEffect(() => {
+    if (chapter) {
+      console.log("Chapter structure:", {
+        id: chapter.id,
+        number: chapter.number,
+        title: chapter.title,
+        manga: chapter.manga,
+        images: chapter.images,
+        chapter_images: chapter.chapter_images
+      });
+    }
+  }, [chapter]);
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,7 +140,7 @@ export default function ChapterReader({
 
     try {
       setIsSubmitting(true);
-      const newComment = await chapterApi.addChapterComment(id, chapterId, commentText);
+      const newComment = await chapterApi.addChapterComment(mangaId, chapterNumber, commentText);
       setComments([newComment, ...comments]);
       setCommentText("");
     } catch (err) {
@@ -151,7 +167,7 @@ export default function ChapterReader({
     return (
       <div className="text-center py-10">
         <p className="text-red-500 mb-4">{error || "Không tìm thấy chapter"}</p>
-        <Link href={`/manga/${id}`} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">
+        <Link href={`/manga/${mangaId}`} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">
           Quay lại danh sách chương
         </Link>
       </div>
@@ -164,18 +180,18 @@ export default function ChapterReader({
       <div className="bg-gray-800 p-4 rounded mb-4 sticky top-0 z-10">
         <div className="flex flex-col md:flex-row justify-between items-center gap-2">
           <div className="flex items-center">
-            <Link href={`/manga/${id}`} className="text-gray-300 hover:text-red-500 mr-2">
+            <Link href={`/manga/${mangaId}`} className="text-gray-300 hover:text-red-500 mr-2">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
               </svg>
             </Link>
             <div>
               <h1 className="text-lg font-bold">
-                <Link href={`/manga/${id}`} className="hover:text-red-500">
-                  {chapter.manga.title}
+                <Link href={`/manga/${mangaId}`} className="hover:text-red-500">
+                  {chapter?.title || "Đang tải..."}
                 </Link>
               </h1>
-              <p className="text-sm text-gray-400">Chapter {chapter.number} {chapter.title ? `- ${chapter.title}` : ""}</p>
+              <p className="text-sm text-gray-400">Chapter {chapter?.number || ""} {chapter?.title ? `- ${chapter.title}` : ""}</p>
             </div>
           </div>
           
@@ -201,9 +217,9 @@ export default function ChapterReader({
               )}
             </button>
             
-            {chapter.prevChapter && (
+            {chapter?.prevChapter && (
               <Link
-                href={`/manga/${id}/chapter/${chapter.prevChapter.id}`}
+                href={`/manga/${mangaId}/chapter/${chapter.prevChapter.id}`}
                 className="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm"
               >
                 Chương trước
@@ -212,29 +228,29 @@ export default function ChapterReader({
             
             <select
               className="bg-gray-700 text-white px-3 py-1 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
-              defaultValue={chapterId}
+              defaultValue={chapterNumber}
               onChange={(e) => {
                 if (e.target.value) {
-                  window.location.href = `/manga/${id}/chapter/${e.target.value}`;
+                  window.location.href = `/manga/${mangaId}/chapter/${e.target.value}`;
                 }
               }}
             >
-              <option value={chapterId}>Chapter {chapter.number}</option>
-              {chapter.prevChapter && (
+              <option value={chapterNumber}>Chapter {chapter?.number || ""}</option>
+              {chapter?.prevChapter && (
                 <option value={chapter.prevChapter.id}>
                   Chapter {chapter.prevChapter.number}
                 </option>
               )}
-              {chapter.nextChapter && (
+              {chapter?.nextChapter && (
                 <option value={chapter.nextChapter.id}>
                   Chapter {chapter.nextChapter.number}
                 </option>
               )}
             </select>
             
-            {chapter.nextChapter && (
+            {chapter?.nextChapter && (
               <Link
-                href={`/manga/${id}/chapter/${chapter.nextChapter.id}`}
+                href={`/manga/${mangaId}/chapter/${chapter.nextChapter.id}`}
                 className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm"
               >
                 Chương sau
@@ -246,14 +262,15 @@ export default function ChapterReader({
       
       {/* Chapter Images */}
       <div className={`${readingMode === "vertical" ? "space-y-1" : "flex overflow-x-auto whitespace-nowrap pb-4"}`}>
-        {chapter.images.map((image) => (
+        {(chapter?.images || chapter?.chapter_images || []).map((image) => (
           <div 
             key={image.id} 
             className={`${readingMode === "horizontal" ? "inline-block mr-1" : ""}`}
           >
-            <Image
-              src={image.image}
-              alt={`Chapter ${chapter.number} - Page ${image.position + 1}`}
+            {console.log("image", image.image)}
+            <img
+              src={image.image.url || ""}
+              alt={`Chapter ${chapter?.number || ""} - Page ${image.position + 1}`}
               width={800}
               height={1200}
               className="w-full h-auto"
@@ -266,23 +283,23 @@ export default function ChapterReader({
       {/* Bottom Navigation */}
       <div className="bg-gray-800 p-4 rounded mt-4 sticky bottom-0 z-10">
         <div className="flex justify-between items-center">
-          <Link href={`/manga/${id}`} className="text-gray-300 hover:text-red-500 text-sm">
+          <Link href={`/manga/${mangaId}`} className="text-gray-300 hover:text-red-500 text-sm">
             Quay lại danh sách chương
           </Link>
           
           <div className="flex items-center space-x-2">
-            {chapter.prevChapter && (
+            {chapter?.prevChapter && (
               <Link
-                href={`/manga/${id}/chapter/${chapter.prevChapter.id}`}
+                href={`/manga/${mangaId}/chapter/${chapter.prevChapter.id}`}
                 className="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm"
               >
                 Chương trước
               </Link>
             )}
             
-            {chapter.nextChapter && (
+            {chapter?.nextChapter && (
               <Link
-                href={`/manga/${id}/chapter/${chapter.nextChapter.id}`}
+                href={`/manga/${mangaId}/chapter/${chapter.nextChapter.id}`}
                 className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm"
               >
                 Chương sau

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import axios from 'axios';
 
 export default function AuthCallback() {
   const router = useRouter();
@@ -14,7 +15,7 @@ export default function AuthCallback() {
     if (token) {
       // Lưu token vào localStorage
       localStorage.setItem("token", token);
-      
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       // Lấy thông tin user từ token (JWT)
       try {
         const base64Url = token.split('.')[1];

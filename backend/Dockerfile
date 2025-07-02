@@ -21,6 +21,11 @@ RUN apt-get update -qq && \
       libpq-dev \
       libyaml-dev \
       pkg-config \
+      ca-certificates \
+      curl \
+      libjemalloc2 \
+      libvips \
+      postgresql-client \
       imagemagick && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 

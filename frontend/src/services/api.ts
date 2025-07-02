@@ -76,24 +76,26 @@ export const mangaApi = {
 export const chapterApi = {
   // Lấy chi tiết một chapter
   getChapter: async (mangaId: string | number, chapterId: string | number) => {
-    const response = await api.get(`/v1/mangas/${mangaId}/chapters/${chapterId}`);
+    const response = await api.get(`/v1/chapters/${chapterId}`);
     return response.data;
   },
 
   // Lấy comments của một chapter
   getChapterComments: async (mangaId: string | number, chapterId: string | number) => {
-    const response = await api.get(`/v1/mangas/${mangaId}/chapters/${chapterId}/comments`);
+    const response = await api.get(`/v1/chapters/${chapterId}/comments`);
     return response.data;
   },
 
   // Thêm comment vào chapter
   addChapterComment: async (mangaId: string | number, chapterId: string | number, content: string) => {
-    const response = await api.post(`/v1/mangas/${mangaId}/chapters/${chapterId}/comments`, { content });
+    const response = await api.post(`/v1/chapters/${chapterId}/comments`, { content });
     return response.data;
   },
 
   // Tạo chapter mới (cần quyền admin)
   createChapter: async (mangaId: string | number, chapterData: FormData) => {
+    // Thêm manga_id vào formData
+    chapterData.append("manga_id", mangaId.toString());
     const response = await api.post(`/v1/mangas/${mangaId}/chapters`, chapterData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -104,7 +106,7 @@ export const chapterApi = {
 
   // Cập nhật chapter (cần quyền admin)
   updateChapter: async (mangaId: string | number, chapterId: string | number, chapterData: FormData) => {
-    const response = await api.put(`/v1/mangas/${mangaId}/chapters/${chapterId}`, chapterData, {
+    const response = await api.put(`/v1/chapters/${chapterId}`, chapterData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -114,7 +116,52 @@ export const chapterApi = {
 
   // Xóa chapter (cần quyền admin)
   deleteChapter: async (mangaId: string | number, chapterId: string | number) => {
-    const response = await api.delete(`/v1/mangas/${mangaId}/chapters/${chapterId}`);
+    const response = await api.delete(`/v1/chapters/${chapterId}`);
+    return response.data;
+  },
+};
+
+// API cho chapter images
+export const chapterImageApi = {
+  // Lấy danh sách ảnh của một chapter
+  getChapterImages: async (chapterId: string | number) => {
+    const response = await api.get(`/v1/chapters/${chapterId}/chapter_images`);
+    return response.data;
+  },
+
+  // Cập nhật một ảnh trong chapter
+  updateChapterImage: async (imageId: number, imageData: FormData) => {
+    const response = await api.put(`/v1/chapter_images/${imageId}`, imageData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // Xóa một ảnh trong chapter
+  deleteChapterImage: async (imageId: number) => {
+    const response = await api.delete(`/v1/chapter_images/${imageId}`);
+    return response.data;
+  },
+
+  // Thêm một ảnh vào chapter
+  addChapterImage: async (chapterId: string | number, imageData: FormData) => {
+    const response = await api.post(`/v1/chapters/${chapterId}/chapter_images`, imageData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // Thêm nhiều ảnh vào chapter
+  bulkAddChapterImages: async (chapterId: string | number, imagesData: FormData) => {
+    const response = await api.post(`/v1/chapters/${chapterId}/chapter_images/bulk`, imagesData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   },
 };
@@ -154,7 +201,7 @@ export const userApi = {
     const formData = new FormData();
     Object.entries(userData).forEach(([key, value]) => {
       if (value !== undefined) {
-        formData.append(key, value);
+        formData.append(`user[${key}]`, value);
       }
     });
 

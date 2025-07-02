@@ -75,4 +75,5 @@ Rails.application.configure do
         expose: ['Authorization']
     end
   end
+  config.hosts << "http://localhost:3000"
 end

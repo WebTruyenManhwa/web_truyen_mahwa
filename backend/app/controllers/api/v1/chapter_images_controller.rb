@@ -2,8 +2,8 @@ module Api
   module V1
     class ChapterImagesController < BaseController
       skip_before_action :authenticate_user!, only: [:index]
-      before_action :set_chapter
-      before_action :set_chapter_image, only: [:show, :update, :destroy]
+      before_action :set_chapter, only: [:index, :create, :bulk_create]
+      before_action :set_chapter_image, only: [:update, :destroy]
       
       def index
         @chapter_images = @chapter.chapter_images.ordered
@@ -55,7 +55,14 @@ module Api
       end
       
       def set_chapter_image
-        @chapter_image = @chapter.chapter_images.find(params[:id])
+        # Xử lý trường hợp shallow route (không có chapter_id)
+        if params[:chapter_id].present?
+          @chapter = Chapter.find(params[:chapter_id])
+          @chapter_image = @chapter.chapter_images.find(params[:id])
+        else
+          @chapter_image = ChapterImage.find(params[:id])
+          @chapter = @chapter_image.chapter
+        end
       end
       
       def chapter_image_params
