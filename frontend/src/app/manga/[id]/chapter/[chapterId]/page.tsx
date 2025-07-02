@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { chapterApi, userApi } from "../../../../../services/api";
+import { chapterApi, userApi, mangaApi } from "../../../../../services/api";
 import { useAuth } from "../../../../../hooks/useAuth";
 import { useParams } from "next/navigation";
 
@@ -131,6 +131,17 @@ export default function ChapterReader() {
         if (isAuthenticated) {
           try {
             await userApi.addToReadingHistory(mangaId, chapterId);
+            // Refresh manga data after adding to reading history
+            const mangaData = await mangaApi.getManga(mangaId);
+            if (chapter?.manga) {
+              setChapter(prev => prev ? {
+                ...prev,
+                manga: {
+                  ...prev.manga,
+                  view_count: mangaData.view_count
+                }
+              } : null);
+            }
           } catch (err) {
             console.error("Failed to add to reading history:", err);
           }
@@ -299,14 +310,12 @@ export default function ChapterReader() {
             </button>
             
             <div className="flex flex-1 min-w-0 gap-2">
-              {chapter.prev_chapter && (
-                <Link
-                  href={`/manga/${mangaId}/chapter/${chapter.prev_chapter.id}`}
-                  className="bg-red-700 hover:bg-red-600 px-3 py-1 rounded text-sm whitespace-nowrap"
-                >
-                  Chương trước
-                </Link>
-              )}
+              <Link
+                href={`/manga/${mangaId}/chapter/${chapter.prev_chapter?.id}`}
+                className="bg-red-700 hover:bg-red-600 px-3 py-1 rounded text-sm whitespace-nowrap"
+              >
+                Chương trước
+              </Link>
               
               <div className="relative flex-1 min-w-0" ref={dropdownRef}>
                 <button
@@ -346,14 +355,12 @@ export default function ChapterReader() {
                 )}
               </div>
               
-              {chapter.next_chapter && (
-                <Link
-                  href={`/manga/${mangaId}/chapter/${chapter.next_chapter.id}`}
-                  className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm whitespace-nowrap"
-                >
-                  Chương sau
-                </Link>
-              )}
+              <Link
+                href={`/manga/${mangaId}/chapter/${chapter.next_chapter?.id}`}
+                className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm whitespace-nowrap"
+              >
+                Chương sau
+              </Link>
             </div>
           </div>
         </div>

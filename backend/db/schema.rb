@@ -91,6 +91,19 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_01_055440) do
     t.integer "view_count"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.decimal "rating", precision: 3, scale: 2, default: "0.0"
+    t.integer "total_votes", default: 0
+  end
+
+  create_table "ratings", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "manga_id", null: false
+    t.integer "value", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["manga_id"], name: "index_ratings_on_manga_id"
+    t.index ["user_id", "manga_id"], name: "index_ratings_on_user_id_and_manga_id", unique: true
+    t.index ["user_id"], name: "index_ratings_on_user_id"
   end
 
   create_table "reading_histories", force: :cascade do |t|
@@ -131,6 +144,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_01_055440) do
   add_foreign_key "favorites", "users"
   add_foreign_key "manga_genres", "genres"
   add_foreign_key "manga_genres", "mangas"
+  add_foreign_key "ratings", "mangas"
+  add_foreign_key "ratings", "users"
   add_foreign_key "reading_histories", "chapters"
   add_foreign_key "reading_histories", "mangas"
   add_foreign_key "reading_histories", "users"

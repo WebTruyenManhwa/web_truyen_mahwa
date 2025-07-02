@@ -6,6 +6,7 @@ import Link from "next/link";
 import { mangaApi } from "../../../services/api";
 import { useAuth } from "../../../hooks/useAuth";
 import { userApi } from "../../../services/api";
+import React from "react";
 
 interface Chapter {
   id: number;
@@ -221,7 +222,7 @@ export default function MangaDetail({ params }: { params: { id: string } }) {
               </div>
               <div className="flex items-center">
                 <span className="text-gray-400">Lượt xem:</span>
-                <span className="ml-2 text-white">{manga.viewCount?.toLocaleString() || 0}</span>
+                <span className="ml-2 text-white">{manga.view_count.toLocaleString() || 0}</span>
               </div>
             </div>
             
