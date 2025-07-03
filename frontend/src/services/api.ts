@@ -263,7 +263,7 @@ export const commentApi = {
 
   // Lấy comments của một chapter
   getChapterComments: async (mangaId: string | number, chapterId: string | number) => {
-    const response = await api.get(`/v1/mangas/${mangaId}/chapters/${chapterId}/comments`);
+    const response = await api.get(`/v1/chapters/${chapterId}/comments`);
     return response.data;
   },
 
@@ -275,7 +275,7 @@ export const commentApi = {
 
   // Thêm comment vào chapter
   addChapterComment: async (mangaId: string | number, chapterId: string | number, content: string) => {
-    const response = await api.post(`/v1/mangas/${mangaId}/chapters/${chapterId}/comments`, { content });
+    const response = await api.post(`/v1/chapters/${chapterId}/comments`, { content });
     return response.data;
   },
 

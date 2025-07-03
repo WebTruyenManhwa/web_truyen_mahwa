@@ -1,9 +1,11 @@
+/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { chapterApi, userApi, mangaApi } from "../../../../../services/api";
+import { chapterApi, userApi, mangaApi, commentApi } from "../../../../../services/api";
 import { useAuth } from "../../../../../hooks/useAuth";
 import { useParams } from "next/navigation";
 
@@ -134,13 +136,18 @@ export default function ChapterReader() {
             // Refresh manga data after adding to reading history
             const mangaData = await mangaApi.getManga(mangaId);
             if (chapter?.manga) {
-              setChapter(prev => prev ? {
-                ...prev,
-                manga: {
-                  ...prev.manga,
-                  view_count: mangaData.view_count
-                }
-              } : null);
+              setChapter(prev => {
+                if (!prev) return null;
+                return {
+                  ...prev,
+                  manga: {
+                    ...prev.manga!,
+                    id: prev.manga!.id,
+                    title: prev.manga!.title,
+                    view_count: mangaData.view_count
+                  }
+                };
+              });
             }
           } catch (err) {
             console.error("Failed to add to reading history:", err);
@@ -149,7 +156,7 @@ export default function ChapterReader() {
 
         // Fetch comments
         try {
-          const commentsData = await chapterApi.getChapterComments(mangaId, chapterId);
+          const commentsData = await commentApi.getChapterComments(mangaId, chapterId);
           setComments(commentsData);
         } catch (err) {
           console.error("Failed to fetch comments:", err);
@@ -221,7 +228,7 @@ export default function ChapterReader() {
 
     try {
       setIsSubmitting(true);
-      const newComment = await chapterApi.addChapterComment(mangaId, chapterId, commentText);
+      const newComment = await commentApi.addChapterComment(mangaId, chapterId, commentText);
       setComments([newComment, ...comments]);
       setCommentText("");
     } catch (err) {
@@ -267,7 +274,7 @@ export default function ChapterReader() {
   }
 
   return (
-    <div className="max-w-[35rem] mx-auto px-2">
+    <div className="max-w-[53rem] mx-auto px-2">
       {/* Top Navigation Bar */}
       <div className="bg-gray-800 p-4 rounded mb-4 sticky top-0 z-10">
         <div className="flex flex-col space-y-3">
@@ -368,7 +375,7 @@ export default function ChapterReader() {
       
       {/* Chapter Images */}
       <div className={`${readingMode === "vertical" ? "space-y-1" : "flex overflow-x-auto whitespace-nowrap pb-4"}`}>
-        {(chapter.chapter_images || []).map((image, index) => (
+        {(chapter.chapter_images || []).map((image, _index) => (
           <div 
             key={image.id} 
             className={`chapter-image ${readingMode === "horizontal" ? "inline-block mr-1" : ""}`}
@@ -458,20 +465,20 @@ export default function ChapterReader() {
                   <div className="flex justify-between items-start">
                     <div className="flex items-center">
                       <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center mr-2">
-                        {comment.user.avatar ? (
+                        {comment.user && comment.user.avatar ? (
                           <Image 
                             src={comment.user.avatar} 
-                            alt={comment.user.username} 
+                            alt={comment.user.username || 'User'} 
                             width={32} 
                             height={32} 
                             className="rounded-full"
                           />
                         ) : (
-                          <span>{comment.user.username.charAt(0).toUpperCase()}</span>
+                          <span>{comment.user && comment.user.username ? comment.user.username.charAt(0).toUpperCase() : '?'}</span>
                         )}
                       </div>
                       <div>
-                        <p className="font-medium text-sm">{comment.user.username}</p>
+                        <p className="font-medium text-sm">{comment.user ? comment.user.username : 'Unknown User'}</p>
                         <p className="text-xs text-gray-400">
                           {new Date(comment.createdAt).toLocaleDateString()}
                         </p>

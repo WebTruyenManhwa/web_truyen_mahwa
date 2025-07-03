@@ -25,8 +25,12 @@ Rails.application.routes.draw do
               post 'bulk', to: 'chapter_images#bulk_create'
             end
           end
+          
+          # Add nested routes for chapter comments
+          resources :comments, only: [:index, :create], module: :chapters
         end
         resources :ratings, only: [:create, :update, :destroy], module: :mangas
+        resources :comments, only: [:index, :create], module: :mangas
       end
       
       resources :genres, only: [:index, :show, :create, :update, :destroy]
