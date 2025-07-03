@@ -329,7 +329,6 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
     try {
       // Lấy số chapter từ URL
       const chapterMatch = importUrl.match(/chuong-(\d+)/);
-      debugger
       if (!chapterMatch) {
         throw new Error("URL không hợp lệ");
       }

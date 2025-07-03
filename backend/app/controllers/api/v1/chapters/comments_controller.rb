@@ -3,15 +3,25 @@ module Api
     module Chapters
       class CommentsController < BaseController
         before_action :set_chapter
-        
+        before_action :set_parent_comment, only: [:create]
+
         def index
-          @comments = @chapter.comments.includes(:user).order(created_at: :desc)
-          render json: @comments
+          @comments = @chapter.comments.includes(:user, replies: [:user]).where(parent_id: nil).order(created_at: :desc)
+          @comment_json = ActiveModelSerializers::SerializableResource.new(@comments, each_serializer: CommentSerializer).as_json
+
+          @comment_json.each do |comment|
+            comment[:replies].each do |reply|
+              reply[:user] = UserSerializer.new(User.find(reply[:user_id])).as_json
+            end
+          end
+
+          render json: @comment_json
         end
-        
+
         def create
           @comment = current_user.comments.new(comment_params)
           @comment.commentable = @chapter
+          @comment.parent = @parent_comment if @parent_comment
           
           if @comment.save
             render json: @comment, status: :created
@@ -26,8 +36,12 @@ module Api
           @chapter = Chapter.find(params[:chapter_id])
         end
         
+        def set_parent_comment
+          @parent_comment = Comment.find(params[:parent_id]) if params[:parent_id].present?
+        end
+        
         def comment_params
-          params.permit(:content)
+          params.permit(:content, :sticker, :parent_id, stickers: [])
         end
       end
     end

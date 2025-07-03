@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import axios from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
@@ -102,8 +103,17 @@ export const chapterApi = {
   },
 
   // Thêm comment vào chapter
-  addChapterComment: async (mangaId: string | number, chapterId: string | number, content: string) => {
-    const response = await api.post(`/v1/chapters/${chapterId}/comments`, { content });
+  addChapterComment: async (
+    mangaId: string | number,
+    chapterId: string | number,
+    content: string,
+    stickers?: string[],
+    parentId?: number
+  ) => {
+    const body: any = { content };
+    if (stickers && stickers.length > 0) body.stickers = stickers;
+    if (parentId) body.parent_id = parentId;
+    const response = await api.post(`/v1/chapters/${chapterId}/comments`, body);
     return response.data;
   },
 
@@ -268,14 +278,36 @@ export const commentApi = {
   },
 
   // Thêm comment vào manga
-  addMangaComment: async (mangaId: string | number, content: string) => {
-    const response = await api.post(`/v1/mangas/${mangaId}/comments`, { content });
+  addMangaComment: async (mangaId: string | number, content: string, sticker?: string) => {
+    const response = await api.post(`/v1/mangas/${mangaId}/comments`, { content, sticker });
     return response.data;
   },
 
   // Thêm comment vào chapter
-  addChapterComment: async (mangaId: string | number, chapterId: string | number, content: string) => {
-    const response = await api.post(`/v1/chapters/${chapterId}/comments`, { content });
+  addChapterComment: async (
+    mangaId: string | number,
+    chapterId: string | number,
+    content: string,
+    stickers?: string[],
+    parentId?: number
+  ) => {
+    const body: any = { content };
+    if (stickers && stickers.length > 0) body.stickers = stickers;
+    if (parentId) body.parent_id = parentId;
+    const response = await api.post(`/v1/chapters/${chapterId}/comments`, body);
+    return response.data;
+  },
+
+  // Trả lời comment
+  replyToComment: async (
+    chapterId: string | number,
+    parentId: number,
+    content: string,
+    stickers?: string[]
+  ) => {
+    const body: any = { content, parent_id: parentId };
+    if (stickers && stickers.length > 0) body.stickers = stickers;
+    const response = await api.post(`/v1/chapters/${chapterId}/comments`, body);
     return response.data;
   },
 

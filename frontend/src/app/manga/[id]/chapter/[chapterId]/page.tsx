@@ -43,7 +43,11 @@ interface Chapter {
 interface Comment {
   id: number;
   content: string;
+  sticker?: string;
+  stickers?: string[];
   createdAt: string;
+  has_replies?: boolean;
+  replies?: Comment[];
   user: {
     id: number;
     username: string;
@@ -60,20 +64,28 @@ export default function ChapterReader() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [comments, setComments] = useState<Comment[]>([]);
-  const [commentText, setCommentText] = useState("");
+  const [commentHtml, setCommentHtml] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedStickers, setSelectedStickers] = useState<string[]>([]);
+  const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
   const [readingMode, setReadingMode] = useState<"vertical" | "horizontal">("vertical");
   const [showBottomNav, setShowBottomNav] = useState(false);
   const [allChapters, setAllChapters] = useState<ChapterSummary[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const stickerPickerRef = useRef<HTMLDivElement>(null);
+  const commentInputRef = useRef<HTMLDivElement>(null);
 
   // Add click outside handler
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
+      }
+      if (stickerPickerRef.current && !stickerPickerRef.current.contains(event.target as Node)) {
+        setShowStickerPicker(false);
       }
     }
 
@@ -222,21 +234,133 @@ export default function ChapterReader() {
     }
   }, [chapter]);
 
+  const insertStickerAtCursor = (stickerUrl: string) => {
+    const el = commentInputRef.current;
+    if (!el) return;
+    el.focus();
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    const img = document.createElement("img");
+    img.src = stickerUrl;
+    img.alt = "Sticker";
+    img.className = "inline h-8 w-8 align-middle mx-1";
+    range.insertNode(img);
+    // Di chuyển con trỏ sau ảnh
+    range.setStartAfter(img);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    // Cập nhật state
+    setCommentHtml(el.innerHTML);
+    setShowStickerPicker(false);
+  };
+
+  const handleSelectSticker = (sticker: string) => {
+    insertStickerAtCursor(sticker);
+  };
+
+  const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
+    setCommentHtml(e.currentTarget.innerHTML);
+  };
+
+  const extractStickersAndTextFromHtml = (html: string): {text: string, stickers: string[]} => {
+    const div = document.createElement("div");
+    div.innerHTML = html;
+    const stickers: string[] = [];
+    // Lấy text, thay img bằng placeholder nếu muốn
+    const walker = document.createTreeWalker(div, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, null);
+    let text = "";
+    let node: Node | null;
+    while ((node = walker.nextNode())) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        text += node.textContent;
+      } else if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === "IMG") {
+        const url = (node as HTMLImageElement).src;
+        stickers.push(url);
+        text += ` [sticker:${url}] `; // hoặc chỉ để trống nếu không muốn placeholder
+      }
+    }
+    return { text: text.trim(), stickers };
+  };
+
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!commentText.trim()) return;
-
+    const { text, stickers } = extractStickersAndTextFromHtml(commentHtml);
+    if (!text && stickers.length === 0) return;
     try {
       setIsSubmitting(true);
-      const newComment = await commentApi.addChapterComment(mangaId, chapterId, commentText);
-      setComments([newComment, ...comments]);
-      setCommentText("");
+      let newComment;
+      if (replyingTo) {
+        newComment = await commentApi.replyToComment(
+          chapterId,
+          replyingTo.id,
+          text,
+          stickers.length > 0 ? stickers : undefined
+        );
+        setComments(prevComments => {
+          return prevComments.map(comment => {
+            if (comment.id === replyingTo.id) {
+              return {
+                ...comment,
+                has_replies: true,
+                replies: [...(comment.replies || []), newComment]
+              };
+            }
+            return comment;
+          });
+        });
+      } else {
+        newComment = await commentApi.addChapterComment(
+          mangaId,
+          chapterId,
+          text,
+          stickers.length > 0 ? stickers : undefined
+        );
+        setComments([newComment, ...comments]);
+      }
+      setCommentHtml("");
+      if (commentInputRef.current) commentInputRef.current.innerHTML = "";
+      setReplyingTo(null);
+      setShowStickerPicker(false);
     } catch (err) {
       console.error("Failed to submit comment:", err);
       alert("Không thể gửi bình luận. Vui lòng thử lại sau.");
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const renderCommentContent = (content: string) => {
+    if (!content) return null;
+    const regex = /\[sticker:(.*?)\]/g;
+    const parts: (JSX.Element | string)[] = [];
+    let lastIndex = 0;
+    let match;
+    let key = 0;
+    while ((match = regex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(<span key={key++}>{content.substring(lastIndex, match.index)}</span>);
+      }
+      if (match[1]) {
+        parts.push(<img key={key++} src={match[1]} alt="Sticker" className="inline h-8 w-8 align-middle mx-1" />);
+      }
+      lastIndex = regex.lastIndex;
+    }
+    if (lastIndex < content.length) {
+      parts.push(<span key={key++}>{content.substring(lastIndex)}</span>);
+    }
+    return parts;
+  };
+
+  const handleReplyToComment = (comment: Comment) => {
+    setReplyingTo(comment);
+    // Scroll to comment form
+    document.getElementById('comment-form')?.scrollIntoView({ behavior: 'smooth' });
+  };
+  
+  const cancelReply = () => {
+    setReplyingTo(null);
   };
 
   const toggleReadingMode = () => {
@@ -424,22 +548,85 @@ export default function ChapterReader() {
       <div className="mt-8">
         <h2 className="text-xl font-bold mb-4 pb-2 border-b border-gray-700">Bình luận</h2>
         <div className="bg-gray-800 rounded p-4">
+          {/* Form bình luận tổng luôn ở đầu */}
           {isAuthenticated ? (
             <div className="mb-4">
-              <form onSubmit={handleSubmitComment}>
-                <textarea 
-                  className="w-full bg-gray-700 text-white rounded p-3 focus:outline-none focus:ring-1 focus:ring-red-500"
-                  placeholder="Viết bình luận của bạn..."
-                  rows={3}
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  required
-                />
-                <div className="mt-2 text-right">
+              <form id="comment-form" onSubmit={handleSubmitComment}>
+                {selectedStickers.length > 0 && !replyingTo && (
+                  <div className="mb-2 p-2 bg-gray-700 rounded flex flex-wrap gap-2 items-center">
+                    {selectedStickers.map((sticker) => (
+                      <div key={sticker} className="flex items-center mr-2 mb-1">
+                        <img src={sticker} alt="Selected sticker" className="h-10 w-10 mr-1" />
+                        <button type="button" onClick={() => setSelectedStickers(selectedStickers.filter((s) => s !== sticker))} className="text-gray-400 hover:text-white">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                    ))}
+                      <span className="text-sm">Sticker đã chọn</span>
+                  </div>
+                )}
+                <div
+                  ref={commentInputRef}
+                  className="w-full bg-gray-700 text-white rounded p-3 focus:outline-none focus:ring-1 focus:ring-red-500 min-h-[60px] relative"
+                  contentEditable
+                  onInput={handleInput}
+                  suppressContentEditableWarning={true}
+                >
+                  {commentHtml === "" && <span className="text-gray-400 pointer-events-none select-none absolute left-3 top-3">Viết bình luận của bạn...</span>}
+                </div>
+                <div className="mt-2 flex justify-between items-center">
+                  <div className="relative" ref={stickerPickerRef}>
+                    <button 
+                      type="button" 
+                      onClick={() => setShowStickerPicker(!showStickerPicker)}
+                      className="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-7.536 5.879a1 1 0 001.414 0 3 3 0 014.242 0 1 1 0 001.414-1.414 5 5 0 00-7.07 0 1 1 0 000 1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                    {showStickerPicker && !replyingTo && (
+                      <div className="block p-2 bg-gray-700 rounded shadow-lg grid grid-cols-4 gap-2">
+                        {/* Stickers */}
+                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742760.png')} className="p-1 hover:bg-gray-600 rounded">
+                          <Image
+                            src="https://cdn-icons-png.flaticon.com/128/742/742760.png"
+                            alt="Sticker 1"
+                            width={32}
+                            height={32}
+                            className="w-8 h-8"
+                          />                        
+                        </button>
+                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742751.png')} className="p-1 hover:bg-gray-600 rounded">
+                          <img src="https://cdn-icons-png.flaticon.com/128/742/742751.png" alt="Sticker 2" className="w-8 h-8" />
+                        </button>
+                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742784.png')} className="p-1 hover:bg-gray-600 rounded">
+                          <img src="https://cdn-icons-png.flaticon.com/128/742/742784.png" alt="Sticker 3" className="w-8 h-8" />
+                        </button>
+                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742750.png')} className="p-1 hover:bg-gray-600 rounded">
+                          <img src="https://cdn-icons-png.flaticon.com/128/742/742750.png" alt="Sticker 4" className="w-8 h-8" />
+                        </button>
+                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742745.png')} className="p-1 hover:bg-gray-600 rounded">
+                          <img src="https://cdn-icons-png.flaticon.com/128/742/742745.png" alt="Sticker 5" className="w-8 h-8" />
+                        </button>
+                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742821.png')} className="p-1 hover:bg-gray-600 rounded">
+                          <img src="https://cdn-icons-png.flaticon.com/128/742/742821.png" alt="Sticker 6" className="w-8 h-8" />
+                        </button>
+                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742752.png')} className="p-1 hover:bg-gray-600 rounded">
+                          <img src="https://cdn-icons-png.flaticon.com/128/742/742752.png" alt="Sticker 7" className="w-8 h-8" />
+                        </button>
+                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742920.png')} className="p-1 hover:bg-gray-600 rounded">
+                          <img src="https://cdn-icons-png.flaticon.com/128/742/742920.png" alt="Sticker 8" className="w-8 h-8" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <button 
                     type="submit" 
-                    disabled={isSubmitting}
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center ml-auto"
+                    disabled={isSubmitting || (!commentHtml.trim() && selectedStickers.length === 0)}
+                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSubmitting && (
                       <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -447,7 +634,7 @@ export default function ChapterReader() {
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                     )}
-                    Gửi bình luận
+                    {"Gửi bình luận"}
                   </button>
                 </div>
               </form>
@@ -457,11 +644,10 @@ export default function ChapterReader() {
               <p>Vui lòng <Link href="/auth/login" className="text-red-400 hover:underline">đăng nhập</Link> để bình luận</p>
             </div>
           )}
-          
-          <div className="space-y-4 mt-6">
+          {/* Danh sách bình luận và form trả lời dưới từng comment */}
             {comments.length > 0 ? (
               comments.map((comment) => (
-                <div key={comment.id} className="bg-gray-700 rounded p-3">
+              <div key={comment.id} className="bg-gray-700 rounded p-3 mb-4">
                   <div className="flex justify-between items-start">
                     <div className="flex items-center">
                       <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center mr-2">
@@ -484,14 +670,186 @@ export default function ChapterReader() {
                         </p>
                       </div>
                     </div>
+                    {isAuthenticated && (
+                      <button 
+                        onClick={() => handleReplyToComment(comment)}
+                        className="text-sm text-gray-400 hover:text-white"
+                      >
+                        Trả lời
+                      </button>
+                    )}
                   </div>
-                  <p className="mt-2 text-sm">{comment.content}</p>
+                {(Array.isArray(comment.stickers) && comment.stickers.length > 0) ? (
+                  <div className="mt-2 flex flex-wrap gap-2 items-center">
+                    {comment.stickers.map((sticker: string, idx: number) => (
+                      <img key={idx} src={sticker} alt="Sticker" className="h-16 w-16" />
+                    ))}
+                    {comment.content && <span className="ml-2 text-sm">{renderCommentContent(comment.content)}</span>}
+                  </div>
+                ) : comment.sticker ? (
+                    <div className="mt-2">
+                      <img src={comment.sticker} alt="Sticker" className="h-16 w-16" />
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-sm">{renderCommentContent(comment.content)}</div>
+                  )}
+                {/* Form trả lời ngay dưới comment nếu đang trả lời comment này */}
+                {isAuthenticated && replyingTo && replyingTo.id === comment.id && (
+                  <div className="mt-3">
+                    <form id="comment-form" onSubmit={handleSubmitComment}>
+                      <div className="bg-gray-700 p-2 mb-2 rounded flex justify-between items-center">
+                        <div className="text-sm">
+                          Đang trả lời <span className="font-semibold text-blue-500">{replyingTo.user?.username || 'Unknown'}</span>
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={cancelReply}
+                          className="text-gray-400 hover:text-white"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      </div>
+                      {selectedStickers.length > 0 && (
+                        <div className="mb-2 p-2 bg-gray-700 rounded flex flex-wrap gap-2 items-center">
+                          {selectedStickers.map((sticker) => (
+                            <div key={sticker} className="flex items-center mr-2 mb-1">
+                              <img src={sticker} alt="Selected sticker" className="h-10 w-10 mr-1" />
+                              <button type="button" onClick={() => setSelectedStickers(selectedStickers.filter((s) => s !== sticker))} className="text-gray-400 hover:text-white">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                            </div>
+                          ))}
+                          <span className="text-sm">Sticker đã chọn</span>
+                        </div>
+                      )}
+                      <div
+                        ref={commentInputRef}
+                        className="w-full bg-gray-700 text-white rounded p-3 focus:outline-none focus:ring-1 focus:ring-red-500 min-h-[60px] relative"
+                        contentEditable
+                        onInput={handleInput}
+                        suppressContentEditableWarning={true}
+                      >
+                        {commentHtml === "" && <span className="text-gray-400 pointer-events-none select-none absolute left-3 top-3">Viết trả lời của bạn...</span>}
+                      </div>
+                      <div className="mt-2 flex justify-between items-center">
+                        <div className="relative" ref={stickerPickerRef}>
+                          <button 
+                            type="button" 
+                            onClick={() => setShowStickerPicker(!showStickerPicker)}
+                            className="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-7.536 5.879a1 1 0 001.414 0 3 3 0 014.242 0 1 1 0 001.414-1.414 5 5 0 00-7.07 0 1 1 0 000 1.414z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                          {showStickerPicker && (
+                            <div className="block p-2 bg-gray-700 rounded shadow-lg grid grid-cols-4 gap-2">
+                              {/* Stickers */}
+                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742760.png')} className="p-1 hover:bg-gray-600 rounded">
+                                <Image
+                                  src="https://cdn-icons-png.flaticon.com/128/742/742760.png"
+                                  alt="Sticker 1"
+                                  width={32}
+                                  height={32}
+                                  className="w-8 h-8"
+                                />                        
+                              </button>
+                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742751.png')} className="p-1 hover:bg-gray-600 rounded">
+                                <img src="https://cdn-icons-png.flaticon.com/128/742/742751.png" alt="Sticker 2" className="w-8 h-8" />
+                              </button>
+                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742784.png')} className="p-1 hover:bg-gray-600 rounded">
+                                <img src="https://cdn-icons-png.flaticon.com/128/742/742784.png" alt="Sticker 3" className="w-8 h-8" />
+                              </button>
+                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742750.png')} className="p-1 hover:bg-gray-600 rounded">
+                                <img src="https://cdn-icons-png.flaticon.com/128/742/742750.png" alt="Sticker 4" className="w-8 h-8" />
+                              </button>
+                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742745.png')} className="p-1 hover:bg-gray-600 rounded">
+                                <img src="https://cdn-icons-png.flaticon.com/128/742/742745.png" alt="Sticker 5" className="w-8 h-8" />
+                              </button>
+                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742821.png')} className="p-1 hover:bg-gray-600 rounded">
+                                <img src="https://cdn-icons-png.flaticon.com/128/742/742821.png" alt="Sticker 6" className="w-8 h-8" />
+                              </button>
+                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742752.png')} className="p-1 hover:bg-gray-600 rounded">
+                                <img src="https://cdn-icons-png.flaticon.com/128/742/742752.png" alt="Sticker 7" className="w-8 h-8" />
+                              </button>
+                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742920.png')} className="p-1 hover:bg-gray-600 rounded">
+                                <img src="https://cdn-icons-png.flaticon.com/128/742/742920.png" alt="Sticker 8" className="w-8 h-8" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <button 
+                          type="submit" 
+                          disabled={isSubmitting || (!commentHtml.trim() && selectedStickers.length === 0)}
+                          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isSubmitting && (
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          )}
+                          {"Gửi bình luận"}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+                  {/* Replies */}
+                  {comment.has_replies && comment.replies && comment.replies.length > 0 && (
+                    <div className="mt-3 pl-4 border-l-2 border-gray-600 space-y-3">
+                      {comment.replies.map((reply) => (
+                        <div key={reply.id} className="bg-gray-800 rounded p-2">
+                          <div className="flex items-center">
+                            <div className="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center mr-2">
+                              {reply.user && reply.user.avatar ? (
+                                <Image 
+                                  src={reply.user.avatar} 
+                                  alt={reply.user.username || 'User'} 
+                                  width={24} 
+                                  height={24} 
+                                  className="rounded-full"
+                                />
+                              ) : (
+                                <span className="text-xs">{reply.user && reply.user.username ? reply.user.username.charAt(0).toUpperCase() : '?'}</span>
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-medium text-xs">{reply.user ? reply.user.username : 'Unknown User'}</p>
+                              <p className="text-xs text-gray-400">
+                                {new Date(reply.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                        {/* Hiển thị tên user cha màu xanh dương ở đầu reply */}
+                        <div className="mt-1">
+                          <span className="text-blue-500 font-semibold mr-1">@{comment.user?.username}</span>
+                          {Array.isArray(reply.stickers) && reply.stickers.length > 0 ? (
+                            <div className="inline-flex items-center gap-2">
+                              {reply.stickers.map((st, idx) => (
+                                <img key={idx} src={st} alt={`Sticker ${idx}`} className="h-12 w-12" />
+                              ))}
+                              {reply.content && <span className="text-xs">{renderCommentContent(reply.content)}</span>}
+                            </div>
+                          ) : reply.sticker ? (
+                            <img src={reply.sticker} alt="Sticker" className="h-12 w-12 inline-block align-middle" />
+                          ) : (
+                            <span className="text-xs align-middle">{renderCommentContent(reply.content)}</span>
+                          )}
+                        </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))
             ) : (
               <p className="text-center text-gray-400 text-sm">Chưa có bình luận nào. Hãy là người đầu tiên bình luận!</p>
             )}
-          </div>
         </div>
       </div>
     </div>

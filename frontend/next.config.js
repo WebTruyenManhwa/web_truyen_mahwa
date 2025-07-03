@@ -7,6 +7,7 @@ const nextConfig = {
       'localhost',
       'picsum.photos',
       '127.0.0.1',
+      'cdn-icons-png.flaticon.com',
       '10.50.80.163'
     ],
   },
