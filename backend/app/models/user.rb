@@ -49,4 +49,20 @@ class User < ApplicationRecord
     Rails.logger.error("OAuth user creation failed: #{e.message}")
     nil
   end
+
+  # test login with id_token from google RS256
+  def self.from_id_token(id_token)
+    # Verify token với Google
+    payload = Google::Auth::IDTokens.verify_oidc id_token, aud: ENV.fetch('GOOGLE_CLIENT_ID')
+    
+    # payload chứa: 'sub', 'email', 'name', ...
+    find_or_create_by(provider: 'google', uid: payload['sub']) do |user|
+      user.email = payload['email']
+      user.password = Devise.friendly_token[0, 20]
+      # user.username = payload['email'].split('@').first # nếu cần
+    end
+  rescue Google::Auth::IDTokens::VerificationError => e
+    Rails.logger.error "Invalid Google id_token: #{e.message}"
+    nil
+  end
 end

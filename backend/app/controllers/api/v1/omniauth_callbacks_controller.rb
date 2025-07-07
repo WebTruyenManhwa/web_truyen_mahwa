@@ -4,7 +4,7 @@ module Api
       # Xử lý callback từ Google
       def google_oauth2
         @user = User.from_omniauth(request.env["omniauth.auth"])
-
+        
         if @user && @user.persisted?
           # Đăng nhập thành công
           sign_in @user

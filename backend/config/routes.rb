@@ -18,6 +18,8 @@ Rails.application.routes.draw do
         delete 'auth/account', to: 'registrations#destroy'
       end
       
+      post 'auth/google_token', to: 'auth#google_token'
+      
       resources :mangas do
         resources :chapters, shallow: true do
           resources :chapter_images, shallow: true do
