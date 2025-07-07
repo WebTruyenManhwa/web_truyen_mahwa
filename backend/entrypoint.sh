@@ -1,8 +1,16 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 
-# Delete old server.pid if exists
+# Xóa PID cũ
 rm -f /rails/tmp/pids/server.pid
 
-# Start the Rails server
+# Chờ DB sẵn sàng
+until bundle exec rails runner "ActiveRecord::Base.connection"; do
+  echo "⏳ Waiting for DB..."
+  sleep 2
+done
+
+echo "🏃 Running migrations..."
+bundle exec rails db:migrate
+
 exec "$@"

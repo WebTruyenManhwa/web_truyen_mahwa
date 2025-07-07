@@ -4,26 +4,26 @@ require 'carrierwave/storage/file'
 require 'carrierwave/storage/fog'
 
 CarrierWave.configure do |config|
-  if Rails.env.production? || ENV['USE_S3'] == 'true'
-    # Use AWS S3 in production or when explicitly enabled
-    config.storage = :fog
-    config.fog_provider = 'fog/aws'
-    config.fog_credentials = {
-      provider:              'AWS',
-      aws_access_key_id:     ENV['AWS_ACCESS_KEY_ID'],
-      aws_secret_access_key: ENV['AWS_SECRET_ACCESS_KEY'],
-      region:                ENV['AWS_REGION'],
-      endpoint:              ENV['AWS_S3_ENDPOINT'],
-    }
-    config.fog_directory  = ENV['AWS_BUCKET']
-    config.fog_public     = true
-    config.fog_attributes = { cache_control: "public, max-age=#{365.days.to_i}" }
+  if ENV['USE_S3'] == 'true' &&
+    ENV['AWS_ACCESS_KEY_ID'].to_s.strip != "" &&
+    ENV['AWS_SECRET_ACCESS_KEY'].to_s.strip != "" &&
+    ENV['AWS_REGION'].to_s.strip != "" &&
+    ENV['AWS_BUCKET'].to_s.strip != ""
+
+   config.storage        = :fog
+   config.fog_provider   = 'fog/aws'
+   config.fog_credentials = {
+     provider:              'AWS',
+     aws_access_key_id:     ENV['AWS_ACCESS_KEY_ID'],
+     aws_secret_access_key: ENV['AWS_SECRET_ACCESS_KEY'],
+     region:                ENV['AWS_REGION'],
+     endpoint:              ENV['AWS_S3_ENDPOINT'].presence
+   }
+   config.fog_directory  = ENV['AWS_BUCKET']
+   config.fog_public     = true
+   config.fog_attributes = { cache_control: "public, max-age=#{365.days.to_i}" }
   else
-    # Use local storage in development and test
     config.storage = :file
-    config.enable_processing = Rails.env.development?
-    config.permissions = 0666
-    config.directory_permissions = 0777
   end
 
   # Override the directory where uploaded files will be stored.
