@@ -31,7 +31,7 @@ CarrierWave.configure do |config|
   config.root = Rails.root.join('public')
   
   # Set default URL for CarrierWave
-  config.asset_host = "http://10.50.80.163:3001" if Rails.env.development?
+  # config.asset_host = "http://10.50.80.163:3001" if Rails.env.development?
   # config.asset_host = Rails.application.routes.default_url_options[:host]
   # Cache setting
   config.cache_storage = :file
