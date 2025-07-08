@@ -78,6 +78,8 @@ Rails.application.configure do
 
   config.active_record.verbose_query_logs = true
 
+  config.public_file_server.enabled = true
+
   # Enable DNS rebinding protection and other `Host` header attacks.
   # config.hosts = [
   #   "example.com",     # Allow requests from example.com

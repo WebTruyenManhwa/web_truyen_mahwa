@@ -26,6 +26,11 @@ CarrierWave.configure do |config|
     config.storage = :file
   end
 
+  if Rails.env.production?
+    # Đưa host của bạn vào đây, hoặc đọc từ biến môi trường
+    config.asset_host = 'https://web-truyen-mahwa.onrender.com'
+  end
+
   # Override the directory where uploaded files will be stored.
   # This is a sensible default for uploaders that are meant to be mounted:
   config.root = Rails.root.join('public')

@@ -65,17 +65,21 @@ FROM base
 COPY --from=build "${BUNDLE_PATH}" "${BUNDLE_PATH}"
 COPY --from=build /rails /rails
 
-# Run and own only the runtime files as a non-root user for security
-RUN groupadd --system --gid 1000 rails && \
-    useradd rails --uid 1000 --gid 1000 --create-home --shell /bin/bash && \
-    chown -R rails:rails db log storage tmp
-USER 1000:1000
+# Tạo group và user rails (idempotent)
+RUN getent group rails >/dev/null || groupadd --system --gid 1000 rails \
+ && id -u rails >/dev/null 2>&1 || useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash rails
 
-# Entrypoint prepares the database.
-COPY --chown=root:root entrypoint.sh /rails/entrypoint.sh
+# Tạo thư mục cần thiết và chown đúng path: /rails chứ không phải /app
+RUN mkdir -p /rails/public/uploads /rails/tmp/sockets /rails/tmp/pids \
+ && chown -R rails:rails /rails /rails/public/uploads /rails/tmp /rails/log /rails/storage
 
+# Chuyển xuống chạy dưới user rails
+USER rails
+
+# Entrypoint chuẩn bị DB
+COPY --chown=root:root --chmod=755 entrypoint.sh /rails/entrypoint.sh
 ENTRYPOINT ["sh", "/rails/entrypoint.sh"]
 
-# Start server via Thruster by default, this can be overwritten at runtime
+# Mở port và khởi server
 EXPOSE 80
 CMD ["./bin/thrust", "./bin/rails", "server"]
