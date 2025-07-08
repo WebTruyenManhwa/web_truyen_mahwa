@@ -52,17 +52,33 @@ class User < ApplicationRecord
 
   # test login with id_token from google RS256
   def self.from_id_token(id_token)
-    # Verify token với Google
-    payload = Google::Auth::IDTokens.verify_oidc id_token, aud: ENV.fetch('GOOGLE_CLIENT_ID')
+    payload = Google::Auth::IDTokens.verify_oidc(
+      id_token,
+      aud: ENV.fetch('GOOGLE_CLIENT_ID')
+    )
+  
+    # Nếu đã có user theo email thì cập nhật provider/uid
+    user = find_by(email: payload['email'])
     
-    # payload chứa: 'sub', 'email', 'name', ...
-    find_or_create_by(provider: 'google', uid: payload['sub']) do |user|
-      user.email = payload['email']
-      user.password = Devise.friendly_token[0, 20]
-      # user.username = payload['email'].split('@').first # nếu cần
+    if user
+      user.update(provider: 'google', uid: payload['sub']) if user.provider.blank? || user.uid.blank?
+      return user
     end
+  
+    # Nếu chưa có, tạo mới user với provider+uid
+    create!(
+      provider: 'google',
+      uid: payload['sub'],
+      email: payload['email'],
+      username: payload['email'].split('@').first,
+      password: Devise.friendly_token[0, 20]
+    )
+  rescue ActiveRecord::RecordInvalid => e
+    Rails.logger.error "[from_id_token] Invalid record: #{e.record.errors.full_messages.join(', ')}"
+    nil
   rescue Google::Auth::IDTokens::VerificationError => e
-    Rails.logger.error "Invalid Google id_token: #{e.message}"
+    Rails.logger.error "[from_id_token] Auth token invalid: #{e.message}"
     nil
   end
+  
 end
