@@ -1,14 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AdminSidebar from "../../../../../../components/admin/AdminSidebar";
 import { chapterApi } from "../../../../../../services/api";
+import React from "react";
 
-export default function CreateChapter({ params }: { params: { id: string } }) {
+type Props = {
+  params: Promise<{ id: string }>;
+};
+
+export default function CreateChapter(props: Props) {
   const router = useRouter();
-  const mangaId = params.id;
+  const { id: mangaId } = use(props.params);
   
   const [title, setTitle] = useState("");
   const [number, setNumber] = useState("");
@@ -73,8 +78,23 @@ export default function CreateChapter({ params }: { params: { id: string } }) {
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     
     // Swap images
-    [newImages[index], newImages[targetIndex]] = [newImages[targetIndex], newImages[index]];
-    [newPreviews[index], newPreviews[targetIndex]] = [newPreviews[targetIndex], newPreviews[index]];
+    const img1 = newImages[index];
+    const img2 = newImages[targetIndex];
+    const prev1 = newPreviews[index];
+    const prev2 = newPreviews[targetIndex];
+
+    if (!img1 || !img2) {
+      console.warn('Swap aborted: one of the images is undefined');
+      return;
+    }
+    if (!prev1 || !prev2) {
+      console.warn('Swap aborted: one of the previews is undefined');
+      return;
+    }
+
+    // Thực hiện swap khi chắc chắn
+    [newImages[index], newImages[targetIndex]] = [img2, img1];
+    [newPreviews[index], newPreviews[targetIndex]] = [prev2, prev1];
     
     setImages(newImages);
     setImagesPreviews(newPreviews);
@@ -103,8 +123,8 @@ export default function CreateChapter({ params }: { params: { id: string } }) {
       formData.append("number", number);
       
       // Append each image with its position
-      images.forEach((image, index) => {
-        formData.append(`images[]`, image);
+      images.forEach(image => {
+        formData.append('images[]', image);
       });
       
       // Create chapter

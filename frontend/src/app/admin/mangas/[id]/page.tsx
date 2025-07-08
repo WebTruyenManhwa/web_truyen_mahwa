@@ -1,11 +1,13 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from "react";
-import Image from "next/image";
+// import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import AdminSidebar from "../../../../components/admin/AdminSidebar";
 import { mangaApi, genreApi } from "../../../../services/api";
+import React from "react";
 
 export default function MangaDetailAdmin() {
   const params = useParams<{ id: string }>();

@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState, useEffect } from "react";
-import Image from "next/image";
+import { useState, useEffect, use } from "react";
+// import Image from "next/image";
 import Link from "next/link";
 import { mangaApi } from "../../../services/api";
 import { useAuth } from "../../../hooks/useAuth";
@@ -13,29 +14,33 @@ interface Chapter {
   number: number;
   title: string;
   createdAt: string;
-  viewCount?: number;
+  view_count?: number;
 }
 
 interface Manga {
   id: number;
   title: string;
   description: string;
-  coverImage: string;
+  coverImage: string | { url: string; thumb?: any; small?: any };
   author: string;
   artist?: string;
   status: string;
   releaseYear?: number;
   genres: string[];
   chapters: Chapter[];
-  viewCount?: number;
+  view_count?: number;
   rating?: number;
   totalVotes?: number;
   translationTeam?: string;
 }
 
-export default function MangaDetail({ params }: { params: { id: string } }) {
+type Props = {
+  params: Promise<{ id: string }>;
+};
+
+export default function MangaDetail(props: Props) {
   // Trích xuất id từ params và lưu vào biến riêng để tránh cảnh báo
-  const mangaId = params.id;
+  const { id: mangaId } = use(props.params);
   const { isAuthenticated } = useAuth();
   const [manga, setManga] = useState<Manga | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,13 +55,20 @@ export default function MangaDetail({ params }: { params: { id: string } }) {
       try {
         setIsLoading(true);
         const data = await mangaApi.getManga(mangaId);
+
+        const normalized = {
+          ...data,
+          coverImage: data.cover_image?.url ?? '',
+        };
         
-        // Đảm bảo chapters được sắp xếp theo số chapter (từ cao xuống thấp)
-        if (data.chapters) {
-          data.chapters = data.chapters.sort((a, b) => b.number - a.number);
+        // Sắp xếp chapters
+        if (normalized.chapters) {
+          normalized.chapters = normalized.chapters.sort(
+            (a: { number: number; }, b: { number: number; }) => b.number - a.number
+          );
         }
         
-        setManga(data);
+        setManga(normalized);
         
         // Kiểm tra xem manga có trong danh sách yêu thích không
         if (isAuthenticated) {
@@ -76,7 +88,7 @@ export default function MangaDetail({ params }: { params: { id: string } }) {
           id: parseInt(mangaId),
           title: "One Piece",
           description: "Gol D. Roger, vua hải tặc với khối tài sản vô giá One Piece, đã bị xử tử. Trước khi chết, ông tiết lộ rằng kho báu của mình được giấu ở Grand Line. Monkey D. Luffy, một cậu bé với ước mơ trở thành vua hải tặc, vô tình ăn phải trái ác quỷ Gomu Gomu, biến cơ thể cậu thành cao su. Giờ đây, cậu cùng các đồng đội hải tặc mũ rơm bắt đầu cuộc hành trình tìm kiếm kho báu One Piece.",
-          coverImage: "https://m.media-amazon.com/images/I/51FVFCrSp0L._AC_UF1000,1000_QL80_.jpg",
+          coverImage: {url:"https://m.media-amazon.com/images/I/51FVFCrSp0L._AC_UF1000,1000_QL80_.jpg" },
           author: "Eiichiro Oda",
           status: "ongoing",
           releaseYear: 1999,
@@ -87,24 +99,24 @@ export default function MangaDetail({ params }: { params: { id: string } }) {
               number: 1088,
               title: "Cuộc chiến cuối cùng",
               createdAt: "2023-08-10",
-              viewCount: 150000,
+              view_count: 150000,
             },
             {
               id: 2,
               number: 1087,
               title: "Luffy vs Kaido",
               createdAt: "2023-08-03",
-              viewCount: 145000,
+              view_count: 145000,
             },
             {
               id: 3,
               number: 1086,
               title: "Bí mật của Laugh Tale",
               createdAt: "2023-07-27",
-              viewCount: 140000,
+              view_count: 140000,
             },
           ],
-          viewCount: 15000000,
+          view_count: 15000000,
         });
       } finally {
         setIsLoading(false);
@@ -203,13 +215,14 @@ export default function MangaDetail({ params }: { params: { id: string } }) {
           {/* Left Column */}
           <div className="md:w-1/4">
             <div className="relative aspect-[2/3] rounded-lg overflow-hidden mb-4">
-              <img
-                src={manga.cover_image.url || "/placeholder-manga.jpg"}
-                alt={manga.title}
-                fill
-                className="object-cover"
-                priority
-              />
+            <img
+              src={typeof manga.coverImage === 'string'
+                ? manga.coverImage
+                : manga.coverImage?.url ?? "/placeholder-manga.jpg"
+              }
+              alt={manga.title}
+              className="object-cover"
+            />
             </div>
             
             {/* Rating Section */}
@@ -264,7 +277,7 @@ export default function MangaDetail({ params }: { params: { id: string } }) {
               </div>
               <div className="flex items-center">
                 <span className="text-gray-400">Lượt xem:</span>
-                <span className="ml-2 text-white">{manga.view_count.toLocaleString() || 0}</span>
+                <span className="ml-2 text-white">{manga.view_count?.toLocaleString() || 0}</span>
               </div>
             </div>
             
@@ -278,7 +291,7 @@ export default function MangaDetail({ params }: { params: { id: string } }) {
                 </span>
               )}
               
-              {manga.viewCount && (
+              {manga.view_count && (
                 <span className="bg-gray-700 text-gray-100 px-2 py-1 rounded text-xs flex items-center">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -300,11 +313,11 @@ export default function MangaDetail({ params }: { params: { id: string } }) {
                       d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                     />
                   </svg>
-                  {manga.viewCount >= 1000000
-                    ? `${(manga.viewCount / 1000000).toFixed(1)}M`
-                    : manga.viewCount >= 1000
-                    ? `${(manga.viewCount / 1000).toFixed(0)}K`
-                    : manga.viewCount}
+                  {manga.view_count >= 1000000
+                    ? `${(manga.view_count / 1000000).toFixed(1)}M`
+                    : manga.view_count >= 1000
+                    ? `${(manga.view_count / 1000).toFixed(0)}K`
+                    : manga.view_count}
                 </span>
               )}
             </div>
@@ -398,7 +411,7 @@ export default function MangaDetail({ params }: { params: { id: string } }) {
                 {chapter.title && <span className="ml-2 text-gray-400">- {chapter.title}</span>}
               </div>
               <div className="flex items-center space-x-4 text-sm text-gray-400">
-                {chapter.viewCount && (
+                {chapter.view_count && (
                   <span className="flex items-center">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -420,9 +433,9 @@ export default function MangaDetail({ params }: { params: { id: string } }) {
                         d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                       />
                     </svg>
-                    {chapter.viewCount >= 1000
-                      ? `${(chapter.viewCount / 1000).toFixed(0)}K`
-                      : chapter.viewCount}
+                    {chapter.view_count >= 1000
+                      ? `${(chapter.view_count / 1000).toFixed(0)}K`
+                      : chapter.view_count}
                   </span>
                 )}
                 <span>{new Date(chapter.createdAt).toLocaleDateString()}</span>

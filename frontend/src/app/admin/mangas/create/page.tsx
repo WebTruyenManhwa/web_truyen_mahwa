@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -5,6 +6,7 @@ import AdminSidebar from "../../../../components/admin/AdminSidebar";
 import Link from "next/link";
 import { mangaApi, genreApi } from "../../../../services/api";
 import { useRouter } from "next/navigation";
+import React from "react";
 
 export default function CreateManga() {
   const router = useRouter();
@@ -148,7 +150,8 @@ export default function CreateManga() {
       setTimeout(() => {
         router.push(`/admin/mangas/${newManga.id}`);
       }, 2000);
-    } catch (_err) {
+    } catch (err) {
+      console.error("Error creating manga:", err);
       setIsLoading(false);
       setError("Tạo truyện thất bại. Vui lòng thử lại sau.");
     } finally {

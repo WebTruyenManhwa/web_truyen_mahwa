@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -41,7 +42,7 @@ export default function Home() {
           sort: "popularity", 
           limit: 12 
         });
-        const mappedPopular = popularData.mangas.map(m => ({
+        const mappedPopular = popularData.mangas.map((m: { cover_image: { url: any; }; }) => ({
           ...m,
           coverImage: m.cover_image?.url
         }));
@@ -53,7 +54,7 @@ export default function Home() {
           sort: "updatedAt", 
           limit: 20 
         });
-        const mappedLatest = latestUpdates.mangas.map(m => ({
+        const mappedLatest = latestUpdates.mangas.map((m: { cover_image: { url: any; }; }) => ({
           ...m,
           coverImage: m.cover_image?.url ?? ""
         }));
@@ -285,8 +286,6 @@ export default function Home() {
           <div key={manga.id} className="group">
             <Link href={`/manga/${manga.id}`} className="block">
               <div className="relative aspect-[2/3] rounded overflow-hidden mb-2 bg-gray-800">
-                {console.log("🔥 manga.coverImage", manga.coverImage)}
-                {console.log("🔥 activeTab", latestUpdates)}
                 {/* <Image
                   src={manga.coverImage}
                   alt={manga.title}

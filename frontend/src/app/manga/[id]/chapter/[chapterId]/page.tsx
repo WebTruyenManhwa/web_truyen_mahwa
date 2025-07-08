@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @next/next/no-img-element */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, JSX } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { chapterApi, userApi, mangaApi, commentApi } from "../../../../../services/api";
@@ -100,7 +101,7 @@ export default function ChapterReader() {
     const handleScroll = () => {
       const scrollPosition = window.scrollY;
       const windowHeight = window.innerHeight;
-      const documentHeight = document.documentElement.scrollHeight;
+      // const documentHeight = document.documentElement.scrollHeight;
       
       // Hiển thị navigation khi scroll xuống 20% trang
       setShowBottomNav(scrollPosition > windowHeight * 0.2);
@@ -290,7 +291,7 @@ export default function ChapterReader() {
     if (!text && stickers.length === 0) return;
     try {
       setIsSubmitting(true);
-      let newComment;
+      let newComment: any;
       if (replyingTo) {
         newComment = await commentApi.replyToComment(
           chapterId,

@@ -1,7 +1,8 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, use } from "react";
+// import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AdminSidebar from "../../../../../../../components/admin/AdminSidebar";
 import { chapterApi, chapterImageApi } from "../../../../../../../services/api";
@@ -12,6 +13,7 @@ interface ChapterImage {
   position: number;
   url: string;
   image?: string;
+  image_url?: string;
   is_external?: boolean;
   external_url?: string;
 }
@@ -20,6 +22,7 @@ interface ChapterImage {
 interface NewImage {
   file?: File;
   position: number;
+  image_url?: string;
   is_external?: boolean;
   external_url?: string;
 }
@@ -31,10 +34,15 @@ interface NewImagePreview {
   is_external?: boolean;
 }
 
-export default function EditChapter({ params }: { params: { id: string; chapterId: string } }) {
-  const router = useRouter();
-  const mangaId = params.id;
-  const chapterId = params.chapterId;
+
+type Props = {
+  params: Promise<{ id: string; chapterId: string }>;
+};
+
+
+export default function EditChapter(props: Props){
+  // const router = useRouter();
+  const { id: mangaId, chapterId } = use(props.params);
   
   const [title, setTitle] = useState("");
   const [number, setNumber] = useState("");
@@ -120,6 +128,10 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
       }
     };
     
+    if (!file) {
+      console.warn('No file selected for reading');
+      return;
+    }
     reader.readAsDataURL(file);
   };
 
@@ -212,12 +224,12 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
     if (newImageIndex !== -1) {
       const newImage = newImages[newImageIndex];
       const preview = newImagesPreviews[newImageIndex];
-      return { 
-        type: 'new' as const, 
-        image: newImage,
-        preview: preview,
-        is_external: newImage.is_external
-      };
+        return {
+          type: 'new' as const,
+          image: newImage,
+          preview,
+          is_external: newImage?.is_external
+      }
     }
     
     return null;
@@ -350,7 +362,8 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
           } else {
             break; // Nếu không tìm thấy ảnh, dừng vòng lặp
           }
-        } catch (error) {
+        } catch (err) {
+          console.error("Error checking image:", err);
           break; // Nếu có lỗi, dừng vòng lặp
         }
       }
@@ -553,27 +566,28 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {allPossiblePositions.map((position) => {
                 const imageData = getImageAtPosition(position);
-                console.log(`Position ${position} image data:`, imageData);
+                console.log(`Position ${position} image data:`, imageData?.image?.image_url);
                 
                 return (
                   <div key={`position-${position}`} className="relative bg-gray-700 rounded-lg p-2">
                     <div className="aspect-[2/3] relative">
                       {imageData ? (
                         <>
-                        {console.log(imageData.image.is_external)}
+                        {console.log(imageData.image?.image_url)}
                           <img
                             src={
                               imageData.type === 'current' 
-                                ? (imageData.image.is_external ? imageData.image.external_url : imageData.image.image?.url)
-                                : (imageData.is_external ? imageData.image.external_url : imageData.preview.preview)
+                                ? (imageData.image.is_external ? imageData.image.external_url :  imageData?.image?.image_url)
+                                : (imageData.is_external ? imageData.image?.external_url : imageData.preview?.preview    
+                                )
                             }
                             alt={`Ảnh vị trí ${position}`}
-                            className="w-full h-full object-contain rounded"
                             onError={(e) => {
-                              console.error(`Error loading image at position ${position}:`, e);
-                              console.log("Image data:", imageData);
-                              e.currentTarget.src = "/placeholder-image.jpg";
+                              const img = e.currentTarget;
+                              img.onerror = null;
+                              img.src = "/placeholder-image.jpg";
                             }}
+                            className="w-full h-full object-contain rounded"
                           />
                           <div className="absolute top-0 left-0 bg-gray-800 text-white text-xs px-2 py-1 rounded-br">
                             Vị trí {position}
@@ -617,7 +631,11 @@ export default function EditChapter({ params }: { params: { id: string; chapterI
                         ) : (
                           <button
                             type="button"
-                            onClick={() => removeNewImage(imageData.image.position)}
+                            onClick={() => {
+                              if (imageData?.image) {
+                                removeNewImage(imageData.image.position);
+                              }
+                            }}
                             className="p-1 rounded bg-red-600 hover:bg-red-700 text-white"
                           >
                             Xóa

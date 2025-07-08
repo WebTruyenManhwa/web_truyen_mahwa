@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import AdminSidebar from "../../../../../components/admin/AdminSidebar";
 import { mangaApi, chapterApi } from "../../../../../services/api";
+import React from "react";
 
 interface Chapter {
   id: number;
@@ -18,8 +19,12 @@ interface Manga {
   title: string;
 }
 
-export default function ManageChapters({ params }: { params: { id: string } }) {
-  const mangaId = params.id;
+type Props = {
+  params: Promise<{ id: string }>;
+};
+
+export default function ManageChapters(props: Props) {
+  const { id: mangaId } = use(props.params);
   const [manga, setManga] = useState<Manga | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [isLoading, setIsLoading] = useState(true);

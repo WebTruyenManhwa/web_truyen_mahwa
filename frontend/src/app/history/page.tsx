@@ -1,8 +1,9 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
+// import Image from "next/image";
 import { userApi } from "../../services/api";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -12,7 +13,7 @@ interface ReadingHistory {
   manga: {
     id: number;
     title: string;
-    cover_image?: string;
+    cover_image?: { url: string };
   };
   chapter: {
     id: number;
@@ -103,9 +104,8 @@ export default function HistoryPage() {
                 <Link href={`/manga/${history.manga.id}`} className="block relative">
                   <div className="aspect-[2/3] relative">
                     <img
-                      src={history.manga.cover_image.url || "/placeholder-image.jpg"}
+                      src={history.manga.cover_image?.url ?? "/placeholder-image.jpg"}
                       alt={history.manga.title}
-                      fill
                       className="object-cover"
                     />
                   </div>
