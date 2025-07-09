@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Image from "next/image";
+// import Image from "next/image";
 import Link from "next/link";
 import { mangaApi, genreApi } from "../services/api";
 import React from "react";
@@ -232,12 +232,10 @@ export default function Home() {
       {featuredManga && (
         <section className="relative rounded-lg overflow-hidden">
           <div className="relative h-72 md:h-96">
-            <Image
+            <img
               src={featuredManga.coverImage || "https://placehold.co/1200x800/333/white?text=No+Image"}
               alt={featuredManga.title}
-              fill
-              className="object-cover brightness-50"
-              priority
+              className="w-full h-full object-cover brightness-50"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
             <div className="absolute bottom-0 left-0 p-6 md:p-8 w-full md:max-w-2xl">
