@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+const API_URL = 'http://localhost:3001/api';
 
 // Tạo axios instance với cấu hình chung
 const api = axios.create({
@@ -217,6 +217,7 @@ export const userApi = {
 
   // Lấy thông tin user hiện tại
   getCurrentUser: async () => {
+    console.log("⏳ Gọi API getCurrentUser()");
     const response = await api.get('/v1/users/me');
     return response.data;
   },

@@ -148,20 +148,20 @@ export default function ChapterReader() {
             await userApi.addToReadingHistory(mangaId, chapterId);
             // Refresh manga data after adding to reading history
             const mangaData = await mangaApi.getManga(mangaId);
-            if (chapter?.manga) {
-              setChapter(prev => {
-                if (!prev) return null;
-                return {
-                  ...prev,
-                  manga: {
-                    ...prev.manga!,
-                    id: prev.manga!.id,
-                    title: prev.manga!.title,
-                    view_count: mangaData.view_count
-                  }
-                };
-              });
-            }
+            console.log("mangaData", mangaData)
+            // Cập nhật chapter với manga data mới
+            setChapter(prev => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                manga: {
+                  ...prev.manga,
+                  id: prev.manga?.id || parseInt(mangaId),
+                  title: prev.manga?.title || mangaData.title,
+                  view_count: mangaData.view_count
+                }
+              };
+            });
           } catch (err) {
             console.error("Failed to add to reading history:", err);
           }
