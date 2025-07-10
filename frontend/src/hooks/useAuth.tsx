@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { userApi } from '../services/api';
 import React from 'react';
+import axios from 'axios';
 
 // Định nghĩa kiểu dữ liệu cho user
 interface User {
@@ -23,6 +24,7 @@ interface AuthContextType {
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => Promise<void>;
+  loginWithToken: (token: string) => void;
 }
 
 // Tạo context
@@ -32,9 +34,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const hasManualLogin = useRef(false);
+
 
   // Kiểm tra xem user đã đăng nhập chưa khi component mount
-  useEffect(() => {
     const checkAuth = async () => {
       try {
         const token = localStorage.getItem('token');
@@ -59,8 +62,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    checkAuth();
-  }, []);
+    useEffect(() => {
+      if (!hasManualLogin.current) {
+        checkAuth();
+      }
+    }, []);
 
   // Đăng nhập
   const login = async (email: string, password: string) => {
@@ -94,6 +100,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Đăng xuất
   const logout = () => {
     userApi.logout();
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
     setUser(null);
   };
 
@@ -112,6 +120,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const loginWithToken = async (token: string) => {
+    hasManualLogin.current = true; 
+    localStorage.setItem("token", token);
+    axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    try {
+      const currentUser = await userApi.getCurrentUser(); // <--- GỌI THẲNG LẠI
+      setUser(currentUser);
+      localStorage.setItem("user", JSON.stringify(currentUser));
+    } catch (e) {
+      console.error("loginWithToken parse error:", e);
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const value = {
     user,
     isLoading,
@@ -120,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     register,
     logout,
     updateUser,
+    loginWithToken,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-// import { useAuth } from "@/hooks/useAuth";
-import axios from 'axios';
+import { useAuth } from "../../../hooks/useAuth";
+// import axios from 'axios';
 import React from "react";
 
 export default function AuthCallback() {
@@ -11,28 +11,17 @@ export default function AuthCallback() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
   const error = searchParams.get("error");
-  
+  const { loginWithToken } = useAuth();
+  const hasHandled = useRef(false);
+
   useEffect(() => {
+    if (hasHandled.current) return;
+    hasHandled.current = true;
+    const handleLogin = async () => {
     if (token) {
-      // Lưu token vào localStorage
-      localStorage.setItem("token", token);
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-      // Lấy thông tin user từ token (JWT)
+
       try {
-        const base64Url = token.split('.')[1];
-        if (!base64Url) {
-          console.error('Invalid token format', token);
-          return;
-        }
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');       
-        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
-        
-        const user = JSON.parse(jsonPayload);
-        localStorage.setItem("user", JSON.stringify(user));
-        
-        // Chuyển hướng về trang chủ
+        await loginWithToken(token);
         router.push("/");
       } catch (error) {
         console.error("Failed to parse token:", error);
@@ -45,7 +34,10 @@ export default function AuthCallback() {
       // Không có token hoặc lỗi, chuyển về trang đăng nhập
       router.push("/auth/login");
     }
-  }, [token, error, router]);
+  };
+
+  handleLogin();
+  }, [token, error, loginWithToken, router]);
   
   return (
     <div className="flex justify-center items-center h-screen">
