@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3001/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 // Tạo axios instance với cấu hình chung
 const api = axios.create({
@@ -150,13 +150,20 @@ export const chapterApi = {
 export const chapterImageApi = {
   // Lấy danh sách ảnh của một chapter
   getChapterImages: async (chapterId: string | number) => {
-    const response = await api.get(`/v1/chapters/${chapterId}/chapter_images`);
-    return response.data;
+    const response = await api.get(`/v1/chapters/${chapterId}`);
+    return response.data.images || [];
   },
 
-  // Cập nhật một ảnh trong chapter
-  updateChapterImage: async (imageId: number, imageData: FormData) => {
-    const response = await api.put(`/v1/chapter_images/${imageId}`, imageData, {
+  // Cập nhật vị trí ảnh trong chapter
+  updateImagePositions: async (chapterId: string | number, positionMapping: Record<number, number>) => {
+    const formData = new FormData();
+    
+    // Thêm mapping vị trí vào formData
+    Object.entries(positionMapping).forEach(([oldPos, newPos]) => {
+      formData.append(`image_positions[${oldPos}]`, newPos.toString());
+    });
+    
+    const response = await api.put(`/v1/chapters/${chapterId}`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -164,15 +171,36 @@ export const chapterImageApi = {
     return response.data;
   },
 
-  // Xóa một ảnh trong chapter
-  deleteChapterImage: async (imageId: number) => {
-    const response = await api.delete(`/v1/chapter_images/${imageId}`);
+  // Xóa ảnh trong chapter theo vị trí
+  deleteImage: async (chapterId: string | number, position: number) => {
+    const formData = new FormData();
+    formData.append('image_positions_to_delete[]', position.toString());
+    
+    const response = await api.put(`/v1/chapters/${chapterId}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   },
 
   // Thêm một ảnh vào chapter
   addChapterImage: async (chapterId: string | number, imageData: FormData) => {
-    const response = await api.post(`/v1/chapters/${chapterId}/chapter_images`, imageData, {
+    // Đảm bảo formData có trường new_images[]
+    const newFormData = new FormData();
+    
+    // Lấy file từ formData cũ
+    const image = imageData.get('chapter_image[image]') || imageData.get('image');
+    const position = imageData.get('chapter_image[position]') || imageData.get('position');
+    const isExternal = imageData.get('chapter_image[is_external]') || imageData.get('is_external');
+    const externalUrl = imageData.get('chapter_image[external_url]') || imageData.get('external_url');
+    
+    if (image) newFormData.append('new_images[]', image);
+    if (position) newFormData.append('new_image_positions[]', position.toString());
+    if (isExternal) newFormData.append('is_external', isExternal.toString());
+    if (externalUrl) newFormData.append('external_url', externalUrl.toString());
+    
+    const response = await api.put(`/v1/chapters/${chapterId}`, newFormData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -182,7 +210,18 @@ export const chapterImageApi = {
 
   // Thêm nhiều ảnh vào chapter
   bulkAddChapterImages: async (chapterId: string | number, imagesData: FormData) => {
-    const response = await api.post(`/v1/chapters/${chapterId}/chapter_images/bulk`, imagesData, {
+    // Đảm bảo formData có trường new_images[]
+    const newFormData = new FormData();
+    
+    // Lấy các files từ formData cũ
+    const images = imagesData.getAll('images[]');
+    
+    // Thêm từng file vào new_images[]
+    images.forEach(image => {
+      newFormData.append('new_images[]', image);
+    });
+    
+    const response = await api.put(`/v1/chapters/${chapterId}`, newFormData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

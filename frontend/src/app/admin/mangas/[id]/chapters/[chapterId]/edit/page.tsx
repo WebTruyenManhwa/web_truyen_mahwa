@@ -5,7 +5,7 @@ import React, { useState, useEffect, use } from "react";
 // import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AdminSidebar from "../../../../../../../components/admin/AdminSidebar";
-import { chapterApi, chapterImageApi } from "../../../../../../../services/api";
+import { chapterApi } from "../../../../../../../services/api";
 
 // Định nghĩa interface cho ảnh chapter
 interface ChapterImage {
@@ -70,7 +70,7 @@ export default function EditChapter(props: Props){
         setNumber(response.number.toString());
         
         // Sắp xếp ảnh theo position
-        const images = response.chapter_images || [];
+        const images = response.images || [];
         console.log("Initial chapter images:", images);
         const sortedImages = [...images].sort((a, b) => a.position - b.position);
         console.log("Initial sorted images:", sortedImages);
@@ -254,60 +254,49 @@ export default function EditChapter(props: Props){
     setIsLoading(true);
     
     try {
-      // Cập nhật thông tin cơ bản của chapter
-      const chapterFormData = new FormData();
-      chapterFormData.append("chapter[title]", title);
-      chapterFormData.append("chapter[number]", number);
+      // Chuẩn bị dữ liệu để cập nhật chapter
+      const formData = new FormData();
+      formData.append("title", title);
+      formData.append("number", number);
       
-      console.log("Updating chapter basic info...");
-      await chapterApi.updateChapter(mangaId, chapterId, chapterFormData);
-      
-      // Xử lý xóa ảnh
-      console.log("Deleting images:", imagesToDelete);
-      for (const imageId of imagesToDelete) {
-        try {
-          await chapterImageApi.deleteChapterImage(imageId);
-          console.log(`Deleted image ${imageId}`);
-        } catch (err) {
-          console.error(`Error deleting image ${imageId}:`, err);
+      // Thêm các ảnh cần xóa (theo vị trí)
+      const positionsToDelete: number[] = [];
+      currentImages.forEach(img => {
+        if (imagesToDelete.includes(img.id)) {
+          positionsToDelete.push(img.position);
         }
-      }
+      });
       
-      // Cập nhật vị trí của ảnh hiện có
-      console.log("Updating image positions...");
-      const imagesToUpdate = currentImages.filter(image => !imagesToDelete.includes(image.id));
-      for (const image of imagesToUpdate) {
-        try {
-          const imageFormData = new FormData();
-          imageFormData.append("chapter_image[position]", image.position.toString());
-          await chapterImageApi.updateChapterImage(image.id, imageFormData);
-        } catch (err) {
-          console.error(`Error updating position for image ${image.id}:`, err);
+      positionsToDelete.forEach(position => {
+        formData.append("image_positions_to_delete[]", position.toString());
+      });
+      
+      // Thêm thông tin về vị trí ảnh cần cập nhật
+      const positionMapping: Record<number, number> = {};
+      currentImages.forEach(img => {
+        if (!imagesToDelete.includes(img.id)) {
+          positionMapping[img.position] = img.position;
         }
-      }
+      });
+      
+      Object.entries(positionMapping).forEach(([oldPos, newPos]) => {
+        formData.append(`image_positions[${oldPos}]`, newPos.toString());
+      });
       
       // Thêm ảnh mới
-      console.log("Adding new images...");
-      for (const image of newImages) {
-        try {
-          const imageFormData = new FormData();
-          imageFormData.append("chapter_image[position]", image.position.toString());
-          
-          if (image.is_external && image.external_url) {
-            // Nếu là ảnh từ nguồn ngoài, gửi URL thay vì file
-            imageFormData.append("chapter_image[external_url]", image.external_url);
-            imageFormData.append("chapter_image[is_external]", "true");
-          } else if (image.file) {
-            // Nếu là file upload từ máy tính
-            imageFormData.append("chapter_image[image]", image.file);
-            imageFormData.append("chapter_image[is_external]", "false");
-          }
-          
-          await chapterImageApi.addChapterImage(chapterId, imageFormData);
-        } catch (err) {
-          console.error(`Error adding new image at position ${image.position}:`, err);
+      newImages.forEach(image => {
+        if (image.is_external && image.external_url) {
+          // Nếu là ảnh từ nguồn ngoài, thêm URL
+          formData.append("new_images[]", image.external_url);
+        } else if (image.file) {
+          // Nếu là file upload từ máy tính
+          formData.append("new_images[]", image.file);
         }
-      }
+        formData.append("new_image_positions[]", image.position.toString());
+      });
+      
+      // Gọi API cập nhật chapter
+      await chapterApi.updateChapter(mangaId, chapterId, formData);
       
       // Cập nhật lại state sau khi lưu thành công
       setNewImages([]);
@@ -318,7 +307,7 @@ export default function EditChapter(props: Props){
       const response = await chapterApi.getChapter(mangaId, chapterId);
       setTitle(response.title);
       setNumber(response.number.toString());
-      setCurrentImages(response.chapter_images || []);
+      setCurrentImages(response.images || []);
       setSuccess(true);
     } catch (err) {
       console.error("Failed to update chapter:", err);
@@ -566,20 +555,17 @@ export default function EditChapter(props: Props){
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {allPossiblePositions.map((position) => {
                 const imageData = getImageAtPosition(position);
-                console.log(`Position ${position} image data:`, imageData?.image?.image_url);
                 
                 return (
                   <div key={`position-${position}`} className="relative bg-gray-700 rounded-lg p-2">
                     <div className="aspect-[2/3] relative">
                       {imageData ? (
                         <>
-                        {console.log(imageData.image?.image_url)}
                           <img
                             src={
-                              imageData.type === 'current' 
-                                ? (imageData.image.is_external ? imageData.image.external_url :  imageData?.image?.image_url)
-                                : (imageData.is_external ? imageData.image?.external_url : imageData.preview?.preview    
-                                )
+                              imageData.type === 'current' && imageData.image
+                                ? (imageData.image.url)
+                                : (imageData.image && imageData.is_external ? imageData.image.external_url : imageData.preview?.preview || '')
                             }
                             alt={`Ảnh vị trí ${position}`}
                             onError={(e) => {

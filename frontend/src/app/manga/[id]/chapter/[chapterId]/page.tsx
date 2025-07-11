@@ -11,11 +11,9 @@ import { useAuth } from "../../../../../hooks/useAuth";
 import { useParams } from "next/navigation";
 
 interface ChapterImage {
-  id: number;
   position: number;
-  image?: string;
-  image_url?: string;
-  url?: string;
+  url: string;
+  is_external: boolean;
 }
 
 interface ChapterSummary {
@@ -26,19 +24,24 @@ interface ChapterSummary {
 
 interface Chapter {
   id: number;
-  number: number;
   title: string;
+  number: number;
   view_count: number;
   created_at: string;
   updated_at: string;
-  manga?: {
+  manga: {
     id: number;
     title: string;
-    chapters?: ChapterSummary[];
   };
-  next_chapter?: ChapterSummary | null;
-  prev_chapter?: ChapterSummary | null;
-  chapter_images?: ChapterImage[];
+  images: ChapterImage[];
+  next_chapter?: {
+    id: number;
+    number: number;
+  };
+  prev_chapter?: {
+    id: number;
+    number: number;
+  };
 }
 
 interface Comment {
@@ -70,7 +73,7 @@ export default function ChapterReader() {
   const [selectedStickers, setSelectedStickers] = useState<string[]>([]);
   const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
-  const [readingMode, setReadingMode] = useState<"vertical" | "horizontal">("vertical");
+  // const [readingMode, setReadingMode] = useState<"vertical" | "horizontal">("vertical");
   const [showBottomNav, setShowBottomNav] = useState(false);
   const [allChapters, setAllChapters] = useState<ChapterSummary[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
@@ -193,24 +196,23 @@ export default function ChapterReader() {
           prev_chapter: {
             id: 2,
             number: 1087,
-            title: "Chapter 1087"
           },
-          next_chapter: null,
-          chapter_images: [
+          next_chapter: undefined,
+          images: [
             {
-              id: 1,
               position: 0,
-              image: "https://m.media-amazon.com/images/I/51FVFCrSp0L._AC_UF1000,1000_QL80_.jpg",
+              url: "https://m.media-amazon.com/images/I/51FVFCrSp0L._AC_UF1000,1000_QL80_.jpg",
+              is_external: false
             },
             {
-              id: 2,
               position: 1,
-              image: "https://m.media-amazon.com/images/I/81qb4I6rbsL._AC_UF1000,1000_QL80_.jpg",
+              url: "https://m.media-amazon.com/images/I/81qb4I6rbsL._AC_UF1000,1000_QL80_.jpg",
+              is_external: false
             },
             {
-              id: 3,
               position: 2,
-              image: "https://m.media-amazon.com/images/I/51QQuG9myeL._AC_UF1000,1000_QL80_.jpg",
+              url: "https://m.media-amazon.com/images/I/51QQuG9myeL._AC_UF1000,1000_QL80_.jpg",
+              is_external: false
             },
           ],
         });
@@ -230,7 +232,7 @@ export default function ChapterReader() {
         number: chapter.number,
         title: chapter.title,
         manga: chapter.manga,
-        images: chapter.chapter_images,
+        images: chapter.images,
       });
     }
   }, [chapter]);
@@ -364,19 +366,13 @@ export default function ChapterReader() {
     setReplyingTo(null);
   };
 
-  const toggleReadingMode = () => {
-    setReadingMode(readingMode === "vertical" ? "horizontal" : "vertical");
-  };
+  // const toggleReadingMode = () => {
+  //   setReadingMode(readingMode === "vertical" ? "horizontal" : "vertical");
+  // };
 
   // Helper function to get the image URL from different possible sources
   const getImageUrl = (image: ChapterImage): string => {
-    if (image.image_url) return image.image_url;
-    if (image.url) return image.url;
-    if (typeof image.image === 'string') return image.image;
-    if (typeof image.image === 'object' && image.image && 'url' in image.image) {
-      return (image.image as { url: string }).url || '';
-    }
-    return '';
+    return image.url || '';
   };
 
   if (isLoading) {
@@ -409,18 +405,18 @@ export default function ChapterReader() {
                 <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
               </svg>
             </Link>
-            <div>
-              <h1 className="text-lg font-bold">
+            <div className="overflow-hidden">
+              <h1 className="text-lg font-bold truncate">
                 <Link href={`/manga/${mangaId}`} className="hover:text-red-500">
                   {chapter.manga?.title || "Đang tải..."}
                 </Link>
               </h1>
-              <p className="text-sm text-gray-400">Chapter {chapter.number || ""} {chapter.title ? `- ${chapter.title}` : ""}</p>
+              <p className="text-sm text-gray-400 truncate">Chapter {chapter.number || ""} {chapter.title ? `- ${chapter.title}` : ""}</p>
             </div>
           </div>
           
           <div className="flex flex-wrap gap-2 items-center">
-            <button
+            {/* <button
               onClick={toggleReadingMode}
               className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm flex items-center"
             >
@@ -439,9 +435,9 @@ export default function ChapterReader() {
                   Ngang
                 </>
               )}
-            </button>
+            </button> */}
             
-            <div className="flex flex-1 min-w-0 gap-2">
+            <div className="flex flex-1 min-w-0 gap-2 flex-wrap sm:flex-nowrap">
               <Link
                 href={`/manga/${mangaId}/chapter/${chapter.prev_chapter?.id}`}
                 className="bg-red-700 hover:bg-red-600 px-3 py-1 rounded text-sm whitespace-nowrap"
@@ -449,7 +445,7 @@ export default function ChapterReader() {
                 Chương trước
               </Link>
               
-              <div className="relative flex-1 min-w-0" ref={dropdownRef}>
+              <div className="relative flex-1 min-w-0 w-full" ref={dropdownRef}>
                 <button
                   className="w-full bg-gray-700 text-white px-3 py-1 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-500 flex items-center justify-between"
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -468,7 +464,7 @@ export default function ChapterReader() {
                 </button>
                 
                 {isDropdownOpen && (
-                  <div className="absolute z-50 w-full mt-1 bg-gray-700 rounded shadow-lg">
+                  <div className="absolute z-50 w-full mt-1 bg-gray-700 rounded shadow-lg max-w-full left-0 right-0">
                     <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
                       {allChapters.map((chap) => (
                         <Link
@@ -479,7 +475,7 @@ export default function ChapterReader() {
                           }`}
                           onClick={() => setIsDropdownOpen(false)}
                         >
-                          Chapter {chap.number} - {chap.title}
+                          <span className="truncate block">Chapter {chap.number} - {chap.title}</span>
                         </Link>
                       ))}
                     </div>
@@ -499,11 +495,11 @@ export default function ChapterReader() {
       </div>
       
       {/* Chapter Images */}
-      <div className={`${readingMode === "vertical" ? "space-y-1" : "flex overflow-x-auto whitespace-nowrap pb-4"}`}>
-        {(chapter.chapter_images || []).map((image, _index) => (
+      <div className={`space-y-1`}>
+        {(chapter.images || []).map((image, index) => (
           <div 
-            key={image.id} 
-            className={`chapter-image ${readingMode === "horizontal" ? "inline-block mr-1" : ""}`}
+            key={`image-${image.position}`} 
+            className={`chapter-image`}
           >
             <img
               src={getImageUrl(image)}

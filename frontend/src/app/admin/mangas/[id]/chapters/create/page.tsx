@@ -122,12 +122,12 @@ export default function CreateChapter(props: Props) {
       formData.append("title", title);
       formData.append("number", number);
       
-      // Append each image with its position
+      // Append each image
       images.forEach(image => {
         formData.append('images[]', image);
       });
       
-      // Create chapter
+      // Create chapter - API mới sẽ xử lý images trong ChapterForm
       await chapterApi.createChapter(mangaId, formData);
       
       setSuccess(true);
