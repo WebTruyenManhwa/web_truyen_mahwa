@@ -328,32 +328,150 @@ export default function EditChapter(props: Props){
     setError("");
 
     try {
-      // Lấy số chapter từ URL
-      const chapterMatch = importUrl.match(/chuong-(\d+)/);
-      if (!chapterMatch) {
-        throw new Error("URL không hợp lệ");
-      }
-      const chapterNum = chapterMatch[1];
-
-      // Tạo danh sách URL ảnh
-      const imageUrls: string[] = [];
-      let index = 1;
-      while (index <= 100) { // Giới hạn tối đa 100 ảnh
-        const paddedIndex = index.toString().padStart(3, '0');
-        const imageUrl = `https://img.henzz.xyz/mo-khoa-tim-em/chuong-${chapterNum}/${paddedIndex}.jpg`;
+      // Phân tích URL để xác định nguồn và định dạng
+      const url = new URL(importUrl);
+      const hostname = url.hostname;
+      const pathname = url.pathname;
+      
+      // Mảng chứa URL ảnh sẽ import
+      let imageUrls: string[] = [];
+      
+      // Xử lý theo từng trang web khác nhau
+      if (hostname.includes('nettruyen') || hostname.includes('truyenvn.shop')) {
+        // Xử lý cho NetTruyen và TruyenVN
+        // Format: /manga/ten-truyen/chapter-X hoặc /truyen-tranh/ten-truyen/chapter-X
+        const chapterMatch = pathname.match(/chapter-(\d+)/i);
+        if (!chapterMatch) {
+          throw new Error("Không thể xác định số chapter từ URL");
+        }
+        
+        const chapterNum = chapterMatch[1];
+        
+        // Thử lấy ảnh từ trang web
+        try {
+          // Giả lập request để lấy HTML của trang
+          const response = await fetch(importUrl);
+          const html = await response.text();
+          
+          // Tìm tất cả các URL ảnh trong HTML
+          const imgRegex = /<img[^>]+src="([^">]+)"[^>]*>/g;
+          let match;
+          while ((match = imgRegex.exec(html)) !== null) {
+            const imgSrc = match[1];
+            if (imgSrc && !imgSrc.includes('logo') && !imgSrc.includes('banner') && !imgSrc.includes('icon')) {
+              imageUrls.push(imgSrc);
+            }
+          }
+          
+          // Lọc ra các ảnh chapter thực sự
+          imageUrls = imageUrls.filter(url => 
+            url.includes('/chapter-') || 
+            url.includes('/chuong-') || 
+            url.includes(`/${chapterNum}-`) ||
+            url.includes(`/${chapterNum}/`)
+          );
+        } catch (err) {
+          console.error("Error fetching page HTML:", err);
+          throw new Error("Không thể tải nội dung từ trang web");
+        }
+      } else if (hostname.includes('sayhentaii.art')) {
+        // Xử lý cho SayHentaii
+        // Format: /truyen-set-up/chuong-X
+        const chapterMatch = pathname.match(/chuong-(\d+)/i);
+        if (!chapterMatch) {
+          throw new Error("Không thể xác định số chapter từ URL");
+        }
+        
+        const chapterNum = chapterMatch[1];
         
         try {
-          // Kiểm tra xem ảnh có tồn tại không
-          const response = await fetch(imageUrl, { method: 'HEAD' });
-          if (response.ok) {
-            imageUrls.push(imageUrl);
-            index++;
-          } else {
-            break; // Nếu không tìm thấy ảnh, dừng vòng lặp
+          // Giả lập request để lấy HTML của trang
+          const response = await fetch(importUrl);
+          const html = await response.text();
+          
+          // Tìm tất cả các URL ảnh trong HTML
+          const imgRegex = /<img[^>]+src="([^">]+)"[^>]*>/g;
+          let match;
+          while ((match = imgRegex.exec(html)) !== null) {
+            const imgSrc = match[1];
+            if (imgSrc && !imgSrc.includes('logo') && !imgSrc.includes('banner') && !imgSrc.includes('icon')) {
+              imageUrls.push(imgSrc);
+            }
           }
+          
+          // Lọc ra các ảnh chapter thực sự
+          imageUrls = imageUrls.filter(url => 
+            url.includes('/chuong-') || 
+            url.includes(`/${chapterNum}/`) ||
+            url.includes(`chapter-${chapterNum}`)
+          );
         } catch (err) {
-          console.error("Error checking image:", err);
-          break; // Nếu có lỗi, dừng vòng lặp
+          console.error("Error fetching page HTML:", err);
+          throw new Error("Không thể tải nội dung từ trang web");
+        }
+      } else if (hostname.includes('hentaivn.cx') || hostname.includes('img.henzz.xyz')) {
+        // Xử lý cho HentaiVN - giữ nguyên logic cũ
+        const chapterMatch = pathname.match(/chuong-(\d+)/i);
+        if (!chapterMatch) {
+          throw new Error("URL không hợp lệ");
+        }
+        const chapterNum = chapterMatch[1];
+
+        // Tạo danh sách URL ảnh
+        let index = 1;
+        while (index <= 100) { // Giới hạn tối đa 100 ảnh
+          const paddedIndex = index.toString().padStart(3, '0');
+          const imageUrl = `https://img.henzz.xyz/mo-khoa-tim-em/chuong-${chapterNum}/${paddedIndex}.jpg`;
+          
+          try {
+            // Kiểm tra xem ảnh có tồn tại không
+            const response = await fetch(imageUrl, { method: 'HEAD' });
+            if (response.ok) {
+              imageUrls.push(imageUrl);
+              index++;
+            } else {
+              break; // Nếu không tìm thấy ảnh, dừng vòng lặp
+            }
+          } catch (err) {
+            console.error("Error checking image:", err);
+            break; // Nếu có lỗi, dừng vòng lặp
+          }
+        }
+      } else {
+        // Xử lý chung cho các trang web khác
+        try {
+          // Giả lập request để lấy HTML của trang
+          const response = await fetch(importUrl);
+          const html = await response.text();
+          
+          // Tìm tất cả các URL ảnh trong HTML
+          const imgRegex = /<img[^>]+src="([^">]+)"[^>]*>/g;
+          let match;
+          while ((match = imgRegex.exec(html)) !== null) {
+            const imgSrc = match[1];
+            // Lọc bỏ các ảnh logo, banner, icon
+            if (imgSrc && !imgSrc.includes('logo') && !imgSrc.includes('banner') && !imgSrc.includes('icon')) {
+              // Chuyển đổi URL tương đối thành tuyệt đối nếu cần
+              if (imgSrc.startsWith('/')) {
+                imageUrls.push(`${url.protocol}//${url.host}${imgSrc}`);
+              } else if (!imgSrc.startsWith('http')) {
+                imageUrls.push(`${url.protocol}//${url.host}/${imgSrc}`);
+              } else {
+                imageUrls.push(imgSrc);
+              }
+            }
+          }
+          
+          // Lọc các ảnh có kích thước lớn (có thể là ảnh chapter)
+          // Đây chỉ là giải pháp tạm thời, cần cải thiện thuật toán lọc
+          imageUrls = imageUrls.filter(url => 
+            !url.includes('avatar') && 
+            !url.includes('thumbnail') && 
+            !url.includes('small')
+          );
+        } catch (err) {
+          console.error("Error fetching page HTML:", err);
+          throw new Error("Không thể tải nội dung từ trang web");
         }
       }
 
@@ -685,7 +803,7 @@ export default function EditChapter(props: Props){
           <div className="mb-8">
             <h3 className="text-lg font-medium mb-4">Import ảnh từ URL</h3>
             <p className="text-sm text-gray-400 mb-2">
-              Nhập URL chapter từ hentaivn.cx để import tất cả ảnh của chapter đó
+              Nhập URL chapter từ các trang web truyện như nettruyen, sayhentaii, truyenvn, hentaivn, v.v. để import tất cả ảnh của chapter đó
             </p>
             
             <div className="flex gap-4">
@@ -693,7 +811,7 @@ export default function EditChapter(props: Props){
                 type="text"
                 value={importUrl}
                 onChange={(e) => setImportUrl(e.target.value)}
-                placeholder="Ví dụ: https://hentaivn.cx/truyen-hentai/mo-khoa-tim-em/chuong-1/"
+                placeholder="Ví dụ: https://nettruyen1905.com/manga/ten-truyen/chapter-1 hoặc https://truyenvn.shop/truyen-tranh/ten-truyen/chapter-1"
                 className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <button
