@@ -496,7 +496,7 @@ export default function ChapterReader() {
       
       {/* Chapter Images */}
       <div className={`space-y-1`}>
-        {(chapter.images || []).map((image, index) => (
+        {(chapter.images || []).map((image, _index) => (
           <div 
             key={`image-${image.position}`} 
             className={`chapter-image`}
