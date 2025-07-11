@@ -79,15 +79,23 @@ export default function EditChapter(props: Props){
           console.log(`Image ${index} - ID: ${img.id}, Position: ${img.position}, URL: ${img.url}`);
         });
 
+        // Sắp xếp ảnh theo position
         const sortedImages = [...images].sort((a, b) => a.position - b.position);
         console.log("Initial sorted images:", sortedImages);
-        setCurrentImages(sortedImages);
+
+        // Nén vị trí ảnh để không có khoảng trống
+        const compactedImages = sortedImages.map((img, index) => ({
+          ...img,
+          position: index
+        }));
+
+        setCurrentImages(compactedImages);
 
         // Tìm vị trí lớn nhất
-        const maxPos = sortedImages.length > 0
-          ? Math.max(...sortedImages.map(img => img.position))
-          : -1;
-        setMaxPosition(maxPos + 1);
+        const maxPos = compactedImages.length > 0
+          ? compactedImages.length
+          : 0;
+        setMaxPosition(maxPos);
       } catch (err) {
         console.error("Failed to fetch chapter:", err);
         setError("Không thể tải thông tin chapter. Vui lòng thử lại sau.");
@@ -194,7 +202,7 @@ export default function EditChapter(props: Props){
   };
 
   // Đánh dấu xóa/khôi phục ảnh hiện tại dựa trên vị trí
-  const toggleImageToDelete = (position: number) => {
+  const toggleImageToDelete = async (position: number) => {
     console.log("Toggle delete for image at position:", position);
 
     // Tìm ảnh theo position
@@ -215,6 +223,104 @@ export default function EditChapter(props: Props){
     } else {
       console.log("Adding position to delete list");
       setImagesToDelete([...imagesToDelete, position]);
+
+      // Hiển thị xác nhận trước khi xóa ngay lập tức
+      if (confirm("Bạn có muốn xóa ảnh này ngay lập tức không? Nhấn OK để xóa ngay, Cancel để chỉ đánh dấu xóa.")) {
+        try {
+          setIsLoading(true);
+          console.log("Deleting image immediately at position:", position);
+
+          // Lưu trữ một bản sao của ảnh hiện tại trước khi xóa
+          const currentImagesCopy = [...currentImages];
+
+          // Xóa ảnh khỏi UI ngay lập tức
+          const updatedImages = currentImages.filter(img => img.position !== position);
+
+          // Nén lại vị trí sau khi xóa
+          const compactedImages = updatedImages.map((img, index) => ({
+            ...img,
+            position: index
+          }));
+
+          console.log("Updated images after deletion:", compactedImages);
+
+          // Cập nhật UI ngay lập tức
+          setCurrentImages(compactedImages);
+          setMaxPosition(compactedImages.length);
+
+          // Xóa khỏi danh sách đánh dấu xóa vì đã xóa khỏi UI
+          setImagesToDelete(imagesToDelete.filter(pos => pos !== position));
+
+          // Chuẩn bị dữ liệu để cập nhật chapter
+          const formData = new FormData();
+          formData.append("title", title);
+          formData.append("number", number);
+
+          // Thêm vị trí cần xóa
+          console.log("Adding position to delete in API call:", position);
+          formData.append("image_positions_to_delete[]", position.toString());
+
+          // Thêm mapping vị trí mới cho các ảnh còn lại
+          const positionMapping: Record<string, string> = {};
+          compactedImages.forEach(img => {
+            if (img.id !== undefined) {
+              positionMapping[img.id.toString()] = img.position.toString();
+              console.log(`Mapping image ID ${img.id} to position ${img.position}`);
+            }
+          });
+
+          // Thêm mapping vào formData
+          Object.entries(positionMapping).forEach(([imageId, newPosition]) => {
+            formData.append(`image_positions[${imageId}]`, newPosition);
+          });
+
+          // Gọi API cập nhật chapter
+          console.log("Calling API to delete image...");
+          const response = await chapterApi.updateChapter(mangaId, chapterId, formData);
+          console.log("API response after deletion:", response);
+
+          // Đợi một khoảng thời gian ngắn để đảm bảo backend đã xử lý xong
+          console.log("Waiting for backend to process deletion...");
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          // Tải lại dữ liệu từ server để đảm bảo đồng bộ
+          console.log("Reloading data from server...");
+          const reloadResponse = await chapterApi.getChapter(mangaId, chapterId);
+          console.log("Server response after deletion:", reloadResponse);
+
+          // Cập nhật state với dữ liệu mới
+          const sortedImages = [...reloadResponse.images || []].sort((a, b) => a.position - b.position);
+          const serverCompactedImages = sortedImages.map((img, index) => ({
+            ...img,
+            position: index
+          }));
+
+          console.log("Final images from server:", serverCompactedImages);
+          setCurrentImages(serverCompactedImages);
+          setMaxPosition(serverCompactedImages.length);
+
+          setSuccess(true);
+        } catch (err) {
+          console.error("Failed to delete image:", err);
+          setError("Xóa ảnh thất bại. Vui lòng thử lại sau.");
+
+          // Nếu API thất bại, tải lại dữ liệu từ server để đảm bảo UI đồng bộ
+          try {
+            const response = await chapterApi.getChapter(mangaId, chapterId);
+            const sortedImages = [...response.images || []].sort((a, b) => a.position - b.position);
+            const compactedImages = sortedImages.map((img, index) => ({
+              ...img,
+              position: index
+            }));
+            setCurrentImages(compactedImages);
+            setMaxPosition(compactedImages.length);
+          } catch (reloadErr) {
+            console.error("Failed to reload chapter data:", reloadErr);
+          }
+        } finally {
+          setIsLoading(false);
+        }
+      }
     }
   };
 
@@ -234,7 +340,17 @@ export default function EditChapter(props: Props){
       positions.add(img.position);
     });
 
-    return Array.from(positions).sort((a, b) => a - b);
+    const usedPositions = Array.from(positions).sort((a, b) => a - b);
+
+    // Tính số lượng vị trí cần hiển thị (bằng số lượng ảnh hiện tại + 1 vị trí mới)
+    const totalImages = usedPositions.length;
+    const totalPositions = Math.max(totalImages + 1, 5); // Ít nhất 5 vị trí
+
+    // Tạo một mảng các vị trí từ 0 đến totalPositions - 1
+    return Array.from(
+      { length: totalPositions },
+      (_, i) => i
+    );
   };
 
   // Lấy ảnh (hiện tại hoặc mới) ở một vị trí cụ thể
@@ -242,7 +358,7 @@ export default function EditChapter(props: Props){
     // Kiểm tra trong ảnh hiện tại
     const currentImage = currentImages.find(img => img.position === position && !imagesToDelete.includes(img.position));
     if (currentImage) {
-      console.log("Found current image at position", position, ":", currentImage);
+      // console.log("Found current image at position", position, ":", currentImage);
       return { type: 'current' as const, image: currentImage };
     }
 
@@ -264,20 +380,23 @@ export default function EditChapter(props: Props){
   };
 
   // Xóa vị trí trống và dịch chuyển các vị trí phía sau
-  const deleteEmptyPosition = (position: number) => {
+  const deleteEmptyPosition = async (position: number) => {
+    console.log("Attempting to delete empty position:", position);
+
     // Kiểm tra xem vị trí có trống không
     const imageAtPosition = getImageAtPosition(position);
     if (imageAtPosition) {
+      console.error("Cannot delete position with image:", position);
       setError("Không thể xóa vị trí đã có ảnh");
       return;
     }
 
-    // Lấy tất cả các vị trí đã sử dụng
-    const usedPositions = getAllPositions();
+    console.log("Position is empty, proceeding with deletion");
 
     // Dịch chuyển các ảnh hiện tại
     const updatedCurrentImages = currentImages.map(img => {
       if (img.position > position && !imagesToDelete.includes(img.position)) {
+        console.log(`Moving image from position ${img.position} to ${img.position - 1}`);
         return { ...img, position: img.position - 1 };
       }
       return img;
@@ -286,6 +405,7 @@ export default function EditChapter(props: Props){
     // Dịch chuyển các ảnh mới
     const updatedNewImages = newImages.map(img => {
       if (img.position > position) {
+        console.log(`Moving new image from position ${img.position} to ${img.position - 1}`);
         return { ...img, position: img.position - 1 };
       }
       return img;
@@ -299,7 +419,7 @@ export default function EditChapter(props: Props){
       return img;
     });
 
-    // Cập nhật state
+    // Cập nhật state ngay lập tức để UI phản ánh thay đổi
     setCurrentImages(updatedCurrentImages);
     setNewImages(updatedNewImages);
     setNewImagesPreviews(updatedNewImagesPreviews);
@@ -308,28 +428,239 @@ export default function EditChapter(props: Props){
     if (position === maxPosition - 1) {
       setMaxPosition(maxPosition - 1);
     }
+
+    try {
+      setIsLoading(true);
+
+      // Lấy tất cả các vị trí đã sử dụng
+      const usedPositions = getUsedPositions();
+      console.log("Current used positions:", usedPositions);
+
+      // Chuẩn bị dữ liệu để cập nhật chapter
+      const formData = new FormData();
+      formData.append("title", title);
+      formData.append("number", number);
+
+      console.log("Preparing image positions for API call");
+
+      // Tạo mapping vị trí mới cho API
+      const positionMapping: Record<string, string> = {};
+
+      // Thêm thông tin về vị trí ảnh cần cập nhật
+      updatedCurrentImages.forEach(img => {
+        if (!imagesToDelete.includes(img.position) && img.id !== undefined) {
+          console.log(`Setting image ID ${img.id} to position ${img.position}`);
+          positionMapping[img.id.toString()] = img.position.toString();
+        } else if (!imagesToDelete.includes(img.position)) {
+          console.log(`Skipping image without ID at position ${img.position}`);
+        }
+      });
+
+      // Thêm mapping vào formData
+      Object.entries(positionMapping).forEach(([imageId, newPosition]) => {
+        formData.append(`image_positions[${imageId}]`, newPosition);
+      });
+
+      // Thêm các ảnh cần xóa (theo vị trí)
+      imagesToDelete.forEach(pos => {
+        console.log(`Marking position ${pos} for deletion`);
+        formData.append("image_positions_to_delete[]", pos.toString());
+      });
+
+      // Thêm ảnh mới
+      updatedNewImages.forEach(image => {
+        if (image.is_external && image.image_url) {
+          // Nếu là ảnh từ nguồn ngoài, thêm URL
+          formData.append("new_images[]", image.image_url);
+          console.log(`Adding external image at position ${image.position}`);
+        } else if (image.is_external && image.external_url) {
+          formData.append("new_images[]", image.external_url);
+          console.log(`Adding external image URL at position ${image.position}`);
+        } else if (image.file) {
+          // Nếu là file upload từ máy tính
+          formData.append("new_images[]", image.file);
+          console.log(`Adding uploaded image at position ${image.position}`);
+        }
+        formData.append("new_image_positions[]", image.position.toString());
+      });
+
+      console.log("Sending update to API");
+
+      // Gọi API cập nhật chapter
+      const updateResponse = await chapterApi.updateChapter(mangaId, chapterId, formData);
+      console.log("API update response:", updateResponse);
+
+      setSuccess(true);
+      console.log("Empty position deleted successfully");
+    } catch (err) {
+      console.error("Failed to update chapter:", err);
+      setError("Cập nhật chapter thất bại. Vui lòng thử lại sau.");
+
+      // Nếu API thất bại, tải lại dữ liệu từ server để đảm bảo UI đồng bộ
+      try {
+        const response = await chapterApi.getChapter(mangaId, chapterId);
+        const sortedImages = [...response.images || []].sort((a, b) => a.position - b.position);
+        const compactedImages = sortedImages.map((img, index) => ({
+          ...img,
+          position: index
+        }));
+        setCurrentImages(compactedImages);
+        setMaxPosition(compactedImages.length);
+      } catch (reloadErr) {
+        console.error("Failed to reload chapter data:", reloadErr);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Lấy danh sách tất cả các vị trí đã được sử dụng
+  const getUsedPositions = () => {
+    const positions = new Set<number>();
+
+    // Thêm vị trí của ảnh hiện tại (không bị đánh dấu xóa)
+    currentImages.forEach(img => {
+      if (!imagesToDelete.includes(img.position)) {
+        positions.add(img.position);
+      }
+    });
+
+    // Thêm vị trí của ảnh mới
+    newImages.forEach(img => {
+      positions.add(img.position);
+    });
+
+    return Array.from(positions).sort((a, b) => a - b);
   };
 
   // Xóa tất cả vị trí trống
-  const deleteAllEmptyPositions = () => {
+  const deleteAllEmptyPositions = async () => {
     // Lấy tất cả các vị trí đã sử dụng và các vị trí trống
-    const usedPositions = getAllPositions();
-    const allPossiblePositions = Array.from(
-      { length: Math.max(...usedPositions, maxPosition) + 1 },
-      (_, i) => i
-    );
+    const usedPositions = getUsedPositions();
+    const allPossiblePositions = getAllPositions();
 
     // Tìm các vị trí trống
     const emptyPositions = allPossiblePositions.filter(pos =>
       !usedPositions.includes(pos)
     ).sort((a, b) => b - a); // Sắp xếp giảm dần để xóa từ vị trí cao xuống thấp
 
-    // Xóa từng vị trí trống từ cao xuống thấp
-    emptyPositions.forEach(position => {
-      deleteEmptyPosition(position);
-    });
+    console.log("Empty positions to delete:", emptyPositions);
 
-    setShowDeleteEmptyConfirm(false);
+    if (emptyPositions.length === 0) {
+      setError("Không có vị trí trống để xóa");
+      setShowDeleteEmptyConfirm(false);
+      return;
+    }
+
+    // Dịch chuyển các ảnh hiện tại
+    let updatedCurrentImages = [...currentImages];
+
+    // Xóa từng vị trí trống từ cao xuống thấp
+    for (const position of emptyPositions) {
+      // Dịch chuyển các ảnh hiện tại
+      updatedCurrentImages = updatedCurrentImages.map(img => {
+        if (img.position > position && !imagesToDelete.includes(img.position)) {
+          console.log(`Moving image from position ${img.position} to ${img.position - 1}`);
+          return { ...img, position: img.position - 1 };
+        }
+        return img;
+      });
+    }
+
+    // Dịch chuyển các ảnh mới
+    let updatedNewImages = [...newImages];
+    for (const position of emptyPositions) {
+      updatedNewImages = updatedNewImages.map(img => {
+        if (img.position > position) {
+          console.log(`Moving new image from position ${img.position} to ${img.position - 1}`);
+          return { ...img, position: img.position - 1 };
+        }
+        return img;
+      });
+    }
+
+    // Dịch chuyển các preview ảnh mới
+    let updatedNewImagesPreviews = [...newImagesPreviews];
+    for (const position of emptyPositions) {
+      updatedNewImagesPreviews = updatedNewImagesPreviews.map(img => {
+        if (img.position > position) {
+          return { ...img, position: img.position - 1 };
+        }
+        return img;
+      });
+    }
+
+    // Cập nhật state ngay lập tức để UI phản ánh thay đổi
+    setCurrentImages(updatedCurrentImages);
+    setNewImages(updatedNewImages);
+    setNewImagesPreviews(updatedNewImagesPreviews);
+
+    // Giảm maxPosition nếu cần
+    const highestEmptyPosition = Math.max(...emptyPositions);
+    if (highestEmptyPosition === maxPosition - 1) {
+      setMaxPosition(maxPosition - emptyPositions.length);
+    }
+
+    try {
+      setIsLoading(true);
+
+      // Chuẩn bị dữ liệu để cập nhật chapter
+      const formData = new FormData();
+      formData.append("title", title);
+      formData.append("number", number);
+
+      console.log("Preparing image positions for API call");
+
+      // Thêm thông tin về vị trí ảnh cần cập nhật
+      const positionMapping: Record<string, string> = {};
+      currentImages.forEach(img => {
+        if (!imagesToDelete.includes(img.position) && img.id !== undefined) {
+          positionMapping[img.id.toString()] = img.position.toString();
+        }
+      });
+
+      Object.entries(positionMapping).forEach(([imageId, newPosition]) => {
+        formData.append(`image_positions[${imageId}]`, newPosition);
+      });
+
+      // Thêm các ảnh cần xóa (theo vị trí)
+      imagesToDelete.forEach(pos => {
+        console.log(`Marking position ${pos} for deletion`);
+        formData.append("image_positions_to_delete[]", pos.toString());
+      });
+
+      // Thêm ảnh mới
+      updatedNewImages.forEach(image => {
+        if (image.is_external && image.image_url) {
+          // Nếu là ảnh từ nguồn ngoài, thêm URL
+          formData.append("new_images[]", image.image_url);
+          console.log(`Adding external image at position ${image.position}`);
+        } else if (image.is_external && image.external_url) {
+          formData.append("new_images[]", image.external_url);
+          console.log(`Adding external image URL at position ${image.position}`);
+        } else if (image.file) {
+          // Nếu là file upload từ máy tính
+          formData.append("new_images[]", image.file);
+          console.log(`Adding uploaded image at position ${image.position}`);
+        }
+        formData.append("new_image_positions[]", image.position.toString());
+      });
+
+      console.log("Sending update to API");
+
+      // Gọi API cập nhật chapter
+      const updateResponse = await chapterApi.updateChapter(mangaId, chapterId, formData);
+      console.log("API update response:", updateResponse);
+
+      setSuccess(true);
+      setShowDeleteEmptyConfirm(false);
+      console.log("All empty positions deleted successfully");
+    } catch (err) {
+      console.error("Failed to update chapter:", err);
+      setError("Cập nhật chapter thất bại. Vui lòng thử lại sau.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -341,13 +672,6 @@ export default function EditChapter(props: Props){
       setError("Vui lòng nhập tiêu đề và số chapter");
       return;
     }
-
-    // Loại bỏ ràng buộc phải có ít nhất một ảnh
-    // const allPositions = getAllPositions();
-    // if (allPositions.length === 0) {
-    //   setError("Chapter phải có ít nhất một ảnh");
-    //   return;
-    // }
 
     setIsLoading(true);
 
@@ -365,20 +689,26 @@ export default function EditChapter(props: Props){
         }
       });
 
+      console.log("Positions to delete:", positionsToDelete);
+
       positionsToDelete.forEach(position => {
+        console.log(`Adding position ${position} to image_positions_to_delete[]`);
         formData.append("image_positions_to_delete[]", position.toString());
       });
 
       // Thêm thông tin về vị trí ảnh cần cập nhật
-      const positionMapping: Record<number, number> = {};
+      const positionMapping: Record<string, string> = {};
       currentImages.forEach(img => {
-        if (!imagesToDelete.includes(img.position)) {
-          positionMapping[img.position] = img.position;
+        if (!imagesToDelete.includes(img.position) && img.id !== undefined) {
+          positionMapping[img.id.toString()] = img.position.toString();
         }
       });
 
-      Object.entries(positionMapping).forEach(([oldPos, newPos]) => {
-        formData.append(`image_positions[${oldPos}]`, newPos.toString());
+      console.log("Position mapping:", positionMapping);
+
+      Object.entries(positionMapping).forEach(([imageId, newPosition]) => {
+        console.log(`Setting image ID ${imageId} to position ${newPosition}`);
+        formData.append(`image_positions[${imageId}]`, newPosition);
       });
 
       // Thêm ảnh mới
@@ -386,30 +716,90 @@ export default function EditChapter(props: Props){
         if (image.is_external && image.external_url) {
           // Nếu là ảnh từ nguồn ngoài, thêm URL
           formData.append("new_images[]", image.external_url);
+          console.log(`Adding external image at position ${image.position}`);
         } else if (image.file) {
           // Nếu là file upload từ máy tính
           formData.append("new_images[]", image.file);
+          console.log(`Adding uploaded image at position ${image.position}`);
         }
         formData.append("new_image_positions[]", image.position.toString());
       });
 
-      // Gọi API cập nhật chapter
-      await chapterApi.updateChapter(mangaId, chapterId, formData);
+      console.log("Sending update to API...");
 
-      // Cập nhật lại state sau khi lưu thành công
-      setNewImages([]);
-      setNewImagesPreviews([]);
+      // Gọi API cập nhật chapter
+      const updateResponse = await chapterApi.updateChapter(mangaId, chapterId, formData);
+      console.log("API update response:", updateResponse);
+
+      // Lọc bỏ các ảnh đã đánh dấu xóa khỏi UI trước khi tải lại dữ liệu
+      const filteredImages = currentImages.filter(img => !imagesToDelete.includes(img.position));
+
+      // Nén lại vị trí sau khi xóa
+      const compactedImages = filteredImages.map((img, index) => ({
+        ...img,
+        position: index
+      }));
+
+      // Cập nhật UI ngay lập tức
+      setCurrentImages(compactedImages);
+      setMaxPosition(compactedImages.length);
+
+      // Đặt lại danh sách ảnh cần xóa
       setImagesToDelete([]);
 
-      // Tải lại dữ liệu chapter
+      // Đợi một khoảng thời gian ngắn để đảm bảo backend đã xử lý xong
+      console.log("Waiting for backend to process changes...");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Tải lại dữ liệu chapter để đảm bảo đồng bộ với server
+      console.log("Reloading chapter data from server...");
       const response = await chapterApi.getChapter(mangaId, chapterId);
+      console.log("Server response after update:", response);
+
+      // Cập nhật state
       setTitle(response.title);
       setNumber(response.number.toString());
-      setCurrentImages(response.images || []);
+
+      // Sắp xếp ảnh theo position
+      const sortedImages = [...response.images || []].sort((a, b) => a.position - b.position);
+      console.log("Sorted images from server:", sortedImages);
+
+      // Nén vị trí ảnh để không có khoảng trống
+      const updatedCompactedImages = sortedImages.map((img, index) => ({
+        ...img,
+        position: index
+      }));
+
+      console.log("Final compacted images:", updatedCompactedImages);
+
+      // Cập nhật state với ảnh mới
+      setCurrentImages(updatedCompactedImages);
+
+      // Cập nhật maxPosition
+      setMaxPosition(updatedCompactedImages.length);
+
+      // Đặt lại các state khác
+      setNewImages([]);
+      setNewImagesPreviews([]);
+
       setSuccess(true);
     } catch (err) {
       console.error("Failed to update chapter:", err);
       setError("Cập nhật chapter thất bại. Vui lòng thử lại sau.");
+
+      // Nếu API thất bại, tải lại dữ liệu từ server để đảm bảo UI đồng bộ
+      try {
+        const response = await chapterApi.getChapter(mangaId, chapterId);
+        const sortedImages = [...response.images || []].sort((a, b) => a.position - b.position);
+        const compactedImages = sortedImages.map((img, index) => ({
+          ...img,
+          position: index
+        }));
+        setCurrentImages(compactedImages);
+        setMaxPosition(compactedImages.length);
+      } catch (reloadErr) {
+        console.error("Failed to reload chapter data:", reloadErr);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -641,7 +1031,7 @@ export default function EditChapter(props: Props){
 
         // Thử lấy ảnh từ trang web
         try {
-          // Giả lập request để lấy HTML của trang qua backend proxy
+          // Giả lậm request để lấy HTML của trang qua backend proxy
           const html = await proxyApi.fetchUrl(importUrl);
 
           // Tìm tất cả các URL ảnh trong HTML theo cấu trúc đặc trưng của truyenvn.shop
@@ -681,7 +1071,7 @@ export default function EditChapter(props: Props){
       } else if (hostname.includes('hentaivn.cx') || hostname.includes('img.henzz.xyz')) {
         // Xử lý cho HentaiVN - cần proxy
         try {
-          // Giả lập request để lấy HTML của trang qua backend proxy
+          // Giả lậm request để lấy HTML của trang qua backend proxy
           const html = await proxyApi.fetchUrl(importUrl);
 
           // Tìm tất cả các URL ảnh trong HTML
@@ -718,7 +1108,7 @@ export default function EditChapter(props: Props){
       } else if (hostname.includes('manhuavn.top') || hostname.includes('g5img.top')) {
         // Xử lý cho ManhuaVN - cần proxy
         try {
-          // Giả lập request để lấy HTML của trang qua backend proxy
+          // Giả lậm request để lấy HTML của trang qua backend proxy
           const html = await proxyApi.fetchUrl(importUrl);
 
           // Tìm tất cả các URL ảnh trong HTML
@@ -1070,15 +1460,6 @@ export default function EditChapter(props: Props){
     );
   }
 
-  // Lấy danh sách tất cả các vị trí đã được sử dụng
-  const allPositions = getAllPositions();
-
-  // Tạo một mảng các vị trí từ 0 đến max position
-  const allPossiblePositions = Array.from(
-    { length: Math.max(...allPositions, maxPosition) + 1 },
-    (_, i) => i
-  );
-
   return (
     <div className="flex min-h-screen bg-gray-900">
       <AdminSidebar />
@@ -1245,7 +1626,7 @@ export default function EditChapter(props: Props){
 
             {/* Hiển thị tất cả các vị trí */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {allPossiblePositions.map((position) => {
+              {getAllPositions().map((position) => {
                 const imageData = getImageAtPosition(position);
 
                 return (
@@ -1354,7 +1735,7 @@ export default function EditChapter(props: Props){
                       <div className="text-gray-400 mb-2">Vị trí mới</div>
                       <button
                         type="button"
-                        onClick={() => handlePositionSelect(allPossiblePositions.length)}
+                        onClick={() => handlePositionSelect(getAllPositions().length)}
                         className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
                       >
                         Thêm ảnh
