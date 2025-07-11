@@ -299,7 +299,8 @@ export default function ChapterReader() {
           chapterId,
           replyingTo.id,
           text,
-          stickers.length > 0 ? stickers : undefined
+          stickers.length > 0 ? stickers : undefined,
+          mangaId
         );
         setComments(prevComments => {
           return prevComments.map(comment => {
