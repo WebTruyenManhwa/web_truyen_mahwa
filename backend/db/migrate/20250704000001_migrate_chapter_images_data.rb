@@ -1,12 +1,10 @@
 class MigrateChapterImagesData < ActiveRecord::Migration[8.0]
   def up
-    # Kiểm tra xem cả hai bảng đều tồn tại
     if table_exists?(:chapter_images) && table_exists?(:chapter_image_collections)
-      # Di chuyển dữ liệu từ bảng cũ sang bảng mới
       execute <<-SQL
         INSERT INTO chapter_image_collections (chapter_id, images, created_at, updated_at)
         SELECT 
-          chapter_id,
+          c.id AS chapter_id,
           (
             SELECT json_agg(
               json_build_object(
@@ -22,7 +20,6 @@ class MigrateChapterImagesData < ActiveRecord::Migration[8.0]
           NOW(),
           NOW()
         FROM (SELECT DISTINCT chapter_id as id FROM chapter_images) c
-        -- Chỉ chèn dữ liệu cho các chapter chưa có trong bảng mới
         WHERE NOT EXISTS (
           SELECT 1 FROM chapter_image_collections cic WHERE cic.chapter_id = c.id
         );
@@ -33,7 +30,6 @@ class MigrateChapterImagesData < ActiveRecord::Migration[8.0]
   end
 
   def down
-    # Xóa tất cả dữ liệu trong bảng mới
     execute "TRUNCATE chapter_image_collections;" if table_exists?(:chapter_image_collections)
   end
 end
