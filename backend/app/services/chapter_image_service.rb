@@ -69,8 +69,8 @@ class ChapterImageService
     
     # Thêm ảnh mới vào collection nếu có
     if new_images_data.present?
-      updated_images = current_images + new_images_data
-      chapter.chapter_image_collection.update(images: updated_images)
+    updated_images = current_images + new_images_data
+    chapter.chapter_image_collection.update(images: updated_images)
     end
   end
   
@@ -87,14 +87,14 @@ class ChapterImageService
       if uploader.file.present?
         Rails.logger.debug "Uploaded file directly: #{uploader.identifier}"
         Rails.logger.debug "File path: #{uploader.path}" if uploader.path.present?
-        
-        {
+      
+      {
           'image' => uploader.identifier,
           'position' => position.to_i,
-          'is_external' => false,
-          'external_url' => nil,
+        'is_external' => false,
+        'external_url' => nil,
           'storage_path' => uploader.store_path
-        }
+      }
       else
         Rails.logger.error "Failed to upload file directly"
         nil
@@ -119,13 +119,13 @@ class ChapterImageService
     return unless identifier.present?
     
     begin
-      # Tạo một uploader tạm thời để xóa file
-      uploader = ChapterImageUploader.new
-      uploader.retrieve_from_store!(identifier)
-      uploader.remove!
+    # Tạo một uploader tạm thời để xóa file
+    uploader = ChapterImageUploader.new
+    uploader.retrieve_from_store!(identifier)
+    uploader.remove!
       Rails.logger.debug "Đã xóa file: #{identifier}"
-    rescue => e
-      Rails.logger.error "Lỗi khi xóa file: #{e.message}"
+  rescue => e
+    Rails.logger.error "Lỗi khi xóa file: #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
     end
   end

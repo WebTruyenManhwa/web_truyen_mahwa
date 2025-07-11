@@ -303,6 +303,18 @@ export const userApi = {
   },
 };
 
+// API cho proxy
+export const proxyApi = {
+  // Fetch external content through our backend proxy
+  fetchUrl: async (url: string) => {
+    const response = await api.get(`/v1/proxy/fetch`, { 
+      params: { url },
+      responseType: 'text'
+    });
+    return response.data;
+  },
+};
+
 // API cho comment
 export const commentApi = {
   // Lấy comments của một manga

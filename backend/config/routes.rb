@@ -20,6 +20,9 @@ Rails.application.routes.draw do
       
       post 'auth/google_token', to: 'auth#google_token'
       
+      # Proxy route for fetching external content
+      get 'proxy/fetch', to: 'proxy#fetch_url'
+      
       resources :mangas do
         resources :chapters, shallow: true do
           # Add nested routes for chapter comments

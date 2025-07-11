@@ -26,6 +26,13 @@ class ChapterForm
       # Tạo hoặc cập nhật chapter
       manga = Manga.find(manga_id)
       chapter = manga.chapters.find_or_initialize_by(id: id)
+      
+      # Check if a chapter with this number already exists (for a different chapter)
+      if chapter.new_record? && manga.chapters.where(number: number).exists?
+        errors.add(:number, "đã tồn tại cho manga này")
+        raise ActiveRecord::Rollback
+      end
+      
       chapter.title = title
       chapter.number = number
       chapter.save!
@@ -47,6 +54,7 @@ class ChapterForm
       end
     end
     
+    return false if errors.any?
     chapter
   rescue ActiveRecord::RecordInvalid => e
     errors.add(:base, e.record.errors.full_messages.join(', '))

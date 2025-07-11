@@ -20,9 +20,7 @@ class ChapterImageUploader < CarrierWave::Uploader::Base
 
   # Override the filename of the uploaded files:
   def filename
-    if original_filename
-      @name ||= "#{SecureRandom.uuid}_#{original_filename}"
-    end
+    @name ||= "#{SecureRandom.uuid}_#{original_filename}"
   end
 
   # Provide a default URL as a default if there hasn't been a file uploaded:
