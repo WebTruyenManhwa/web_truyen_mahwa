@@ -7,66 +7,36 @@ module Api
       
       def index
         @chapters = @manga.chapters.ordered
-        render json: @chapters
+        render json: @chapters.map { |chapter| ChapterPresenter.new(chapter).as_json }
       end
       
       def show
         # Increment view count
         @chapter.increment!(:view_count)
         
-        render json: @chapter, include: { chapter_images: { only: [:id, :image, :position] } }
+        render json: ChapterPresenter.new(@chapter).as_json
       end
       
       def create
-        @chapter = @manga.chapters.new(chapter_params)
+        form = ChapterForm.new(chapter_form_params.merge(manga_id: @manga.id))
+        chapter = form.save
         
-        if @chapter.save
-          # Xử lý tải lên hình ảnh nếu có
-          if params[:images].present?
-            params[:images].each_with_index do |image, index|
-              @chapter.chapter_images.create(image: image, position: index)
-            end
-          end
-          
-          render json: @chapter, status: :created
+        if chapter
+          render json: ChapterPresenter.new(chapter).as_json, status: :created
         else
-          render json: { errors: @chapter.errors }, status: :unprocessable_entity
+          render json: { errors: form.errors }, status: :unprocessable_entity
         end
       end
       
       def update
-        # Transaction block
-        ActiveRecord::Base.transaction do
-          # Update basic attributes
-          if params[:title] || params[:number]
-            @chapter.update!(chapter_params)
-          end
-
-          # Handle deletion of images
-          if params[:image_ids_to_delete].present?
-            ChapterImage.where(chapter_id: @chapter.id, id: params[:image_ids_to_delete]).destroy_all
-          end
-
-          # Reorder existing images
-          if params[:image_positions].present?
-            params[:image_positions].each do |id, position|
-              img = @chapter.images.find(id)
-              img.update!(position: position)
-            end
-          end
-
-          # Attach new images
-          if params[:new_images].present?
-            positions = Array(params[:new_image_positions])
-            Array(params[:new_images]).each_with_index do |uploaded, index|
-              @chapter.images.create!(file: uploaded, position: positions[index])
-            end
-          end
+        form = ChapterForm.new(chapter_form_params.merge(manga_id: @chapter.manga_id, id: @chapter.id))
+        chapter = form.save
+        
+        if chapter
+          render json: ChapterPresenter.new(chapter).as_json, status: :ok
+        else
+          render json: { errors: form.errors }, status: :unprocessable_entity
         end
-
-        render json: @chapter, status: :ok
-      rescue ActiveRecord::RecordInvalid => e
-        render json: { error: e.record.errors.full_messages }, status: :unprocessable_entity
       end
       
       def destroy
@@ -86,9 +56,18 @@ module Api
                   Chapter.find(params[:id])
       end
       
-      def chapter_params
-        params.permit(:title, :number)
+      def chapter_form_params
+        params.permit(
+          :id,
+          :title, 
+          :number, 
+          images: [], 
+          image_positions_to_delete: [], 
+          image_positions: {}, 
+          new_images: [], 
+          new_image_positions: []
+        )
       end
     end
   end
-end 
+end

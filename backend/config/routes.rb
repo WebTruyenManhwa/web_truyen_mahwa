@@ -22,11 +22,7 @@ Rails.application.routes.draw do
       
       resources :mangas do
         resources :chapters, shallow: true do
-          resources :chapter_images, shallow: true do
-            collection do
-              post 'bulk', to: 'chapter_images#bulk_create'
-            end
-          end
+          # Xóa routes chapter_images
           
           # Add nested routes for chapter comments
           resources :comments, only: [:index, :create], module: :chapters

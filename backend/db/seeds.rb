@@ -104,12 +104,22 @@ Manga.all.each do |manga|
       c.title = "Chapter #{chapter_number}"
     end
     
-    # Tạo một số ảnh cho mỗi chapter
+    # Tạo collection ảnh cho chapter
+    image_collection = chapter.ensure_image_collection
+    
+    # Tạo dữ liệu ảnh cho collection
+    images_data = []
     rand(10..20).times do |j|
-      chapter.chapter_images.find_or_create_by(position: j + 1) do |ci|
-        ci.image = "https://picsum.photos/800/1200?random=#{manga.id}-#{chapter_number}-#{j+1}"
-      end
+      images_data << {
+        'position' => j,
+        'is_external' => true,
+        'external_url' => "https://picsum.photos/800/1200?random=#{manga.id}-#{chapter_number}-#{j+1}",
+        'image' => nil
+      }
     end
+    
+    # Cập nhật collection với dữ liệu ảnh
+    image_collection.update(images: images_data)
   end
 end
 

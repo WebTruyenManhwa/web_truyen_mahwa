@@ -2,6 +2,7 @@ class ChapterImageUploader < CarrierWave::Uploader::Base
   # Include RMagick or MiniMagick support:
   # include CarrierWave::RMagick
   include CarrierWave::MiniMagick
+  require 'securerandom'
 
   # Choose what kind of storage to use for this uploader:
   # storage is configured in config/initializers/carrierwave.rb
@@ -9,24 +10,25 @@ class ChapterImageUploader < CarrierWave::Uploader::Base
   # storage :fog
 
   # Override the directory where uploaded files will be stored.
-  # This is a sensible default for uploaders that are meant to be mounted:
   def store_dir
     if Rails.env.production? || ENV['USE_S3'] == 'true'
-      "chapter_images/#{model.id}"
+      "chapter_images"
     else
-      "uploads/#{model.class.to_s.underscore}/#{mounted_as}/#{model.id}"
+      "uploads/chapter_images"
+    end
+  end
+
+  # Override the filename of the uploaded files:
+  def filename
+    if original_filename
+      @name ||= "#{SecureRandom.uuid}_#{original_filename}"
     end
   end
 
   # Provide a default URL as a default if there hasn't been a file uploaded:
   def default_url(*args)
-    Rails.logger.debug "Default URL called for #{model.inspect}"
-    if model.is_external?
-      model.external_url
-    else
-      # Trả về nil nếu không có ảnh và không phải external
-      nil
-    end
+    Rails.logger.debug "Default URL called"
+    nil
   end
 
   # Process files as they are uploaded:

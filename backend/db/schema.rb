@@ -10,20 +10,16 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_07_03_083913) do
+ActiveRecord::Schema[8.0].define(version: 2025_07_04_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
-  create_table "chapter_images", force: :cascade do |t|
+  create_table "chapter_image_collections", force: :cascade do |t|
     t.bigint "chapter_id", null: false
-    t.string "image"
-    t.integer "position"
+    t.json "images", default: []
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.boolean "is_external", default: false
-    t.string "external_url"
-    t.index ["chapter_id"], name: "index_chapter_images_on_chapter_id"
-    t.index ["is_external"], name: "index_chapter_images_on_is_external"
+    t.index ["chapter_id"], name: "index_chapter_image_collections_on_chapter_id", unique: true
   end
 
   create_table "chapters", force: :cascade do |t|
@@ -140,7 +136,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_03_083913) do
     t.index ["username"], name: "index_users_on_username", unique: true
   end
 
-  add_foreign_key "chapter_images", "chapters"
+  add_foreign_key "chapter_image_collections", "chapters"
   add_foreign_key "chapters", "mangas"
   add_foreign_key "comments", "users"
   add_foreign_key "favorites", "mangas"
