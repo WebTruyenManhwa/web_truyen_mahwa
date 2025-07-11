@@ -5,7 +5,7 @@ import React, { useState, useEffect, use } from "react";
 // import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AdminSidebar from "../../../../../../../components/admin/AdminSidebar";
-import { chapterApi } from "../../../../../../../services/api";
+import { chapterApi, proxyApi } from "../../../../../../../services/api";
 
 // Định nghĩa interface cho ảnh chapter
 interface ChapterImage {
@@ -336,148 +336,521 @@ export default function EditChapter(props: Props){
       // Mảng chứa URL ảnh sẽ import
       let imageUrls: string[] = [];
       
-      // Xử lý theo từng trang web khác nhau
-      if (hostname.includes('nettruyen') || hostname.includes('truyenvn.shop')) {
-        // Xử lý cho NetTruyen và TruyenVN
-        // Format: /manga/ten-truyen/chapter-X hoặc /truyen-tranh/ten-truyen/chapter-X
-        const chapterMatch = pathname.match(/chapter-(\d+)/i);
-        if (!chapterMatch) {
-          throw new Error("Không thể xác định số chapter từ URL");
-        }
+      // Kiểm tra xem URL có phải là URL ảnh trực tiếp không
+      if (pathname.match(/\.(jpg|jpeg|png|webp|gif)$/i)) {
+        console.log("Detected direct image URL");
+        // Nếu là URL ảnh trực tiếp, thêm vào danh sách
+        imageUrls.push(importUrl);
         
-        const chapterNum = chapterMatch[1];
+        // Nếu URL có dạng số tuần tự như 001.jpg, thử tìm các ảnh tiếp theo
+        const sequentialPattern = importUrl.match(/(.*\/)(\d+)(\.[a-zA-Z]+)$/);
+        if (sequentialPattern && sequentialPattern[1] && sequentialPattern[2] && sequentialPattern[3]) {
+          const baseUrl = sequentialPattern[1];  // https://img.pixelimg.net/ba-chi-chu-nha/chapter-1/
+          const numberPart = sequentialPattern[2]; // 001
+          const extension = sequentialPattern[3];  // .jpg
+          const digits = numberPart.length;
+          const startNumber = parseInt(numberPart);
+          
+          console.log(`Detected sequential pattern: ${baseUrl}${numberPart}${extension}`);
+          console.log(`Base URL: ${baseUrl}, Number: ${startNumber}, Digits: ${digits}, Extension: ${extension}`);
+          
+          // Thử tìm các ảnh tiếp theo trong chuỗi
+          for (let i = startNumber + 1; i < startNumber + 50; i++) {
+            // Format số với đúng số chữ số (padding)
+            const formattedNumber = i.toString().padStart(digits, '0');
+            const nextUrl = `${baseUrl}${formattedNumber}${extension}`;
+            
+            // Thêm vào danh sách
+            imageUrls.push(nextUrl);
+          }
+        }
+      } else if (hostname.includes('nettruyen')) {
+        // Xử lý cho NetTruyen - không cần proxy
+        // Format: /manga/ten-truyen/chapter-X hoặc /truyen-tranh/ten-truyen/chapter-X
+        const chapterMatch = pathname.match(/(?:chapter|chuong)-(\d+)/i);
+      if (!chapterMatch) {
+          throw new Error("Không thể xác định số chapter từ URL");
+      }
+        
+      const chapterNum = chapterMatch[1];
+        console.log("Detected chapter number:", chapterNum);
         
         // Thử lấy ảnh từ trang web
         try {
-          // Giả lập request để lấy HTML của trang
+          // Giả lập request để lấy HTML của trang - dùng fetch trực tiếp
           const response = await fetch(importUrl);
           const html = await response.text();
           
           // Tìm tất cả các URL ảnh trong HTML
-          const imgRegex = /<img[^>]+src="([^">]+)"[^>]*>/g;
+          const imgRegex = /<img[^>]+(?:src|data-src|data-original)="([^">]+)"[^>]*>/g;
+          const allImageUrls = new Set<string>();
           let match;
+          
+          // Tìm ảnh từ các thuộc tính src, data-src, data-original
           while ((match = imgRegex.exec(html)) !== null) {
             const imgSrc = match[1];
-            if (imgSrc && !imgSrc.includes('logo') && !imgSrc.includes('banner') && !imgSrc.includes('icon')) {
-              imageUrls.push(imgSrc);
+            // Bỏ qua các ảnh rõ ràng không phải ảnh chapter
+            if (imgSrc && typeof imgSrc === 'string' && 
+                !imgSrc.includes('logo') && 
+                !imgSrc.includes('banner') && 
+                !imgSrc.includes('icon') &&
+                !imgSrc.includes('tmp/0.png') && // Bỏ qua ảnh tmp/0.png
+                !imgSrc.includes('tmp/1.png') && // Bỏ qua ảnh tmp/1.png
+                !imgSrc.includes('tmp/2.png') && // Bỏ qua các ảnh tmp khác
+                !imgSrc.includes('ads') &&
+                !imgSrc.includes('facebook') &&
+                !imgSrc.includes('fbcdn') &&
+                !imgSrc.includes('avatar') &&
+                !imgSrc.includes('thumbnail')) {
+              // Chuẩn hóa URL và chuyển đổi kiểu
+              const normalizedUrl = imgSrc.split('?')[0] as string;
+              allImageUrls.add(normalizedUrl);
             }
           }
           
+          // Tìm riêng các thuộc tính data-src và data-original (NetTruyen thường dùng cách này)
+          const dataAttrRegex = /data-(?:src|original)="([^"]+)"/g;
+          while ((match = dataAttrRegex.exec(html)) !== null) {
+            const imgSrc = match[1];
+            if (imgSrc && typeof imgSrc === 'string' && 
+                (imgSrc.includes('.jpg') || 
+                 imgSrc.includes('.jpeg') || 
+                 imgSrc.includes('.png') || 
+                 imgSrc.includes('.webp') || 
+                 imgSrc.includes('.gif')) &&
+                !imgSrc.includes('tmp/0.png') && // Bỏ qua ảnh tmp/0.png
+                !imgSrc.includes('tmp/1.png') && // Bỏ qua ảnh tmp/1.png
+                !imgSrc.includes('tmp/2.png')) { // Bỏ qua các ảnh tmp khác
+              // Chuẩn hóa URL và chuyển đổi kiểu
+              const normalizedUrl = imgSrc.split('?')[0] as string;
+              allImageUrls.add(normalizedUrl);
+            }
+          }
+          
+          console.log("Found all images:", Array.from(allImageUrls));
+          
           // Lọc ra các ảnh chapter thực sự
-          imageUrls = imageUrls.filter(url => 
-            url.includes('/chapter-') || 
-            url.includes('/chuong-') || 
-            url.includes(`/${chapterNum}-`) ||
-            url.includes(`/${chapterNum}/`)
-          );
+          if (allImageUrls.size > 0) {
+            // Tìm pattern phổ biến cho URL ảnh chapter
+            const urlPatterns = [
+              `/ch/${chapterNum}/`, 
+              `/chapter-${chapterNum}/`,
+              `/chuong-${chapterNum}/`,
+              `/chap-${chapterNum}/`,
+              `/ch-${chapterNum}/`,
+              `/${chapterNum}.`,
+              `/${chapterNum}-`,
+              // Thêm các pattern phổ biến của NetTruyen
+              'ntcdn',
+              'netcdn',
+              'truyenvua.com',
+              'nettruyen',
+              'truyenqq'
+            ];
+            
+            // Lọc ảnh theo pattern
+            const filteredUrls = Array.from(allImageUrls).filter(url => {
+              // Lọc bỏ các ảnh từ mạng xã hội, quảng cáo và ảnh tạm
+              if (url.includes('facebook') || 
+                  url.includes('fbcdn') || 
+                  url.includes('ads') || 
+                  url.includes('banner') || 
+                  url.includes('logo') || 
+                  url.includes('icon') ||
+                  url.includes('avatar') ||
+                  url.includes('tmp/0.png') ||
+                  url.includes('tmp/1.png') ||
+                  url.includes('tmp/2.png') ||
+                  url.includes('thumbnail')) {
+                return false;
+              }
+              
+              // Ưu tiên các ảnh có pattern của chapter
+              for (const pattern of urlPatterns) {
+                if (url.includes(pattern)) {
+                  return true;
+                }
+              }
+              
+              // Nếu không tìm thấy pattern cụ thể, kiểm tra xem có phải ảnh lớn không
+              return (url.includes('.webp') || 
+                      url.includes('.jpg') || 
+                      url.includes('.png')) &&
+                     !url.includes('thumbnail') &&
+                     !url.includes('small');
+            });
+            
+            console.log("Filtered images by pattern:", filteredUrls);
+            
+            // Nếu sau khi lọc theo pattern vẫn còn nhiều ảnh, thử lọc theo URL pattern phổ biến
+            if (filteredUrls.length > 0) {
+              // Kiểm tra xem có pattern nhất quán không
+              const commonPatterns = [
+                /\/ch\/\d+\/\d+\.(jpg|png|webp|jpeg)/i,
+                /\/images\/\d+\/\d+\.(jpg|png|webp|jpeg)/i,
+                /\/chapter-\d+\/\d+\.(jpg|png|webp|jpeg)/i,
+                // Thêm pattern cho NetTruyen
+                /ntcdn\d+\.netcdn\.one.*\.(jpg|png|webp|jpeg)/i,
+                /i\d+\.truyenvua\.com.*\.(jpg|png|webp|jpeg)/i,
+                /\.netcdn\.one\/.*\/\d+\/\d+\.(jpg|png|webp|jpeg)/i
+              ];
+              
+              let foundConsistentPattern = false;
+              let bestMatchUrls: string[] = [];
+              
+              for (const pattern of commonPatterns) {
+                const matchingUrls = filteredUrls.filter(url => pattern.test(url));
+                if (matchingUrls.length >= 3) { // Nếu có ít nhất 3 ảnh cùng pattern
+                  // Lấy pattern có nhiều ảnh nhất
+                  if (matchingUrls.length > bestMatchUrls.length) {
+                    bestMatchUrls = matchingUrls;
+                    foundConsistentPattern = true;
+                  }
+                }
+              }
+              
+              // Nếu tìm thấy pattern nhất quán, sử dụng nó
+              if (foundConsistentPattern) {
+                imageUrls = bestMatchUrls;
+              } else {
+                // Nếu không tìm thấy pattern nhất quán, sử dụng tất cả các URL đã lọc
+                // nhưng loại bỏ các URL trùng lặp sau khi chuẩn hóa
+                const normalizedUrls = new Set<string>();
+                filteredUrls.forEach(url => {
+                  if (url && typeof url === 'string') {
+                    const normalizedUrl = url.split('?')[0] as string;
+                    normalizedUrls.add(normalizedUrl);
+                  }
+                });
+                imageUrls = Array.from(normalizedUrls);
+              }
+            }
+          }
         } catch (err) {
           console.error("Error fetching page HTML:", err);
           throw new Error("Không thể tải nội dung từ trang web");
         }
-      } else if (hostname.includes('sayhentaii.art')) {
-        // Xử lý cho SayHentaii
-        // Format: /truyen-set-up/chuong-X
-        const chapterMatch = pathname.match(/chuong-(\d+)/i);
+      } else if (hostname.includes('truyenvn.shop')) {
+        // Xử lý cho TruyenVN - cần proxy
+        // Format: /manga/ten-truyen/chapter-X hoặc /truyen-tranh/ten-truyen/chapter-X
+        const chapterMatch = pathname.match(/(?:chapter|chuong)-(\d+)/i);
         if (!chapterMatch) {
           throw new Error("Không thể xác định số chapter từ URL");
         }
         
         const chapterNum = chapterMatch[1];
+        console.log("Detected chapter number:", chapterNum);
         
+        // Thử lấy ảnh từ trang web
         try {
-          // Giả lập request để lấy HTML của trang
-          const response = await fetch(importUrl);
-          const html = await response.text();
+          // Giả lập request để lấy HTML của trang qua backend proxy
+          const html = await proxyApi.fetchUrl(importUrl);
           
-          // Tìm tất cả các URL ảnh trong HTML
-          const imgRegex = /<img[^>]+src="([^">]+)"[^>]*>/g;
+          // Tìm tất cả các URL ảnh trong HTML theo cấu trúc đặc trưng của truyenvn.shop
+          const allImageUrls = new Set<string>();
+          
+          // Tìm các thẻ img trong div class="page-break no-gaps" và có class="wp-manga-chapter-img"
+          const regex = /page-break no-gaps[^>]*>[\s\n]*<img[^>]+src=\s*"([^">]+)"[^>]*class="[^"]*wp-manga-chapter-img[^"]*"/g;
           let match;
-          while ((match = imgRegex.exec(html)) !== null) {
-            const imgSrc = match[1];
-            if (imgSrc && !imgSrc.includes('logo') && !imgSrc.includes('banner') && !imgSrc.includes('icon')) {
-              imageUrls.push(imgSrc);
+          
+          while ((match = regex.exec(html)) !== null) {
+            const imgSrc = match[1]?.trim() || '';
+            if (imgSrc) {
+              allImageUrls.add(imgSrc);
+              console.log("Found TruyenVN chapter image:", imgSrc);
             }
           }
           
-          // Lọc ra các ảnh chapter thực sự
-          imageUrls = imageUrls.filter(url => 
-            url.includes('/chuong-') || 
-            url.includes(`/${chapterNum}/`) ||
-            url.includes(`chapter-${chapterNum}`)
-          );
-        } catch (err) {
-          console.error("Error fetching page HTML:", err);
-          throw new Error("Không thể tải nội dung từ trang web");
-        }
-      } else if (hostname.includes('hentaivn.cx') || hostname.includes('img.henzz.xyz')) {
-        // Xử lý cho HentaiVN - giữ nguyên logic cũ
-        const chapterMatch = pathname.match(/chuong-(\d+)/i);
-        if (!chapterMatch) {
-          throw new Error("URL không hợp lệ");
-        }
-        const chapterNum = chapterMatch[1];
-
-        // Tạo danh sách URL ảnh
-        let index = 1;
-        while (index <= 100) { // Giới hạn tối đa 100 ảnh
-          const paddedIndex = index.toString().padStart(3, '0');
-          const imageUrl = `https://img.henzz.xyz/mo-khoa-tim-em/chuong-${chapterNum}/${paddedIndex}.jpg`;
-          
-          try {
-            // Kiểm tra xem ảnh có tồn tại không
-            const response = await fetch(imageUrl, { method: 'HEAD' });
-            if (response.ok) {
-              imageUrls.push(imageUrl);
-              index++;
-            } else {
-              break; // Nếu không tìm thấy ảnh, dừng vòng lặp
-            }
-          } catch (err) {
-            console.error("Error checking image:", err);
-            break; // Nếu có lỗi, dừng vòng lặp
-          }
-        }
-      } else {
-        // Xử lý chung cho các trang web khác
-        try {
-          // Giả lập request để lấy HTML của trang
-          const response = await fetch(importUrl);
-          const html = await response.text();
-          
-          // Tìm tất cả các URL ảnh trong HTML
-          const imgRegex = /<img[^>]+src="([^">]+)"[^>]*>/g;
-          let match;
-          while ((match = imgRegex.exec(html)) !== null) {
-            const imgSrc = match[1];
-            // Lọc bỏ các ảnh logo, banner, icon
-            if (imgSrc && !imgSrc.includes('logo') && !imgSrc.includes('banner') && !imgSrc.includes('icon')) {
-              // Chuyển đổi URL tương đối thành tuyệt đối nếu cần
-              if (imgSrc.startsWith('/')) {
-                imageUrls.push(`${url.protocol}//${url.host}${imgSrc}`);
-              } else if (!imgSrc.startsWith('http')) {
-                imageUrls.push(`${url.protocol}//${url.host}/${imgSrc}`);
-              } else {
-                imageUrls.push(imgSrc);
+          // Nếu không tìm thấy ảnh, tìm tất cả các img có class wp-manga-chapter-img
+          if (allImageUrls.size === 0) {
+            const imgRegex = /<img[^>]+src=\s*"([^">]+)"[^>]*class="[^"]*wp-manga-chapter-img[^"]*"/g;
+            
+            while ((match = imgRegex.exec(html)) !== null) {
+              const imgSrc = match[1]?.trim() || '';
+              if (imgSrc) {
+                allImageUrls.add(imgSrc);
+                console.log("Found TruyenVN chapter image (fallback):", imgSrc);
               }
             }
           }
           
+          console.log("Found TruyenVN images:", Array.from(allImageUrls));
+          imageUrls = Array.from(allImageUrls);
+        } catch (err) {
+          console.error("Error fetching TruyenVN page HTML:", err);
+          throw new Error("Không thể tải nội dung từ trang web");
+        }
+      } else if (hostname.includes('hentaivn.cx') || hostname.includes('img.henzz.xyz')) {
+        // Xử lý cho HentaiVN - cần proxy
+        try {
+          // Giả lập request để lấy HTML của trang qua backend proxy
+          const html = await proxyApi.fetchUrl(importUrl);
+          
+          // Tìm tất cả các URL ảnh trong HTML
+          const imgRegex = /<img[^>]+(?:src|data-src|data-original)="([^">]+)"[^>]*>/g;
+          const allImageUrls = new Set<string>();
+          let match;
+          
+          while ((match = imgRegex.exec(html)) !== null) {
+            const imgSrc = match[1];
+            if (typeof imgSrc === 'string' && 
+                !imgSrc.includes('logo') && 
+                !imgSrc.includes('banner') && 
+                !imgSrc.includes('icon') &&
+                !imgSrc.includes('avatar') &&
+                !imgSrc.includes('thumbnail')) {
+              allImageUrls.add(imgSrc);
+            }
+          }
+          
+          // Lọc ảnh theo đuôi file phổ biến
+          imageUrls = Array.from(allImageUrls).filter(url => 
+            (url.includes('.jpg') || 
+             url.includes('.jpeg') || 
+             url.includes('.png') || 
+             url.includes('.webp') || 
+             url.includes('.gif'))
+          );
+          
+          console.log("Filtered HentaiVN images:", imageUrls);
+        } catch (err) {
+          console.error("Error fetching HentaiVN HTML:", err);
+          throw new Error("Không thể tải nội dung từ trang web");
+        }
+      } else if (hostname.includes('manhuavn.top') || hostname.includes('g5img.top')) {
+        // Xử lý cho ManhuaVN - cần proxy
+        try {
+          // Giả lập request để lấy HTML của trang qua backend proxy
+          const html = await proxyApi.fetchUrl(importUrl);
+          
+          // Tìm tất cả các URL ảnh trong HTML
+          const imgRegex = /<img[^>]+(?:src|data-src|data-original)="([^">]+)"[^>]*>/g;
+          const allImageUrls = new Set<string>();
+          let match;
+          
+          while ((match = imgRegex.exec(html)) !== null) {
+            const imgSrc = match[1];
+            if (typeof imgSrc === 'string' && 
+                !imgSrc.includes('logo') && 
+                !imgSrc.includes('banner') && 
+                !imgSrc.includes('icon') &&
+                !imgSrc.includes('avatar') &&
+                !imgSrc.includes('thumbnail')) {
+              allImageUrls.add(imgSrc);
+            }
+          }
+          
+          // Tìm riêng các thuộc tính data-src và data-original
+          const dataAttrRegex = /data-(?:src|original)="([^"]+)"/g;
+          while ((match = dataAttrRegex.exec(html)) !== null) {
+            const imgSrc = match[1];
+            if (typeof imgSrc === 'string' && 
+                (imgSrc.includes('.jpg') || 
+                 imgSrc.includes('.jpeg') || 
+                 imgSrc.includes('.png') || 
+                 imgSrc.includes('.webp') || 
+                 imgSrc.includes('.gif'))) {
+              allImageUrls.add(imgSrc);
+            }
+          }
+          
+          // Tìm các URL ảnh từ g5img.top
+          const g5imgRegex = /https:\/\/img\d+\.g5img\.top\/[^"'\s]+/g;
+          while ((match = g5imgRegex.exec(html)) !== null) {
+            allImageUrls.add(match[0]);
+          }
+          
+          console.log("Found ManhuaVN images:", Array.from(allImageUrls));
+          
+          // Lọc ảnh theo đuôi file phổ biến
+          imageUrls = Array.from(allImageUrls).filter(url => 
+            (url.includes('.jpg') || 
+             url.includes('.jpeg') || 
+             url.includes('.png') || 
+             url.includes('.webp') || 
+             url.includes('.gif')) &&
+            !url.includes('facebook') &&
+            !url.includes('fbcdn') &&
+            !url.includes('ads')
+          );
+          
+          console.log("Filtered ManhuaVN images:", imageUrls);
+        } catch (err) {
+          console.error("Error fetching ManhuaVN HTML:", err);
+          
+          // Fallback: Thử xử lý dựa trên pattern URL
+          if (pathname.includes('/doc-truyen/') && pathname.includes('chapter-')) {
+            // Phân tích URL để lấy tên manga và số chapter
+            const pathParts = pathname.split('/');
+            let mangaSlug = '';
+            let chapterNum = '';
+            
+            for (const part of pathParts) {
+              if (part.includes('chapter-')) {
+                chapterNum = part.replace('chapter-', '');
+              } else if (part !== 'doc-truyen' && part.length > 0) {
+                mangaSlug = part;
+              }
+            }
+            
+            if (mangaSlug && chapterNum) {
+              // Thử một số pattern phổ biến cho ManhuaVN
+              for (let i = 1; i <= 50; i++) {
+                const paddedNum = i.toString().padStart(2, '0');
+                // Pattern 1: img02.g5img.top
+                imageUrls.push(`https://img02.g5img.top/bbdata/sv45qu49qbd17n/${mangaSlug}_sv47pcaf7sl8fmmaq_${paddedNum}.jpg`);
+                imageUrls.push(`https://img02.g5img.top/bbdata/sv45qu49qbd17n/${mangaSlug}_sv47pcaf7sl8fmmaq_${paddedNum}.png`);
+                
+                // Pattern 2: img01.g5img.top
+                imageUrls.push(`https://img01.g5img.top/bbdata/sv45qu49qbd17n/${mangaSlug}_sv47pcaf7sl8fmmaq_${paddedNum}.jpg`);
+                imageUrls.push(`https://img01.g5img.top/bbdata/sv45qu49qbd17n/${mangaSlug}_sv47pcaf7sl8fmmaq_${paddedNum}.png`);
+              }
+              console.log("Generated ManhuaVN image URLs based on pattern");
+            }
+          }
+          
+          if (imageUrls.length === 0) {
+            throw new Error("Không thể tải nội dung từ trang web");
+          }
+        }
+      } else {
+        // Xử lý chung cho các trang web khác - thử fetch trực tiếp trước, nếu lỗi CORS thì dùng proxy
+        try {
+          // Thử fetch trực tiếp trước
+          let html;
+          try {
+            const response = await fetch(importUrl);
+            html = await response.text();
+          } catch (directFetchError) {
+            console.log("Direct fetch failed, trying proxy:", directFetchError);
+            // Nếu fetch trực tiếp lỗi, dùng proxy
+            html = await proxyApi.fetchUrl(importUrl);
+          }
+          
+          // Tìm tất cả các URL ảnh trong HTML
+          const imgRegex = /<img[^>]+(?:src|data-src|data-original)="([^">]+)"[^>]*>/g;
+          const allImageUrls = new Set<string>();
+          let match;
+          
+          while ((match = imgRegex.exec(html)) !== null) {
+            const imgSrc = match[1];
+            // Lọc bỏ các ảnh logo, banner, icon
+            if (typeof imgSrc === 'string' && !imgSrc.includes('logo') && !imgSrc.includes('banner') && !imgSrc.includes('icon')) {
+              // Chuyển đổi URL tương đối thành tuyệt đối nếu cần
+              if (imgSrc.startsWith('/')) {
+                allImageUrls.add(`${url.protocol}//${url.host}${imgSrc}`);
+              } else if (!imgSrc.startsWith('http')) {
+                allImageUrls.add(`${url.protocol}//${url.host}/${imgSrc}`);
+              } else {
+                allImageUrls.add(imgSrc);
+              }
+            }
+          }
+          
+          // Tìm riêng các thuộc tính data-src và data-original
+          const dataAttrRegex = /data-(?:src|original)="([^"]+)"/g;
+          while ((match = dataAttrRegex.exec(html)) !== null) {
+            const imgSrc = match[1];
+            if (typeof imgSrc === 'string' && 
+                (imgSrc.includes('.jpg') || 
+                 imgSrc.includes('.jpeg') || 
+                 imgSrc.includes('.png') || 
+                 imgSrc.includes('.webp') || 
+                 imgSrc.includes('.gif'))) {
+              // Chuyển đổi URL tương đối thành tuyệt đối nếu cần
+              if (imgSrc.startsWith('/')) {
+                allImageUrls.add(`${url.protocol}//${url.host}${imgSrc}`);
+              } else if (!imgSrc.startsWith('http')) {
+                allImageUrls.add(`${url.protocol}//${url.host}/${imgSrc}`);
+              } else {
+                allImageUrls.add(imgSrc);
+              }
+            }
+          }
+          
+          console.log("Found all images:", Array.from(allImageUrls));
+          
           // Lọc các ảnh có kích thước lớn (có thể là ảnh chapter)
-          // Đây chỉ là giải pháp tạm thời, cần cải thiện thuật toán lọc
-          imageUrls = imageUrls.filter(url => 
+          imageUrls = Array.from(allImageUrls).filter(url => 
             !url.includes('avatar') && 
             !url.includes('thumbnail') && 
-            !url.includes('small')
+            !url.includes('small') &&
+            !url.includes('facebook') &&
+            !url.includes('fbcdn') &&
+            !url.includes('ads') &&
+            (url.includes('.jpg') || 
+             url.includes('.jpeg') || 
+             url.includes('.png') || 
+             url.includes('.webp') || 
+             url.includes('.gif'))
           );
+          
+          console.log("Filtered images:", imageUrls);
+          
+          // Tìm pattern nhất quán trong URL
+          const urlPatterns = [
+            /\/ch\/\d+\/\d+\.(jpg|png|webp|jpeg)/i,
+            /\/images\/\d+\/\d+\.(jpg|png|webp|jpeg)/i,
+            /\/chapter-\d+\/\d+\.(jpg|png|webp|jpeg)/i
+          ];
+          
+          for (const pattern of urlPatterns) {
+            const matchingUrls = imageUrls.filter(url => pattern.test(url));
+            if (matchingUrls.length >= 3) { // Nếu có ít nhất 3 ảnh cùng pattern
+              imageUrls = matchingUrls;
+              console.log("Found consistent pattern:", pattern, imageUrls);
+              break;
+            }
+          }
         } catch (err) {
           console.error("Error fetching page HTML:", err);
           throw new Error("Không thể tải nội dung từ trang web");
+        }
+      }
+
+      // Nếu không tìm thấy ảnh nào, thử tìm URL ảnh trực tiếp trong input
+      if (imageUrls.length === 0) {
+        // Kiểm tra xem input có chứa URL ảnh không
+        const directImageUrlMatch = importUrl.match(/(https?:\/\/[^"\s]+\.(jpg|jpeg|png|webp|gif))/i);
+        if (directImageUrlMatch) {
+          const directImageUrl = directImageUrlMatch[0];
+          console.log("Found direct image URL in input:", directImageUrl);
+          imageUrls.push(directImageUrl);
+          
+          // Thử tìm pattern cho URL ảnh tuần tự
+          // Ví dụ: https://img.pixelimg.net/ba-chi-chu-nha/chapter-1/001.jpg
+          // Cố gắng tìm các ảnh từ 001.jpg đến 100.jpg
+          const sequentialPattern = directImageUrl.match(/(.*\/)(\d+)(\.[a-zA-Z]+)$/);
+          if (sequentialPattern && sequentialPattern[1] && sequentialPattern[2] && sequentialPattern[3]) {
+            const baseUrl = sequentialPattern[1];  // https://img.pixelimg.net/ba-chi-chu-nha/chapter-1/
+            const numberPart = sequentialPattern[2]; // 001
+            const extension = sequentialPattern[3];  // .jpg
+            const digits = numberPart.length;
+            const startNumber = parseInt(numberPart);
+            
+            console.log(`Detected sequential pattern: ${baseUrl}${numberPart}${extension}`);
+            console.log(`Base URL: ${baseUrl}, Number: ${startNumber}, Digits: ${digits}, Extension: ${extension}`);
+            
+            // Thử tìm các ảnh tiếp theo trong chuỗi
+            for (let i = startNumber + 1; i < startNumber + 100; i++) {
+              // Format số với đúng số chữ số (padding)
+              const formattedNumber = i.toString().padStart(digits, '0');
+              const nextUrl = `${baseUrl}${formattedNumber}${extension}`;
+              
+              // Thêm vào danh sách để kiểm tra sau
+              imageUrls.push(nextUrl);
+            }
+          }
         }
       }
 
       if (imageUrls.length === 0) {
         throw new Error("Không tìm thấy ảnh nào từ URL này");
       }
+      
+      // Loại bỏ các URL trùng lặp
+      imageUrls = Array.from(new Set(imageUrls));
+      console.log("Final image URLs after removing duplicates:", imageUrls);
 
       // Thêm ảnh vào state
       let nextPosition = maxPosition;
@@ -509,6 +882,66 @@ export default function EditChapter(props: Props){
       setImportUrl("");
     } catch (error) {
       console.error("Lỗi khi import ảnh:", error);
+      
+      // Thử xử lý URL ảnh trực tiếp nếu có lỗi
+      try {
+        // Kiểm tra xem input có phải là URL ảnh trực tiếp không
+        if (importUrl.match(/\.(jpg|jpeg|png|webp|gif)$/i)) {
+          console.log("Falling back to direct image URL:", importUrl);
+          
+          // Thêm ảnh vào state
+          const position = maxPosition;
+          const newImage: NewImage = {
+            position,
+            is_external: true,
+            external_url: importUrl
+          };
+          
+          const newPreview: NewImagePreview = {
+            preview: importUrl,
+            position,
+            is_external: true
+          };
+          
+          setNewImages([...newImages, newImage]);
+          setNewImagesPreviews([...newImagesPreviews, newPreview]);
+          setMaxPosition(maxPosition + 1);
+          setSuccess(true);
+          setImportUrl("");
+          return;
+        }
+        
+        // Kiểm tra xem input có chứa URL ảnh không
+        const directImageUrlMatch = importUrl.match(/(https?:\/\/[^"\s]+\.(jpg|jpeg|png|webp|gif))/i);
+        if (directImageUrlMatch) {
+          const directImageUrl = directImageUrlMatch[0];
+          console.log("Found direct image URL in input:", directImageUrl);
+          
+          // Thêm ảnh vào state
+          const position = maxPosition;
+          const newImage: NewImage = {
+            position,
+            is_external: true,
+            external_url: directImageUrl
+          };
+          
+          const newPreview: NewImagePreview = {
+            preview: directImageUrl,
+            position,
+            is_external: true
+          };
+          
+          setNewImages([...newImages, newImage]);
+          setNewImagesPreviews([...newImagesPreviews, newPreview]);
+          setMaxPosition(maxPosition + 1);
+          setSuccess(true);
+          setImportUrl("");
+          return;
+        }
+      } catch (fallbackError) {
+        console.error("Fallback error:", fallbackError);
+      }
+      
       setError(error instanceof Error ? error.message : "Lỗi khi import ảnh từ URL");
     } finally {
       setIsImporting(false);
