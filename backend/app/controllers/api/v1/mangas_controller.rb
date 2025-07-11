@@ -63,7 +63,7 @@ module Api
       private
       
       def set_manga
-        @manga = Manga.find(params[:id])
+        @manga = Manga.find_by(slug: params[:id]) || Manga.find(params[:id])
       end
       
       def manga_params

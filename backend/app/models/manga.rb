@@ -16,6 +16,7 @@ class Manga < ApplicationRecord
   # Validations
   validates :title, presence: true
   validates :status, presence: true
+  validates :slug, uniqueness: true, allow_blank: true
   
   # Scopes
   scope :popular, -> { order(view_count: :desc) }
@@ -25,6 +26,7 @@ class Manga < ApplicationRecord
   
   # Callbacks
   before_create :set_defaults
+  before_save :set_slug
 
   def update_rating_stats
     if ratings.any?
@@ -37,11 +39,31 @@ class Manga < ApplicationRecord
     end
   end
   
+  def to_param
+    slug
+  end
+  
   private
   
   def set_defaults
     self.view_count ||= 0
     self.rating ||= 0
     self.total_votes ||= 0
+  end
+  
+  def set_slug
+    return if slug.present?
+    
+    base_slug = title.parameterize
+    new_slug = base_slug
+    counter = 2
+    
+    # Kiểm tra xem slug đã tồn tại chưa
+    while Manga.where(slug: new_slug).where.not(id: id).exists?
+      new_slug = "#{base_slug}-#{counter}"
+      counter += 1
+    end
+    
+    self.slug = new_slug
   end
 end

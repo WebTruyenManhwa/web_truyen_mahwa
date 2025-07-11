@@ -18,7 +18,7 @@ class Api::V1::ProxyController < Api::V1::BaseController
       http.use_ssl = (uri.scheme == 'https')
       
       # Skip SSL verification (IMPORTANT: In production, this should be properly configured)
-      http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+      http.verify_mode = OpenSSL::SSL::VERIFY_NONE if Rails.env.development?
       
       # Set a reasonable timeout
       http.open_timeout = 10

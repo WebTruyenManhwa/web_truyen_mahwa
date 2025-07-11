@@ -16,7 +16,8 @@ class ChapterPresenter
       manga: manga_data,
       images: formatted_images,
       next_chapter: next_chapter_data,
-      prev_chapter: prev_chapter_data
+      prev_chapter: prev_chapter_data,
+      slug: chapter.slug
     }
   end
   
@@ -25,7 +26,8 @@ class ChapterPresenter
   def manga_data
     {
       id: chapter.manga.id,
-      title: chapter.manga.title
+      title: chapter.manga.title,
+      slug: chapter.manga.slug
     }
   end
   
@@ -58,11 +60,11 @@ class ChapterPresenter
   
   def next_chapter_data
     next_chap = chapter.manga.chapters.where("number > ?", chapter.number).order(number: :asc).first
-    next_chap ? { id: next_chap.id, number: next_chap.number } : nil
+    next_chap ? { id: next_chap.id, number: next_chap.number, slug: next_chap.slug } : nil
   end
   
   def prev_chapter_data
     prev_chap = chapter.manga.chapters.where("number < ?", chapter.number).order(number: :desc).first
-    prev_chap ? { id: prev_chap.id, number: prev_chap.number } : nil
+    prev_chap ? { id: prev_chap.id, number: prev_chap.number, slug: prev_chap.slug } : nil
   end
 end 

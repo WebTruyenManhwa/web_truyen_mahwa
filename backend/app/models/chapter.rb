@@ -9,12 +9,14 @@ class Chapter < ApplicationRecord
   # Validations
   validates :title, presence: true
   validates :number, presence: true, uniqueness: { scope: :manga_id }
+  validates :slug, presence: true, allow_blank: true
   
   # Scopes
   scope :ordered, -> { order(number: :asc) }
   
   # Callbacks
   before_create :set_defaults
+  before_save :set_slug
   after_create :update_manga_updated_at
   after_create :create_image_collection
   
@@ -62,6 +64,10 @@ class Chapter < ApplicationRecord
     chapter_image_collection
   end
   
+  def to_param
+    "#{id}-#{slug}"
+  end
+  
   private
   
   def set_defaults
@@ -74,5 +80,13 @@ class Chapter < ApplicationRecord
   
   def create_image_collection
     build_chapter_image_collection(images: []).save
+  end
+  
+  def set_slug
+    return if slug.present?
+    
+    # Tạo slug từ số chapter - chỉ lấy phần số nguyên
+    chapter_number = number.to_i
+    self.slug = "chapter-#{chapter_number}"
   end
 end

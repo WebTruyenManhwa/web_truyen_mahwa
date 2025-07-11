@@ -47,28 +47,48 @@ module Api
       private
       
       def set_manga
-        @manga = Manga.find(params[:manga_id])
+        @manga = Manga.find_by(slug: params[:manga_id]) || Manga.find(params[:manga_id])
       end
 
       def set_chapter
         @chapter = if params[:manga_id].present?
-                    # If manga_id is provided, find the chapter within that manga's chapters
-                    Manga.find(params[:manga_id]).chapters.find(params[:id])
-                  else
-                    # For routes that don't include manga_id in the URL, find the chapter first
-                    # then verify it belongs to the correct manga if manga_id is in the params
-                    chapter = Chapter.find(params[:id])
+                # If manga_id is provided, find the chapter within that manga's chapters
+                manga = Manga.find_by(slug: params[:manga_id]) || Manga.find(params[:manga_id])
+                
+                # Extract ID from combined ID-slug parameter if present
+                chapter_id = params[:id].to_s.split('-').first if params[:id].to_s.match(/^\d+-/)
+                
+                if chapter_id.present?
+                  # If ID is part of the parameter, find by ID
+                  manga.chapters.find(chapter_id)
+                else
+                  # Try to find by slug or ID
+                  manga.chapters.find_by(slug: params[:id]) || manga.chapters.find(params[:id])
+                end
+              else
+                # For routes that don't include manga_id in the URL, find the chapter first
+                # Extract ID from combined ID-slug parameter if present
+                chapter_id = params[:id].to_s.split('-').first if params[:id].to_s.match(/^\d+-/)
+                
+                if chapter_id.present?
+                  # If ID is part of the parameter, find by ID
+                  Chapter.find(chapter_id)
+                else
+                  # Try to find by slug or ID
+                  Chapter.find_by(slug: params[:id]) || Chapter.find(params[:id])
+                end
 
-                    # If chapter_form_params includes manga_id, verify the chapter belongs to that manga
-                    if params[:manga_id] || (params[:chapter] && params[:chapter][:manga_id])
-                      manga_id = params[:manga_id] || params[:chapter][:manga_id]
-                      unless chapter.manga_id.to_s == manga_id.to_s
-                        raise ActiveRecord::RecordNotFound, "Couldn't find Chapter with id=#{params[:id]} for Manga with id=#{manga_id}"
-                      end
-                    end
-
-                    chapter
+                # If chapter_form_params includes manga_id, verify the chapter belongs to that manga
+                if params[:manga_id] || (params[:chapter] && params[:chapter][:manga_id])
+                  manga_id = params[:manga_id] || params[:chapter][:manga_id]
+                  manga = Manga.find_by(slug: manga_id) || Manga.find_by(id: manga_id)
+                  unless chapter.manga_id.to_s == manga&.id.to_s
+                    raise ActiveRecord::RecordNotFound, "Couldn't find Chapter with id=#{params[:id]} for Manga with id=#{manga_id}"
                   end
+                end
+
+                chapter
+              end
       end
 
       def chapter_form_params

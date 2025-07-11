@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_07_04_000002) do
+ActiveRecord::Schema[8.0].define(version: 2025_07_11_111445) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -29,7 +29,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_04_000002) do
     t.integer "view_count"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "slug"
     t.index ["manga_id"], name: "index_chapters_on_manga_id"
+    t.index ["slug"], name: "index_chapters_on_slug"
   end
 
   create_table "comments", force: :cascade do |t|
@@ -92,6 +94,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_04_000002) do
     t.datetime "updated_at", null: false
     t.decimal "rating", precision: 3, scale: 2, default: "0.0"
     t.integer "total_votes", default: 0
+    t.string "slug"
+    t.index ["slug"], name: "index_mangas_on_slug", unique: true
   end
 
   create_table "ratings", force: :cascade do |t|
