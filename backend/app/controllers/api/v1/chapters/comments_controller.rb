@@ -33,7 +33,13 @@ module Api
         private
         
         def set_chapter
-          @chapter = Chapter.find(params[:chapter_id])
+          if params[:manga_id].present?
+            # If manga_id is provided, find the chapter within that manga's chapters
+            @chapter = Manga.find(params[:manga_id]).chapters.find(params[:chapter_id])
+          else
+            # For backward compatibility
+            @chapter = Chapter.find(params[:chapter_id])
+          end
         end
         
         def set_parent_comment

@@ -49,22 +49,37 @@ module Api
       def set_manga
         @manga = Manga.find(params[:manga_id])
       end
-      
+
       def set_chapter
-        @chapter = params[:manga_id].present? ? 
-                  Manga.find(params[:manga_id]).chapters.find(params[:id]) :
-                  Chapter.find(params[:id])
+        @chapter = if params[:manga_id].present?
+                    # If manga_id is provided, find the chapter within that manga's chapters
+                    Manga.find(params[:manga_id]).chapters.find(params[:id])
+                  else
+                    # For routes that don't include manga_id in the URL, find the chapter first
+                    # then verify it belongs to the correct manga if manga_id is in the params
+                    chapter = Chapter.find(params[:id])
+
+                    # If chapter_form_params includes manga_id, verify the chapter belongs to that manga
+                    if params[:manga_id] || (params[:chapter] && params[:chapter][:manga_id])
+                      manga_id = params[:manga_id] || params[:chapter][:manga_id]
+                      unless chapter.manga_id.to_s == manga_id.to_s
+                        raise ActiveRecord::RecordNotFound, "Couldn't find Chapter with id=#{params[:id]} for Manga with id=#{manga_id}"
+                      end
+                    end
+
+                    chapter
+                  end
       end
-      
+
       def chapter_form_params
         params.permit(
           :id,
-          :title, 
-          :number, 
-          images: [], 
-          image_positions_to_delete: [], 
-          image_positions: {}, 
-          new_images: [], 
+          :title,
+          :number,
+          images: [],
+          image_positions_to_delete: [],
+          image_positions: {},
+          new_images: [],
           new_image_positions: []
         )
       end

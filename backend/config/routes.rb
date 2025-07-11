@@ -22,13 +22,23 @@ Rails.application.routes.draw do
       
       resources :mangas do
         resources :chapters, shallow: true do
-          # Xóa routes chapter_images
-          
           # Add nested routes for chapter comments
           resources :comments, only: [:index, :create], module: :chapters
         end
         resources :ratings, only: [:create, :update, :destroy], module: :mangas
         resources :comments, only: [:index, :create], module: :mangas
+      end
+      
+      # Add a specific route for getting chapters with manga_id
+      get 'mangas/:manga_id/chapters/:id', to: 'chapters#show'
+      
+      # Add routes for chapter comments with manga_id
+      get 'mangas/:manga_id/chapters/:chapter_id/comments', to: 'chapters/comments#index'
+      post 'mangas/:manga_id/chapters/:chapter_id/comments', to: 'chapters/comments#create'
+      
+      # Add non-nested routes for chapters for backward compatibility
+      resources :chapters, only: [:show, :update, :destroy] do
+        resources :comments, only: [:index, :create], module: :chapters
       end
       
       resources :genres, only: [:index, :show, :create, :update, :destroy]
