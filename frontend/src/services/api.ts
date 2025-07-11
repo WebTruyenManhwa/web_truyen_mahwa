@@ -130,8 +130,8 @@ export const chapterApi = {
   },
 
   // Cập nhật chapter (cần quyền admin)
-  updateChapter: async (_mangaId: string | number, chapterId: string | number, chapterData: FormData) => {
-    const response = await api.put(`/v1/chapters/${chapterId}`, chapterData, {
+  updateChapter: async (mangaId: string | number, chapterId: string | number, chapterData: FormData) => {
+    const response = await api.put(`/v1/mangas/${mangaId}/chapters/${chapterId}`, chapterData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

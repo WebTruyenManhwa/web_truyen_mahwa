@@ -15,6 +15,7 @@ interface Chapter {
   title: string;
   createdAt: string;
   view_count?: number;
+  slug?: string;
 }
 
 interface Manga {
@@ -32,6 +33,7 @@ interface Manga {
   rating?: number;
   totalVotes?: number;
   translationTeam?: string;
+  slug?: string;
 }
 
 type Props = {
@@ -247,11 +249,11 @@ export default function MangaDetail(props: Props) {
             {/* Action Buttons */}
             <div className="space-y-2">
               <div className="grid grid-cols-2 gap-2">
-                <Link href={`/manga/${manga.id}/chapter/${manga.chapters[manga.chapters.length - 1]?.id || 1}`}
+                <Link href={`/manga/${manga.slug || manga.id}/chapter/${manga.chapters[manga.chapters.length - 1]?.slug || manga.chapters[manga.chapters.length - 1]?.id || 1}`}
                   className="block bg-blue-600 hover:bg-blue-700 text-white text-center py-2 rounded">
                   Chap đầu
                 </Link>
-                <Link href={`/manga/${manga.id}/chapter/${manga.chapters[0]?.id || 1}`}
+                <Link href={`/manga/${manga.slug || manga.id}/chapter/${manga.chapters[0]?.slug || manga.chapters[0]?.id || 1}`}
                   className="block bg-red-600 hover:bg-red-700 text-white text-center py-2 rounded">
                   Chap cuối
                 </Link>
@@ -403,7 +405,7 @@ export default function MangaDetail(props: Props) {
           {manga.chapters.map((chapter) => (
             <Link
               key={chapter.id}
-              href={`/manga/${manga.id}/chapter/${chapter.id}`}
+              href={`/manga/${manga.slug || manga.id}/chapter/${chapter.slug || chapter.id}`}
               className="flex justify-between items-center p-3 hover:bg-gray-700 rounded transition-colors"
             >
               <div>

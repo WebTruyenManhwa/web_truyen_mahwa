@@ -20,6 +20,7 @@ interface ChapterSummary {
   id: number;
   number: number;
   title: string;
+  slug?: string;
 }
 
 interface Chapter {
@@ -32,16 +33,20 @@ interface Chapter {
   manga: {
     id: number;
     title: string;
+    slug?: string;
   };
   images: ChapterImage[];
   next_chapter?: {
     id: number;
     number: number;
+    slug?: string;
   };
   prev_chapter?: {
     id: number;
     number: number;
+    slug?: string;
   };
+  slug?: string;
 }
 
 interface Comment {
@@ -408,7 +413,7 @@ export default function ChapterReader() {
             </Link>
             <div className="overflow-hidden">
               <h1 className="text-lg font-bold truncate">
-                <Link href={`/manga/${mangaId}`} className="hover:text-red-500">
+                <Link href={`/manga/${chapter.manga?.slug || mangaId}`} className="hover:text-red-500">
                   {chapter.manga?.title || "Đang tải..."}
                 </Link>
               </h1>
@@ -440,7 +445,7 @@ export default function ChapterReader() {
             
             <div className="flex flex-1 min-w-0 gap-2 flex-wrap sm:flex-nowrap">
               <Link
-                href={`/manga/${mangaId}/chapter/${chapter.prev_chapter?.id}`}
+                href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.prev_chapter?.slug || chapter.prev_chapter?.id}`}
                 className="bg-red-700 hover:bg-red-600 px-3 py-1 rounded text-sm whitespace-nowrap"
               >
                 Chương trước
@@ -470,7 +475,7 @@ export default function ChapterReader() {
                       {allChapters.map((chap) => (
                         <Link
                           key={chap.id}
-                          href={`/manga/${mangaId}/chapter/${chap.id}`}
+                          href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chap.slug || chap.id}`}
                           className={`block px-3 py-2 text-sm hover:bg-gray-600 ${
                             chap.id.toString() === chapterId ? 'bg-gray-600' : ''
                           }`}
@@ -485,7 +490,7 @@ export default function ChapterReader() {
               </div>
               
               <Link
-                href={`/manga/${mangaId}/chapter/${chapter.next_chapter?.id}`}
+                href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.next_chapter?.slug || chapter.next_chapter?.id}`}
                 className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm whitespace-nowrap"
               >
                 Chương sau
@@ -518,7 +523,7 @@ export default function ChapterReader() {
         <div className="fixed bottom-4 right-4 flex gap-2">
           {currentPage > 0 && chapter.prev_chapter && (
             <Link
-              href={`/manga/${mangaId}/chapter/${chapter.prev_chapter.id}`}
+              href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.prev_chapter?.slug || chapter.prev_chapter?.id}`}
               className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-full shadow-lg flex items-center"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
@@ -530,7 +535,7 @@ export default function ChapterReader() {
           
           {chapter.next_chapter && (
             <Link
-              href={`/manga/${mangaId}/chapter/${chapter.next_chapter.id}`}
+              href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.next_chapter?.slug || chapter.next_chapter?.id}`}
               className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full shadow-lg flex items-center"
             >
               Chapter sau

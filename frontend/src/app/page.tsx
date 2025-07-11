@@ -16,6 +16,7 @@ interface Manga {
   viewCount?: number;
   chapter?: number;
   updatedAt?: string;
+  slug?: string;
 }
 
 interface Genre {
@@ -242,7 +243,7 @@ export default function Home() {
               <h1 className="text-2xl md:text-3xl font-bold mb-2 text-white">{featuredManga.title}</h1>
               <p className="text-gray-300 mb-4 line-clamp-2 text-sm md:text-base">{featuredManga.description}</p>
               <Link
-                href={`/manga/${featuredManga.id}`}
+                href={`/manga/${featuredManga.slug || featuredManga.id}`}
                 className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded font-medium text-sm inline-block"
               >
                 Đọc ngay
@@ -282,7 +283,7 @@ export default function Home() {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
         {(activeTab === "latest" ? latestUpdates : popularMangas).map((manga) => (
           <div key={manga.id} className="group">
-            <Link href={`/manga/${manga.id}`} className="block">
+            <Link href={`/manga/${manga.slug || manga.id}`} className="block">
               <div className="relative aspect-[2/3] rounded overflow-hidden mb-2 bg-gray-800">
                 {/* <Image
                   src={manga.coverImage}
