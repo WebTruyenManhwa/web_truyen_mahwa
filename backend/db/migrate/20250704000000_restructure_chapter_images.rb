@@ -10,7 +10,7 @@ class RestructureChapterImages < ActiveRecord::Migration[8.0]
       end
 
       # Thêm index để tìm kiếm nhanh
-      add_index :chapter_image_collections, :chapter_id, unique: true unless index_exists?(:chapter_image_collections, :chapter_id, unique: true)
+      # add_index :chapter_image_collections, :chapter_id, unique: true unless index_exists?(:chapter_image_collections, :chapter_id, unique: true)
     end
 
     # Chúng ta sẽ giữ bảng chapter_images cũ cho đến khi di chuyển dữ liệu xong
