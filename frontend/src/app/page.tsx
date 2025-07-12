@@ -32,36 +32,46 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("latest");
+  const [activeRanking, setActiveRanking] = useState<'day' | 'week' | 'month'>('day');
+
+  // Define rankings with proper typing
+  const [rankings, setRankings] = useState<{
+    day: Manga[];
+    week: Manga[];
+    month: Manga[];
+  }>({
+    day: [],
+    week: [],
+    month: []
+  });
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        
+
         // Fetch popular mangas
-        const popularData = await mangaApi.getMangas({ 
-          sort: "popularity", 
-          limit: 12 
+        const popularData = await mangaApi.getMangas({
+          sort: "popularity",
+          limit: 12
         });
         const mappedPopular = popularData.mangas.map((m: { cover_image: { url: any; }; }) => ({
           ...m,
           coverImage: m.cover_image?.url
         }));
         setPopularMangas(mappedPopular);
-        // setPopularMangas(popularData.mangas || []);
-        
+
         // Fetch latest updates
-        const latestUpdates = await mangaApi.getMangas({ 
-          sort: "updatedAt", 
-          limit: 20 
+        const latestUpdates = await mangaApi.getMangas({
+          sort: "updatedAt",
+          limit: 20
         });
         const mappedLatest = latestUpdates.mangas.map((m: { cover_image: { url: any; }; }) => ({
           ...m,
           coverImage: m.cover_image?.url ?? ""
         }));
         setLatestUpdates(mappedLatest);
-        // setLatestUpdates(latestData.mangas || []);
-        
+
         // Set featured manga (first popular manga)
         if (popularData.mangas && popularData.mangas.length > 0) {
           const featured = await mangaApi.getManga(popularData.mangas[0].id);
@@ -70,7 +80,7 @@ export default function Home() {
             coverImage: featured.cover_image?.url,
           });
         }
-        
+
         // Fetch genres
         try {
           const genresData = await genreApi.getGenres();
@@ -78,11 +88,19 @@ export default function Home() {
         } catch (err) {
           console.error("Failed to fetch genres:", err);
         }
-        
+
+        // Set rankings data (for now using the same data with different sorting)
+        // In a real application, you would fetch this data from the API with appropriate filters
+        setRankings({
+          day: mappedPopular.slice(0, 6).sort(() => Math.random() - 0.5),
+          week: mappedPopular.slice(0, 6).sort(() => Math.random() - 0.5),
+          month: mappedPopular.slice(0, 6).sort(() => Math.random() - 0.5)
+        });
+
       } catch (err) {
         console.error("Failed to fetch data:", err);
         setError("Không thể tải dữ liệu. Vui lòng thử lại sau.");
-        
+
         // Fallback to mock data
         setFeaturedManga({
           id: 1,
@@ -91,8 +109,9 @@ export default function Home() {
           description:
             "Gol D. Roger, vua hải tặc với khối tài sản vô giá One Piece, đã bị xử tử. Trước khi chết, ông tiết lộ rằng kho báu của mình được giấu ở Grand Line. Monkey D. Luffy, một cậu bé với ước mơ trở thành vua hải tặc, vô tình ăn phải trái ác quỷ Gomu Gomu, biến cơ thể cậu thành cao su. Giờ đây, cậu cùng các đồng đội hải tặc mũ rơm bắt đầu cuộc hành trình tìm kiếm kho báu One Piece.",
         });
-        
-        setPopularMangas([
+
+        // Add mock ranking data
+        const mockMangas = [
           {
             id: 1,
             title: "One Piece",
@@ -135,52 +154,13 @@ export default function Home() {
             latestChapter: 139,
             viewCount: 11000000,
           },
-        ]);
-        
-        setLatestUpdates([
-          {
-            id: 1,
-            title: "One Piece",
-            coverImage: "https://m.media-amazon.com/images/I/51FVFCrSp0L._AC_UF1000,1000_QL80_.jpg",
-            chapter: 1088,
-            updatedAt: "2023-08-10",
-          },
-          {
-            id: 3,
-            title: "Jujutsu Kaisen",
-            coverImage: "https://m.media-amazon.com/images/I/81TmHlRleJL._AC_UF1000,1000_QL80_.jpg",
-            chapter: 223,
-            updatedAt: "2023-08-09",
-          },
-          {
-            id: 5,
-            title: "My Hero Academia",
-            coverImage: "https://m.media-amazon.com/images/I/51FZ6JzhBEL._AC_UF1000,1000_QL80_.jpg",
-            chapter: 402,
-            updatedAt: "2023-08-08",
-          },
-          {
-            id: 4,
-            title: "Demon Slayer",
-            coverImage: "https://m.media-amazon.com/images/I/81ZNkhqRvVL._AC_UF1000,1000_QL80_.jpg",
-            chapter: 205,
-            updatedAt: "2023-08-07",
-          },
-          {
-            id: 2,
-            title: "Naruto",
-            coverImage: "https://m.media-amazon.com/images/I/71QYLrc-IQL._AC_UF1000,1000_QL80_.jpg",
-            chapter: 700,
-            updatedAt: "2023-08-06",
-          },
-          {
-            id: 6,
-            title: "Attack on Titan",
-            coverImage: "https://m.media-amazon.com/images/I/91M9VaZWxOL._AC_UF1000,1000_QL80_.jpg",
-            chapter: 139,
-            updatedAt: "2023-08-05",
-          },
-        ]);
+        ];
+
+        setRankings({
+          day: [...mockMangas].sort((a, b) => b.viewCount - a.viewCount),
+          week: [...mockMangas].sort((a, b) => b.viewCount - a.viewCount),
+          month: [...mockMangas].sort((a, b) => b.viewCount - a.viewCount)
+        });
       } finally {
         setIsLoading(false);
       }
@@ -217,8 +197,8 @@ export default function Home() {
     return (
       <div className="text-center py-10">
         <p className="text-red-500 mb-4">{error}</p>
-        <button 
-          onClick={() => window.location.reload()} 
+        <button
+          onClick={() => window.location.reload()}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
         >
           Thử lại
@@ -298,14 +278,14 @@ export default function Home() {
                   className="object-cover w-full h-full"
                 />
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/70 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                
+
                 {/* Chapter Badge */}
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
                   <div className="flex justify-between items-center text-xs">
                     <span className="bg-red-600 text-white px-1.5 py-0.5 rounded text-xs">
                       Ch. {manga.latestChapter || manga.chapter}
                     </span>
-                    
+
                     {manga.viewCount && (
                       <span className="flex items-center text-white text-xs">
                         <svg
@@ -351,13 +331,99 @@ export default function Home() {
 
       {/* View More Button */}
       <div className="text-center mt-8">
-        <Link 
-          href={activeTab === "latest" ? "/latest" : "/popular"} 
+        <Link
+          href={activeTab === "latest" ? "/latest" : "/popular"}
           className="inline-block bg-gray-800 hover:bg-gray-700 text-white px-6 py-2 rounded-full"
         >
           Xem thêm
         </Link>
       </div>
+
+      {/* Top Rankings Section */}
+      <section className="mt-12">
+        <h2 className="text-xl font-bold mb-4 pb-2 border-b border-gray-700">Bảng xếp hạng</h2>
+
+        <div className="flex mb-4 border-b border-gray-800">
+          <button
+            className={`px-4 py-2 font-medium ${activeRanking === 'day' ? 'text-red-500 border-b-2 border-red-500' : 'text-gray-400'}`}
+            onClick={() => setActiveRanking('day')}
+          >
+            Top ngày
+          </button>
+          <button
+            className={`px-4 py-2 font-medium ${activeRanking === 'week' ? 'text-red-500 border-b-2 border-red-500' : 'text-gray-400'}`}
+            onClick={() => setActiveRanking('week')}
+          >
+            Top tuần
+          </button>
+          <button
+            className={`px-4 py-2 font-medium ${activeRanking === 'month' ? 'text-red-500 border-b-2 border-red-500' : 'text-gray-400'}`}
+            onClick={() => setActiveRanking('month')}
+          >
+            Top tháng
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
+          {rankings[activeRanking].map((manga, index) => (
+            <div key={manga.id} className="group">
+              <Link href={`/manga/${manga.slug || manga.id}`} className="block">
+                <div className="relative aspect-[2/3] rounded overflow-hidden mb-2 bg-gray-800">
+                  {/* Ranking number badge */}
+                  <div className="absolute top-0 right-0 bg-gray-900/80 text-red-500 font-bold px-2 py-1 text-sm z-10">
+                    #{index + 1}
+                  </div>
+
+                  <img
+                    src={manga.coverImage || "/placeholder-manga.jpg"}
+                    alt={manga.title}
+                    className="object-cover w-full h-full"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/70 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+                  {/* Chapter Badge */}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="bg-red-600 text-white px-1.5 py-0.5 rounded text-xs">
+                        Ch. {manga.latestChapter || manga.chapter || 1}
+                      </span>
+
+                      <span className="flex items-center text-white text-xs">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-3 w-3 mr-1"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                          />
+                        </svg>
+                        {(manga.viewCount || 0) >= 1000000
+                          ? `${((manga.viewCount || 0) / 1000000).toFixed(1)}M`
+                          : (manga.viewCount || 0) >= 1000
+                          ? `${((manga.viewCount || 0) / 1000).toFixed(0)}K`
+                          : manga.viewCount || 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <h3 className="font-medium text-sm line-clamp-2 group-hover:text-red-500 transition-colors">{manga.title}</h3>
+              </Link>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Genres Section */}
       <section className="mt-12">
