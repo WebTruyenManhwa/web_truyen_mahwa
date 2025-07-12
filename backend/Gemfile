@@ -61,6 +61,7 @@ gem "aws-sdk-s3", require: false
 
 # Background jobs
 gem "sidekiq"
+gem "sidekiq-scheduler", "~> 5.0" # Thêm để lên lịch các job định kỳ
 
 # Serialization
 gem "active_model_serializers"

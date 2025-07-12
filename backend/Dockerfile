@@ -1,10 +1,7 @@
 # check=error=true
 
-# This Dockerfile is designed for production, not development. Use with Kamal or build'n'run by hand:
-# docker build -t backend .
-# docker run -d -p 80:80 -e RAILS_MASTER_KEY=<value from config/master.key> --name backend backend
-
-# For a containerized dev environment, see Dev Containers: https://guides.rubyonrails.org/getting_started_with_devcontainer.html
+# This Dockerfile is designed for production deployment on Render
+# It runs both Rails web server and Sidekiq in the same container
 
 # Make sure RUBY_VERSION matches the Ruby version in .ruby-version
 ARG RUBY_VERSION=3.3.0
@@ -26,14 +23,16 @@ RUN apt-get update -qq && \
       libjemalloc2 \
       libvips \
       postgresql-client \
-      imagemagick && \
+      imagemagick \
+      supervisor && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 # Set production environment
 ENV RAILS_ENV="production" \
     BUNDLE_DEPLOYMENT="1" \
     BUNDLE_PATH="/usr/local/bundle" \
-    BUNDLE_WITHOUT="development"
+    BUNDLE_WITHOUT="development" \
+    RAILS_LOG_TO_STDOUT="true"
 
 # Throw-away build stage to reduce size of final image
 FROM base AS build
@@ -73,6 +72,10 @@ RUN getent group rails >/dev/null || groupadd --system --gid 1000 rails \
 RUN mkdir -p /rails/public/uploads /rails/tmp/sockets /rails/tmp/pids \
  && chown -R rails:rails /rails /rails/public/uploads /rails/tmp /rails/log /rails/storage
 
+# Create supervisor configuration
+RUN mkdir -p /etc/supervisor/conf.d
+COPY --chown=root:root --chmod=644 docker/supervisor.conf /etc/supervisor/conf.d/app.conf
+
 # Chuyển xuống chạy dưới user rails
 USER rails
 
@@ -80,6 +83,8 @@ USER rails
 COPY --chown=root:root --chmod=755 entrypoint.sh /rails/entrypoint.sh
 ENTRYPOINT ["sh", "/rails/entrypoint.sh"]
 
-# Mở port và khởi server
+# Expose port
 EXPOSE 80
-CMD ["./bin/thrust", "./bin/rails", "server"]
+
+# Start supervisor to manage both Rails and Sidekiq
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/app.conf"]
