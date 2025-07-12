@@ -37,6 +37,9 @@ module Api
       end
 
       def show
+        # Increment manga view count with rate limiting
+        increment_manga_view_count
+
         render json: @manga, include: [:genres, chapters: { only: [:id, :title, :number, :created_at] }]
       end
 
@@ -69,6 +72,23 @@ module Api
       end
 
       private
+
+      def increment_manga_view_count
+        # Generate a unique key for this IP + manga combination
+        visitor_identifier = request.remote_ip
+        manga_key = "view_count:manga_page:#{@manga.id}:#{visitor_identifier}"
+
+        # Use Rails.cache for rate limiting
+        manga_viewed = Rails.cache.exist?(manga_key)
+
+        # Increment manga view count if not viewed recently by this IP
+        unless manga_viewed
+          @manga.increment!(:view_count)
+          # Set cache to expire after 30 minutes
+          Rails.cache.write(manga_key, true, expires_in: 30.minutes)
+          Rails.logger.info "=== Incremented view count for manga page #{@manga.id} (#{@manga.title}) ==="
+        end
+      end
 
       def set_manga
         @manga = Manga.find_by(slug: params[:id]) || Manga.find(params[:id])

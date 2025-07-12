@@ -24,7 +24,7 @@ Rails.application.configure do
   end
 
   # Change to :null_store to avoid any caching.
-  config.cache_store = :memory_store
+  config.cache_store = :memory_store, { size: 64.megabytes, expires_in: 1.hour }
 
   # Store uploaded files on the local file system (see config/storage.yml for options).
   config.active_storage.service = :local
@@ -37,7 +37,7 @@ Rails.application.configure do
 
   # Set localhost to be used by links generated in mailer templates.
   config.action_mailer.default_url_options = { host: "localhost", port: 3000 }
-  
+
   # Set default URL options for routes
   Rails.application.routes.default_url_options = { host: "localhost", port: 3000 }
 
@@ -64,7 +64,7 @@ Rails.application.configure do
 
   # Raise error when a before_action's only/except options reference missing actions
   config.action_controller.raise_on_missing_callback_actions = true
-  
+
   # Allow requests from any origin in development
   config.middleware.insert_before 0, Rack::Cors do
     allow do
