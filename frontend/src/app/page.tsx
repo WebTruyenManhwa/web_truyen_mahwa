@@ -13,7 +13,8 @@ interface Manga {
   coverImage?: string;
   description?: string;
   latestChapter?: number;
-  viewCount?: number;
+  view_count?: number;
+  period_views?: number;
   chapter?: number;
   updatedAt?: string;
   slug?: string;
@@ -89,14 +90,41 @@ export default function Home() {
           console.error("Failed to fetch genres:", err);
         }
 
-        // Set rankings data (for now using the same data with different sorting)
-        // In a real application, you would fetch this data from the API with appropriate filters
-        setRankings({
-          day: mappedPopular.slice(0, 6).sort(() => Math.random() - 0.5),
-          week: mappedPopular.slice(0, 6).sort(() => Math.random() - 0.5),
-          month: mappedPopular.slice(0, 6).sort(() => Math.random() - 0.5)
-        });
+        // Fetch rankings data for each time period
+        try {
+          const [dayRankings, weekRankings, monthRankings] = await Promise.all([
+            mangaApi.getRankings('day', 6),
+            mangaApi.getRankings('week', 6),
+            mangaApi.getRankings('month', 6)
+          ]);
 
+          // Map the data to our format
+          const mapRankingData = (data: any[]) => data.map((m: any) => ({
+            ...m,
+            coverImage: m.cover_image?.url,
+            id: m.id,
+            title: m.title,
+            slug: m.slug,
+            view_count: m.view_count,
+            chapter: m.latest_chapter?.number || m.chapters_count || 0,
+            latestChapter: m.latest_chapter?.number || m.chapters_count || 0
+          }));
+
+          setRankings({
+            day: mapRankingData(dayRankings.mangas || []),
+            week: mapRankingData(weekRankings.mangas || []),
+            month: mapRankingData(monthRankings.mangas || [])
+          });
+        } catch (err) {
+          console.error("Failed to fetch rankings:", err);
+
+          // Fallback to using popular mangas as rankings if API fails
+          setRankings({
+            day: mappedPopular.slice(0, 6),
+            week: mappedPopular.slice(0, 6).sort(() => Math.random() - 0.5),
+            month: mappedPopular.slice(0, 6).sort(() => Math.random() - 0.5)
+          });
+        }
       } catch (err) {
         console.error("Failed to fetch data:", err);
         setError("Không thể tải dữ liệu. Vui lòng thử lại sau.");
@@ -117,49 +145,49 @@ export default function Home() {
             title: "One Piece",
             coverImage: "https://m.media-amazon.com/images/I/51FVFCrSp0L._AC_UF1000,1000_QL80_.jpg",
             latestChapter: 1088,
-            viewCount: 15000000,
+            view_count: 15000000,
           },
           {
             id: 2,
             title: "Naruto",
             coverImage: "https://m.media-amazon.com/images/I/71QYLrc-IQL._AC_UF1000,1000_QL80_.jpg",
             latestChapter: 700,
-            viewCount: 12000000,
+            view_count: 12000000,
           },
           {
             id: 3,
             title: "Jujutsu Kaisen",
             coverImage: "https://m.media-amazon.com/images/I/81TmHlRleJL._AC_UF1000,1000_QL80_.jpg",
             latestChapter: 223,
-            viewCount: 8000000,
+            view_count: 8000000,
           },
           {
             id: 4,
             title: "Demon Slayer",
             coverImage: "https://m.media-amazon.com/images/I/81ZNkhqRvVL._AC_UF1000,1000_QL80_.jpg",
             latestChapter: 205,
-            viewCount: 9500000,
+            view_count: 9500000,
           },
           {
             id: 5,
             title: "My Hero Academia",
             coverImage: "https://m.media-amazon.com/images/I/51FZ6JzhBEL._AC_UF1000,1000_QL80_.jpg",
             latestChapter: 402,
-            viewCount: 7800000,
+            view_count: 7800000,
           },
           {
             id: 6,
             title: "Attack on Titan",
             coverImage: "https://m.media-amazon.com/images/I/91M9VaZWxOL._AC_UF1000,1000_QL80_.jpg",
             latestChapter: 139,
-            viewCount: 11000000,
+            view_count: 11000000,
           },
         ];
 
         setRankings({
-          day: [...mockMangas].sort((a, b) => b.viewCount - a.viewCount),
-          week: [...mockMangas].sort((a, b) => b.viewCount - a.viewCount),
-          month: [...mockMangas].sort((a, b) => b.viewCount - a.viewCount)
+          day: [...mockMangas].sort((a, b) => (b.view_count || 0) - (a.view_count || 0)),
+          week: [...mockMangas].sort((a, b) => (b.view_count || 0) - (a.view_count || 0)),
+          month: [...mockMangas].sort((a, b) => (b.view_count || 0) - (a.view_count || 0))
         });
       } finally {
         setIsLoading(false);
@@ -286,7 +314,7 @@ export default function Home() {
                       Ch. {manga.latestChapter || manga.chapter}
                     </span>
 
-                    {manga.viewCount && (
+                    {manga.view_count && (
                       <span className="flex items-center text-white text-xs">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -308,11 +336,11 @@ export default function Home() {
                             d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                           />
                         </svg>
-                        {manga.viewCount >= 1000000
-                          ? `${(manga.viewCount / 1000000).toFixed(1)}M`
-                          : manga.viewCount >= 1000
-                          ? `${(manga.viewCount / 1000).toFixed(0)}K`
-                          : manga.viewCount}
+                        {manga.view_count >= 1000000
+                          ? `${(manga.view_count / 1000000).toFixed(1)}M`
+                          : manga.view_count >= 1000
+                          ? `${(manga.view_count / 1000).toFixed(0)}K`
+                          : manga.view_count}
                       </span>
                     )}
                   </div>
@@ -409,11 +437,11 @@ export default function Home() {
                             d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                           />
                         </svg>
-                        {(manga.viewCount || 0) >= 1000000
-                          ? `${((manga.viewCount || 0) / 1000000).toFixed(1)}M`
-                          : (manga.viewCount || 0) >= 1000
-                          ? `${((manga.viewCount || 0) / 1000).toFixed(0)}K`
-                          : manga.viewCount || 0}
+                        {(manga.period_views || manga.view_count || 0) >= 1000000
+                          ? `${((manga.period_views || manga.view_count || 0) / 1000000).toFixed(1)}M`
+                          : (manga.period_views || manga.view_count || 0) >= 1000
+                          ? `${((manga.period_views || manga.view_count || 0) / 1000).toFixed(0)}K`
+                          : manga.period_views || manga.view_count || 0}
                       </span>
                     </div>
                   </div>

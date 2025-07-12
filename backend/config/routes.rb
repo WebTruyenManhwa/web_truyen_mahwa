@@ -20,6 +20,11 @@ Rails.application.routes.draw do
 
       post 'auth/google_token', to: 'auth#google_token'
 
+      # Admin routes
+      namespace :admin do
+        get 'dashboard/stats', to: 'dashboard#stats'
+      end
+
       # Proxy route for fetching external content
       get 'proxy/fetch', to: 'proxy#fetch_url'
 
@@ -30,6 +35,13 @@ Rails.application.routes.draw do
         end
         resources :ratings, only: [:create, :update, :destroy], module: :mangas
         resources :comments, only: [:index, :create], module: :mangas
+
+        collection do
+          # Add routes for rankings
+          get 'rankings/day', to: 'mangas#rankings_day'
+          get 'rankings/week', to: 'mangas#rankings_week'
+          get 'rankings/month', to: 'mangas#rankings_month'
+        end
       end
 
       # Add a specific route for getting chapters with manga_id

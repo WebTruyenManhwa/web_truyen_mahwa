@@ -52,14 +52,14 @@ module Api
         chapter_key = "view_count:chapter:#{@chapter.id}:#{visitor_identifier}"
         manga_key = "view_count:manga:#{@chapter.manga_id}:#{visitor_identifier}"
 
-        # Use Rails.cache for rate limiting (works with Redis or memory store)
+        # Use Rails.cache for rate limiting
         chapter_viewed = Rails.cache.exist?(chapter_key)
         manga_viewed = Rails.cache.exist?(manga_key)
 
         # Increment chapter view count if not viewed recently by this IP
         unless chapter_viewed
           @chapter.increment!(:view_count)
-          # Set cache to expire after 1 hour
+          # Set cache to expire after 30 minutes
           Rails.cache.write(chapter_key, true, expires_in: 30.minutes)
           Rails.logger.info "=== Incremented view count for chapter #{@chapter.id} ==="
         end
@@ -67,7 +67,15 @@ module Api
         # Increment manga view count if not viewed recently by this IP
         unless manga_viewed
           @chapter.manga.increment!(:view_count)
-          # Set cache to expire after 1 hour
+
+          # Track manga view in Redis for rankings
+          begin
+            ViewTrackerService.instance.track_manga_view(@chapter.manga_id)
+          rescue Redis::CannotConnectError => e
+            Rails.logger.error "Redis connection error when tracking view: #{e.message}"
+          end
+
+          # Set cache to expire after 30 minutes
           Rails.cache.write(manga_key, true, expires_in: 30.minutes)
           Rails.logger.info "=== Incremented view count for manga #{@chapter.manga_id} ==="
         end

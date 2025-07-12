@@ -40,6 +40,12 @@ export const mangaApi = {
     return response.data;
   },
 
+  // Lấy bảng xếp hạng theo thời gian
+  getRankings: async (period: 'day' | 'week' | 'month', limit: number = 6) => {
+    const response = await api.get(`/v1/mangas/rankings/${period}`, { params: { limit } });
+    return response.data;
+  },
+
   // Kiểm tra trạng thái yêu thích của một manga
   checkFavorite: async (mangaId: string | number) => {
     // Ensure mangaId is a number
@@ -412,21 +418,21 @@ export const genreApi = {
 export const adminApi = {
   // Lấy thống kê dashboard
   getDashboardStats: async () => {
-    const response = await api.get('/admin/stats');
+    const response = await api.get('/v1/admin/dashboard/stats');
     return response.data;
   },
 
   // Lấy danh sách người dùng (cần quyền admin)
-  getUsers: async (params?: { page?: number; limit?: number }) => {
-    const response = await api.get('/admin/users', { params });
+  getUsers: async (params?: { page?: number; limit?: number; search?: string }) => {
+    const response = await api.get('/v1/admin/users', { params });
     return response.data;
   },
 
   // Cập nhật vai trò người dùng (cần quyền admin)
-  updateUserRole: async (userId: string | number, role: string) => {
-    const response = await api.put(`/admin/users/${userId}/role`, { role });
+  updateUserRole: async (userId: number, role: string) => {
+    const response = await api.put(`/v1/admin/users/${userId}/role`, { role });
     return response.data;
-  },
+  }
 };
 
 export default api;

@@ -1,110 +1,141 @@
 "use client";
 
 import Link from "next/link";
+import { useState, useEffect } from "react";
 import AdminSidebar from "../../../components/admin/AdminSidebar";
+import { adminApi } from "../../../services/api";
 
-// Mock data - sẽ được thay thế bằng API call thực tế
-const dashboardStats = {
-  totalMangas: 1250,
-  totalUsers: 15420,
-  totalViews: 2450000,
-  newUsersToday: 124,
-  newMangasToday: 15,
-  viewsToday: 85000,
+// Interface cho dữ liệu từ API
+interface DashboardData {
+  dashboardStats: {
+    totalMangas: number;
+    totalUsers: number;
+    totalViews: number;
+    newUsersToday: number;
+    newMangasToday: number;
+    viewsToday: number;
+  };
+  recentMangas: {
+    id: number;
+    title: string;
+    slug: string;
+    chapters: number;
+    view_count: number;
+    status: string;
+    updatedAt: string;
+  }[];
+  recentUsers: {
+    id: number;
+    username: string;
+    email: string;
+    registeredAt: string;
+    role: string;
+  }[];
+}
+
+// Dữ liệu mặc định khi đang tải
+const defaultData: DashboardData = {
+  dashboardStats: {
+    totalMangas: 0,
+    totalUsers: 0,
+    totalViews: 0,
+    newUsersToday: 0,
+    newMangasToday: 0,
+    viewsToday: 0,
+  },
+  recentMangas: [],
+  recentUsers: [],
 };
 
-const recentMangas = [
-  {
-    id: 1,
-    title: "One Piece",
-    chapters: 1088,
-    views: 15000000,
-    status: "Đang tiến hành",
-    updatedAt: "2023-08-10",
-  },
-  {
-    id: 3,
-    title: "Jujutsu Kaisen",
-    chapters: 223,
-    views: 8000000,
-    status: "Đang tiến hành",
-    updatedAt: "2023-08-09",
-  },
-  {
-    id: 5,
-    title: "My Hero Academia",
-    chapters: 402,
-    views: 7800000,
-    status: "Đang tiến hành",
-    updatedAt: "2023-08-08",
-  },
-  {
-    id: 4,
-    title: "Demon Slayer",
-    chapters: 205,
-    views: 9500000,
-    status: "Hoàn thành",
-    updatedAt: "2023-08-07",
-  },
-  {
-    id: 2,
-    title: "Naruto",
-    chapters: 700,
-    views: 12000000,
-    status: "Hoàn thành",
-    updatedAt: "2023-08-06",
-  },
-];
-
-const recentUsers = [
-  {
-    id: 1,
-    username: "manga_lover",
-    email: "manga_lover@example.com",
-    registeredAt: "2023-08-10",
-    role: "User",
-  },
-  {
-    id: 2,
-    username: "anime_fan",
-    email: "anime_fan@example.com",
-    registeredAt: "2023-08-09",
-    role: "User",
-  },
-  {
-    id: 3,
-    username: "otaku123",
-    email: "otaku123@example.com",
-    registeredAt: "2023-08-08",
-    role: "User",
-  },
-  {
-    id: 4,
-    username: "manga_admin",
-    email: "admin@mangaverse.com",
-    registeredAt: "2023-08-07",
-    role: "Admin",
-  },
-  {
-    id: 5,
-    username: "manga_mod",
-    email: "mod@mangaverse.com",
-    registeredAt: "2023-08-06",
-    role: "Moderator",
-  },
-];
-
 export default function AdminDashboard() {
+  const [dashboardData, setDashboardData] = useState<DashboardData>(defaultData);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        const response = await adminApi.getDashboardStats();
+        setDashboardData(response);
+        setError(null);
+      } catch (err) {
+        console.error("Error fetching dashboard data:", err);
+        setError("Không thể tải dữ liệu dashboard. Vui lòng thử lại sau.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  // Hiển thị trạng thái loading
+  if (loading) {
+    return (
+      <div className="flex min-h-screen bg-gray-900">
+        <AdminSidebar />
+        <main className="flex-1 p-6 flex items-center justify-center">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+            <p className="text-gray-400">Đang tải dữ liệu...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Hiển thị thông báo lỗi
+  if (error) {
+    return (
+      <div className="flex min-h-screen bg-gray-900">
+        <AdminSidebar />
+        <main className="flex-1 p-6 flex items-center justify-center">
+          <div className="text-center">
+            <div className="bg-red-900 text-red-200 p-4 rounded-lg mb-4">
+              <p>{error}</p>
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+            >
+              Thử lại
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Destructuring data cho dễ sử dụng
+  const { dashboardStats, recentMangas, recentUsers } = dashboardData;
+
+  // Format status từ enum sang text
+  const formatStatus = (status: string) => {
+    switch (status) {
+      case "ongoing":
+        return "Đang tiến hành";
+      case "completed":
+        return "Hoàn thành";
+      case "hiatus":
+        return "Tạm ngưng";
+      case "cancelled":
+        return "Đã hủy";
+      default:
+        return status;
+    }
+  };
+
   return (
     <div className="flex min-h-screen bg-gray-900">
       <AdminSidebar />
-      
+
       <main className="flex-1 p-6">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
           <p className="text-gray-400">Xin chào Admin, chào mừng trở lại!</p>
         </div>
-        
+
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-gray-800 rounded-lg p-6">
@@ -116,7 +147,7 @@ export default function AdminDashboard() {
               </span>
             </div>
           </div>
-          
+
           <div className="bg-gray-800 rounded-lg p-6">
             <h3 className="text-gray-400 mb-2">Tổng số người dùng</h3>
             <div className="flex items-center">
@@ -126,18 +157,26 @@ export default function AdminDashboard() {
               </span>
             </div>
           </div>
-          
+
           <div className="bg-gray-800 rounded-lg p-6">
             <h3 className="text-gray-400 mb-2">Tổng lượt xem</h3>
             <div className="flex items-center">
-              <span className="text-3xl font-bold">{(dashboardStats.totalViews / 1000000).toFixed(2)}M</span>
+              <span className="text-3xl font-bold">
+                {dashboardStats.totalViews >= 1000000
+                  ? `${(dashboardStats.totalViews / 1000000).toFixed(2)}M`
+                  : dashboardStats.totalViews >= 1000
+                  ? `${(dashboardStats.totalViews / 1000).toFixed(0)}K`
+                  : dashboardStats.totalViews}
+              </span>
               <span className="ml-2 text-green-500 text-sm">
-                +{(dashboardStats.viewsToday / 1000).toFixed(0)}K hôm nay
+                +{dashboardStats.viewsToday >= 1000
+                  ? `${(dashboardStats.viewsToday / 1000).toFixed(0)}K`
+                  : dashboardStats.viewsToday} hôm nay
               </span>
             </div>
           </div>
         </div>
-        
+
         {/* Recent Mangas */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-4">
@@ -146,7 +185,7 @@ export default function AdminDashboard() {
               Xem tất cả
             </Link>
           </div>
-          
+
           <div className="bg-gray-800 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -181,16 +220,24 @@ export default function AdminDashboard() {
                         </Link>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">{manga.chapters}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">{(manga.views / 1000000).toFixed(1)}M</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {manga.view_count >= 1000000
+                          ? `${(manga.view_count / 1000000).toFixed(1)}M`
+                          : manga.view_count >= 1000
+                          ? `${(manga.view_count / 1000).toFixed(0)}K`
+                          : manga.view_count}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            manga.status === "Đang tiến hành"
+                            manga.status === "ongoing"
                               ? "bg-green-900 text-green-300"
-                              : "bg-blue-900 text-blue-300"
+                              : manga.status === "completed"
+                              ? "bg-blue-900 text-blue-300"
+                              : "bg-yellow-900 text-yellow-300"
                           }`}
                         >
-                          {manga.status}
+                          {formatStatus(manga.status)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-gray-400">
@@ -211,7 +258,7 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
-        
+
         {/* Recent Users */}
         <div>
           <div className="flex justify-between items-center mb-4">
@@ -220,7 +267,7 @@ export default function AdminDashboard() {
               Xem tất cả
             </Link>
           </div>
-          
+
           <div className="bg-gray-800 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -255,14 +302,14 @@ export default function AdminDashboard() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            user.role === "Admin"
+                            user.role === "admin"
                               ? "bg-red-900 text-red-300"
-                              : user.role === "Moderator"
+                              : user.role === "moderator"
                               ? "bg-yellow-900 text-yellow-300"
                               : "bg-gray-700 text-gray-300"
                           }`}
                         >
-                          {user.role}
+                          {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-gray-400">

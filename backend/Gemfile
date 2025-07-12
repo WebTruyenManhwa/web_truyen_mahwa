@@ -95,3 +95,4 @@ end
 
 gem "pry"
 gem 'googleauth'
+gem "whenever", require: false # Add whenever for cron job scheduling
