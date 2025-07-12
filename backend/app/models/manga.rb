@@ -1,7 +1,7 @@
 class Manga < ApplicationRecord
   # CarrierWave
   mount_uploader :cover_image, CoverImageUploader
-  
+
   # Enums
   enum :status, { ongoing: 0, completed: 1, hiatus: 2, cancelled: 3 }
 
@@ -17,13 +17,13 @@ class Manga < ApplicationRecord
   validates :title, presence: true
   validates :status, presence: true
   validates :slug, uniqueness: true, allow_blank: true
-  
+
   # Scopes
   scope :popular, -> { order(view_count: :desc) }
   scope :recent, -> { order(created_at: :desc) }
   scope :alphabetical, -> { order(title: :asc) }
   scope :top_rated, -> { where('total_votes > 0').order(rating: :desc) }
-  
+
   # Callbacks
   before_create :set_defaults
   before_save :set_slug
@@ -38,32 +38,52 @@ class Manga < ApplicationRecord
       update_columns(rating: 0, total_votes: 0)
     end
   end
-  
+
   def to_param
     slug
   end
-  
+
   private
-  
+
   def set_defaults
     self.view_count ||= 0
     self.rating ||= 0
     self.total_votes ||= 0
   end
-  
+
   def set_slug
     return if slug.present?
-    
-    base_slug = title.parameterize
+
+    base_slug = custom_slugify(title)
     new_slug = base_slug
     counter = 2
-    
+
     # Kiểm tra xem slug đã tồn tại chưa
     while Manga.where(slug: new_slug).where.not(id: id).exists?
       new_slug = "#{base_slug}-#{counter}"
       counter += 1
     end
-    
+
     self.slug = new_slug
+  end
+
+  # Custom slugify method to preserve Vietnamese characters
+  def custom_slugify(text)
+    # Replace spaces with hyphens
+    result = text.gsub(/\s+/, '-')
+
+    # Remove special characters except Vietnamese ones
+    result = result.gsub(/[^\p{L}\p{N}\-]/u, '')
+
+    # Convert to lowercase
+    result = result.downcase
+
+    # Replace multiple hyphens with a single one
+    result = result.gsub(/-+/, '-')
+
+    # Remove leading and trailing hyphens
+    result = result.gsub(/^-|-$/, '')
+
+    result
   end
 end
