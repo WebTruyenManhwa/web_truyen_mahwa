@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom scrollbar styles */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+
+  .scrollbar-thumb-gray-600::-webkit-scrollbar-thumb {
+    background-color: #4B5563; /* gray-600 */
+    border-radius: 6px;
+  }
+
+  .scrollbar-track-gray-800::-webkit-scrollbar-track {
+    background-color: #1F2937; /* gray-800 */
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .search-results-dropdown-scrollbar-thin {
+    scrollbar-width: thin;
+  }
+
+  .search-results-dropdown-scrollbar-thumb-gray-600::-webkit-scrollbar-thumb {
+    background-color: #4B5563; /* gray-600 */
+    border-radius: 6px;
+  }
+
+  .search-results-dropdown-scrollbar-track-gray-800::-webkit-scrollbar-track {
+    background-color: #1F2937; /* gray-800 */
+  }
+
+  .search-results-dropdown-scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+}
+
+/* Other global styles can go here */

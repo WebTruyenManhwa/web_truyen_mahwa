@@ -3,12 +3,12 @@ module Api
     class MangasController < BaseController
       skip_before_action :authenticate_user!, only: [:index, :show]
       before_action :set_manga, only: [:show, :update, :destroy]
-      
+
       def index
-        @mangas = Manga.includes(:genres)
+        @mangas = Manga.includes(:genres, :chapters)
         @mangas = @mangas.where('title ILIKE ?', "%#{params[:search]}%") if params[:search].present?
         @mangas = @mangas.joins(:manga_genres).where(manga_genres: { genre_id: params[:genre_id] }) if params[:genre_id].present?
-        
+
         case params[:sort]
         when 'popular'
           @mangas = @mangas.popular
@@ -19,29 +19,37 @@ module Api
         else
           @mangas = @mangas.recent
         end
-        
+
         @pagy, @mangas = pagy(@mangas, items: params[:per_page] || 20)
-        
+
+        # Add latest chapter to each manga in the response
+        manga_with_latest_chapters = @mangas.map do |manga|
+          latest_chapter = manga.chapters.order(number: :desc).first
+          manga_json = manga.as_json
+          manga_json['latest_chapter'] = latest_chapter.as_json(only: [:id, :number, :created_at]) if latest_chapter
+          manga_json
+        end
+
         render json: {
-          mangas: @mangas,
+          mangas: manga_with_latest_chapters,
           pagination: pagination_dict(@pagy)
         }
       end
-      
+
       def show
         render json: @manga, include: [:genres, chapters: { only: [:id, :title, :number, :created_at] }]
       end
-      
+
       def create
         @manga = Manga.new(manga_params)
-        
+
         if @manga.save
           render json: @manga, status: :created
         else
           render json: { errors: @manga.errors }, status: :unprocessable_entity
         end
       end
-      
+
       def update
         if params[:genres]
           genre_objects = Genre.where(name: params[:genres])
@@ -54,18 +62,18 @@ module Api
           render json: { errors: @manga.errors }, status: :unprocessable_entity
         end
       end
-      
+
       def destroy
         @manga.destroy
         head :no_content
       end
-      
+
       private
-      
+
       def set_manga
         @manga = Manga.find_by(slug: params[:id]) || Manga.find(params[:id])
       end
-      
+
       def manga_params
         # Handle both JSON and multipart form data
         if request.content_type =~ /multipart\/form-data/
@@ -76,4 +84,4 @@ module Api
       end
     end
   end
-end 
+end
