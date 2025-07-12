@@ -2,7 +2,12 @@ require 'sidekiq'
 require 'sidekiq-scheduler'
 
 Sidekiq.configure_server do |config|
-  config.redis = { url: ENV.fetch('REDIS_URL', 'redis://localhost:6379/0') }
+  config.redis = {
+    url: ENV.fetch('REDIS_URL', 'redis://localhost:6379/0'),
+    size: 10, # Connection pool size
+    network_timeout: 5,
+    reconnect_attempts: 3
+  }
 
   # Tải lịch trình từ file YAML
   config.on(:startup) do
@@ -12,5 +17,10 @@ Sidekiq.configure_server do |config|
 end
 
 Sidekiq.configure_client do |config|
-  config.redis = { url: ENV.fetch('REDIS_URL', 'redis://localhost:6379/0') }
+  config.redis = {
+    url: ENV.fetch('REDIS_URL', 'redis://localhost:6379/0'),
+    size: 5, # Smaller pool for clients
+    network_timeout: 5,
+    reconnect_attempts: 3
+  }
 end

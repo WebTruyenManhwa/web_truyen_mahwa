@@ -97,3 +97,6 @@ end
 gem "pry"
 gem 'googleauth'
 gem "whenever", require: false # Add whenever for cron job scheduling
+
+# Redis and Sidekiq
+gem 'connection_pool', '~> 2.4'
