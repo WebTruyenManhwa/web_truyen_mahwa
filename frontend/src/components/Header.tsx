@@ -54,32 +54,43 @@ export default function Header() {
   }, [searchQuery]);
 
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
+    const timeout = setTimeout(() => {
+      let openTimeoutId: NodeJS.Timeout;
+      let closeTimeoutId: NodeJS.Timeout;
 
-    const handleMouseEnter = () => {
-      clearTimeout(timeoutId);
-      setIsDropdownOpen(true);
-    };
+      const handleMouseEnter = () => {
+        clearTimeout(closeTimeoutId);
+        openTimeoutId = setTimeout(() => {
+          setIsDropdownOpen(true);
+        }, 0);
+      };
 
-    const handleMouseLeave = () => {
-      timeoutId = setTimeout(() => {
-        setIsDropdownOpen(false);
-      }, 300); // 300ms delay before hiding the dropdown
-    };
+      const handleMouseLeave = () => {
+        clearTimeout(openTimeoutId);
+        closeTimeoutId = setTimeout(() => {
+          setIsDropdownOpen(false);
+        }, 300);
+      };
 
-    const dropdownElement = dropdownRef.current;
-    if (dropdownElement) {
-      dropdownElement.addEventListener('mouseenter', handleMouseEnter);
-      dropdownElement.addEventListener('mouseleave', handleMouseLeave);
-    }
-
-    return () => {
-      clearTimeout(timeoutId);
+      const dropdownElement = dropdownRef.current;
       if (dropdownElement) {
-        dropdownElement.removeEventListener('mouseenter', handleMouseEnter);
-        dropdownElement.removeEventListener('mouseleave', handleMouseLeave);
+        dropdownElement.addEventListener('mouseenter', handleMouseEnter);
+        dropdownElement.addEventListener('mouseleave', handleMouseLeave);
       }
-    };
+
+      // Cleanup
+      return () => {
+        clearTimeout(openTimeoutId);
+        clearTimeout(closeTimeoutId);
+        if (dropdownElement) {
+          dropdownElement.removeEventListener('mouseenter', handleMouseEnter);
+          dropdownElement.removeEventListener('mouseleave', handleMouseLeave);
+        }
+      };
+    }, 1500); // ⏳ Delay 1.5s
+
+    // Cleanup timeout if component unmounts early
+    return () => clearTimeout(timeout);
   }, []);
 
   // Add new useEffect to handle category dropdown menu behavior
@@ -191,7 +202,11 @@ export default function Header() {
     }
 
     return (
-      <div className="relative" ref={dropdownRef}>
+      <div
+        className="relative"
+        ref={dropdownRef}
+
+      >
         <button
           className="flex items-center text-gray-300 hover:text-white bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded-full text-sm"
           onMouseEnter={() => setIsDropdownOpen(true)}
