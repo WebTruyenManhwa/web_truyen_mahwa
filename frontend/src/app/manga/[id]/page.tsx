@@ -13,7 +13,7 @@ interface Chapter {
   id: number;
   number: number;
   title: string;
-  createdAt: string;
+  created_at: string;  // Changed from createdAt to created_at
   view_count?: number;
   slug?: string;
 }
@@ -62,21 +62,24 @@ export default function MangaDetail(props: Props) {
           ...data,
           coverImage: data.cover_image?.url ?? '',
         };
-        
+
         // Sắp xếp chapters
         if (normalized.chapters) {
           normalized.chapters = normalized.chapters.sort(
             (a: { number: number; }, b: { number: number; }) => b.number - a.number
           );
         }
-        
+
         setManga(normalized);
-        
+
         // Kiểm tra xem manga có trong danh sách yêu thích không
         if (isAuthenticated) {
           try {
-            const favorites = await mangaApi.checkFavorite(mangaId);
-            setIsFavorite(favorites.isFavorite);
+            // Use the numeric ID from the fetched manga data
+            const numericId = normalized.id;
+            const favorites = await mangaApi.checkFavorite(numericId);
+            setIsFavorite(favorites.is_favorite);
+            // debugger
           } catch (err) {
             console.error("Failed to check favorite status:", err);
           }
@@ -84,7 +87,7 @@ export default function MangaDetail(props: Props) {
       } catch (err) {
         console.error("Failed to fetch manga:", err);
         setError("Không thể tải thông tin truyện. Vui lòng thử lại sau.");
-        
+
         // Fallback to mock data
         setManga({
           id: parseInt(mangaId),
@@ -100,21 +103,21 @@ export default function MangaDetail(props: Props) {
               id: 1,
               number: 1088,
               title: "Cuộc chiến cuối cùng",
-              createdAt: "2023-08-10",
+              created_at: "2023-08-10",
               view_count: 150000,
             },
             {
               id: 2,
               number: 1087,
               title: "Luffy vs Kaido",
-              createdAt: "2023-08-03",
+              created_at: "2023-08-03",
               view_count: 145000,
             },
             {
               id: 3,
               number: 1086,
               title: "Bí mật của Laugh Tale",
-              createdAt: "2023-07-27",
+              created_at: "2023-07-27",
               view_count: 140000,
             },
           ],
@@ -135,7 +138,9 @@ export default function MangaDetail(props: Props) {
     }
 
     try {
-      await userApi.toggleFavorite(mangaId);
+      // Ensure we're using the numeric ID, not the slug
+      const numericId = manga?.id || parseInt(mangaId);
+      await userApi.toggleFavorite(numericId);
       setIsFavorite(!isFavorite);
     } catch (err) {
       console.error("Failed to toggle favorite:", err);
@@ -151,7 +156,9 @@ export default function MangaDetail(props: Props) {
 
     try {
       setIsRating(true);
-      const response = await mangaApi.rateManga(mangaId, rating);
+      // Ensure we're using the numeric ID, not the slug
+      const numericId = manga?.id || parseInt(mangaId);
+      const response = await mangaApi.rateManga(numericId, rating);
       setManga(prev => prev ? {
         ...prev,
         rating: response.rating,
@@ -226,7 +233,7 @@ export default function MangaDetail(props: Props) {
               className="object-cover"
             />
             </div>
-            
+
             {/* Rating Section */}
             <div className="bg-gray-700/50 rounded-lg p-4 mb-4">
               {renderRatingStars()}
@@ -266,11 +273,11 @@ export default function MangaDetail(props: Props) {
               </button>
             </div>
           </div>
-          
+
           {/* Right Column */}
           <div className="md:w-3/4 mt-6 md:mt-0">
             <h1 className="text-3xl font-bold text-white mb-4">{manga.title}</h1>
-            
+
             {/* Stats Row */}
             <div className="flex flex-wrap gap-4 mb-6">
               <div className="flex items-center">
@@ -282,17 +289,17 @@ export default function MangaDetail(props: Props) {
                 <span className="ml-2 text-white">{manga.view_count?.toLocaleString() || 0}</span>
               </div>
             </div>
-            
+
             {/* Meta Info */}
             <div className="flex flex-wrap gap-2 mb-4">
               {manga.status && (
                 <span className="bg-blue-900 text-blue-100 px-2 py-1 rounded text-xs">
-                  {manga.status === "ongoing" ? "Đang tiến hành" : 
-                   manga.status === "completed" ? "Hoàn thành" : 
+                  {manga.status === "ongoing" ? "Đang tiến hành" :
+                   manga.status === "completed" ? "Hoàn thành" :
                    manga.status === "hiatus" ? "Tạm ngưng" : "Đã hủy"}
                 </span>
               )}
-              
+
               {manga.view_count && (
                 <span className="bg-gray-700 text-gray-100 px-2 py-1 rounded text-xs flex items-center">
                   <svg
@@ -323,7 +330,7 @@ export default function MangaDetail(props: Props) {
                 </span>
               )}
             </div>
-            
+
             {/* Genres */}
             <div className="mb-4">
               <h2 className="text-sm text-gray-400 mb-2">Thể loại:</h2>
@@ -331,7 +338,7 @@ export default function MangaDetail(props: Props) {
                 {manga.genres && manga.genres.map((genre, index) => {
                   // Xử lý genre dựa trên kiểu dữ liệu
                   let genreName = '';
-                  
+
                   if (typeof genre === 'object' && genre !== null) {
                     // Sử dụng type assertion để TypeScript biết cấu trúc của đối tượng
                     const genreObj = genre as { name?: string; title?: string; id?: number | string };
@@ -343,13 +350,13 @@ export default function MangaDetail(props: Props) {
                     // Các trường hợp khác (string, number)
                     genreName = String(genre);
                   }
-                  
+
                   // Tạo slug an toàn cho URL
                   const slug = genreName.toLowerCase()
                     .replace(/[^\w\s-]/g, '') // Loại bỏ ký tự đặc biệt
                     .replace(/\s+/g, '-')     // Thay khoảng trắng bằng dấu gạch ngang
                     || `genre-${index}`;      // Fallback nếu slug rỗng
-                  
+
                   return (
                     <Link
                       key={index}
@@ -362,32 +369,32 @@ export default function MangaDetail(props: Props) {
                 })}
               </div>
             </div>
-            
+
             {/* Info Table */}
             <div className="mb-4">
               <div className="grid grid-cols-3 gap-2 text-sm">
                 <div className="text-gray-400">Tác giả:</div>
                 <div className="col-span-2">{manga.author}</div>
-                
+
                 {manga.artist && (
                   <>
                     <div className="text-gray-400">Họa sĩ:</div>
                     <div className="col-span-2">{manga.artist}</div>
                   </>
                 )}
-                
+
                 {manga.releaseYear && (
                   <>
                     <div className="text-gray-400">Năm phát hành:</div>
                     <div className="col-span-2">{manga.releaseYear}</div>
                   </>
                 )}
-                
+
                 <div className="text-gray-400">Số chương:</div>
                 <div className="col-span-2">{manga.chapters.length}</div>
               </div>
             </div>
-            
+
             {/* Description */}
             <div className="mb-4">
               <h2 className="text-sm text-gray-400 mb-2">Mô tả:</h2>
@@ -396,11 +403,11 @@ export default function MangaDetail(props: Props) {
           </div>
         </div>
       </div>
-      
+
       {/* Chapter List Section */}
       <div className="bg-gray-800 rounded-lg p-4">
         <h2 className="text-xl font-bold mb-4 pb-2 border-b border-gray-700">Danh sách chương</h2>
-        
+
         <div className="space-y-2">
           {manga.chapters.map((chapter) => (
             <Link
@@ -440,7 +447,7 @@ export default function MangaDetail(props: Props) {
                       : chapter.view_count}
                   </span>
                 )}
-                <span>{new Date(chapter.createdAt).toLocaleDateString()}</span>
+                <span>{new Date(chapter.created_at).toLocaleDateString()}</span>
               </div>
             </Link>
           ))}
@@ -448,4 +455,4 @@ export default function MangaDetail(props: Props) {
       </div>
     </div>
   );
-} 
+}

@@ -42,7 +42,9 @@ export const mangaApi = {
 
   // Kiểm tra trạng thái yêu thích của một manga
   checkFavorite: async (mangaId: string | number) => {
-    const response = await api.get(`/v1/users/favorites/check/${mangaId}`);
+    // Ensure mangaId is a number
+    const numericId = typeof mangaId === 'string' ? parseInt(mangaId) : mangaId;
+    const response = await api.get(`/v1/users/favorites/check/${numericId}`);
     return response.data;
   },
 
@@ -73,7 +75,9 @@ export const mangaApi = {
   },
 
   rateManga: async (mangaId: string | number, rating: number) => {
-    const response = await api.post(`/v1/mangas/${mangaId}/ratings`, {
+    // Ensure mangaId is a number
+    const numericId = typeof mangaId === 'string' ? parseInt(mangaId) : mangaId;
+    const response = await api.post(`/v1/mangas/${numericId}/ratings`, {
       rating: {
         rating: rating
       }
@@ -157,12 +161,12 @@ export const chapterImageApi = {
   // Cập nhật vị trí ảnh trong chapter
   updateImagePositions: async (mangaId: string | number, chapterId: string | number, positionMapping: Record<number, number>) => {
     const formData = new FormData();
-    
+
     // Thêm mapping vị trí vào formData
     Object.entries(positionMapping).forEach(([oldPos, newPos]) => {
       formData.append(`image_positions[${oldPos}]`, newPos.toString());
     });
-    
+
     const response = await api.put(`/v1/mangas/${mangaId}/chapters/${chapterId}`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -175,7 +179,7 @@ export const chapterImageApi = {
   deleteImage: async (mangaId: string | number, chapterId: string | number, position: number) => {
     const formData = new FormData();
     formData.append('image_positions_to_delete[]', position.toString());
-    
+
     const response = await api.put(`/v1/mangas/${mangaId}/chapters/${chapterId}`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -188,18 +192,18 @@ export const chapterImageApi = {
   addChapterImage: async (mangaId: string | number, chapterId: string | number, imageData: FormData) => {
     // Đảm bảo formData có trường new_images[]
     const newFormData = new FormData();
-    
+
     // Lấy file từ formData cũ
     const image = imageData.get('chapter_image[image]') || imageData.get('image');
     const position = imageData.get('chapter_image[position]') || imageData.get('position');
     const isExternal = imageData.get('chapter_image[is_external]') || imageData.get('is_external');
     const externalUrl = imageData.get('chapter_image[external_url]') || imageData.get('external_url');
-    
+
     if (image) newFormData.append('new_images[]', image);
     if (position) newFormData.append('new_image_positions[]', position.toString());
     if (isExternal) newFormData.append('is_external', isExternal.toString());
     if (externalUrl) newFormData.append('external_url', externalUrl.toString());
-    
+
     const response = await api.put(`/v1/mangas/${mangaId}/chapters/${chapterId}`, newFormData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -212,15 +216,15 @@ export const chapterImageApi = {
   bulkAddChapterImages: async (mangaId: string | number, chapterId: string | number, imagesData: FormData) => {
     // Đảm bảo formData có trường new_images[]
     const newFormData = new FormData();
-    
+
     // Lấy các files từ formData cũ
     const images = imagesData.getAll('images[]');
-    
+
     // Thêm từng file vào new_images[]
     images.forEach(image => {
       newFormData.append('new_images[]', image);
     });
-    
+
     const response = await api.put(`/v1/mangas/${mangaId}/chapters/${chapterId}`, newFormData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -307,7 +311,7 @@ export const userApi = {
 export const proxyApi = {
   // Fetch external content through our backend proxy
   fetchUrl: async (url: string) => {
-    const response = await api.get(`/v1/proxy/fetch`, { 
+    const response = await api.get(`/v1/proxy/fetch`, {
       params: { url },
       responseType: 'text'
     });
@@ -360,12 +364,12 @@ export const commentApi = {
   ) => {
     const body: any = { content, parent_id: parentId };
     if (stickers && stickers.length > 0) body.stickers = stickers;
-    
+
     // Use manga_id if provided, otherwise fall back to old URL
-    const url = mangaId 
+    const url = mangaId
       ? `/v1/mangas/${mangaId}/chapters/${chapterId}/comments`
       : `/v1/chapters/${chapterId}/comments`;
-      
+
     const response = await api.post(url, body);
     return response.data;
   },
@@ -425,4 +429,4 @@ export const adminApi = {
   },
 };
 
-export default api; 
+export default api;
