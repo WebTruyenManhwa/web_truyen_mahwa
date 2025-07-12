@@ -75,7 +75,7 @@ export default function EditChapter(props: Props){
         console.log("Initial chapter images:", images);
 
         // Kiểm tra xem các ảnh có ID không
-        images.forEach((img, index) => {
+        images.forEach((img: ChapterImage, index: number) => {
           console.log(`Image ${index} - ID: ${img.id}, Position: ${img.position}, URL: ${img.url}`);
         });
 
@@ -228,10 +228,9 @@ export default function EditChapter(props: Props){
       if (confirm("Bạn có muốn xóa ảnh này ngay lập tức không? Nhấn OK để xóa ngay, Cancel để chỉ đánh dấu xóa.")) {
         try {
           setIsLoading(true);
-          console.log("Deleting image immediately at position:", position);
 
           // Lưu trữ một bản sao của ảnh hiện tại trước khi xóa
-          const currentImagesCopy = [...currentImages];
+          // const currentImagesCopy = [...currentImages];
 
           // Xóa ảnh khỏi UI ngay lập tức
           const updatedImages = currentImages.filter(img => img.position !== position);
@@ -241,8 +240,6 @@ export default function EditChapter(props: Props){
             ...img,
             position: index
           }));
-
-          console.log("Updated images after deletion:", compactedImages);
 
           // Cập nhật UI ngay lập tức
           setCurrentImages(compactedImages);
@@ -257,47 +254,10 @@ export default function EditChapter(props: Props){
           formData.append("number", number);
 
           // Thêm vị trí cần xóa
-          console.log("Adding position to delete in API call:", position);
           formData.append("image_positions_to_delete[]", position.toString());
 
-          // Thêm mapping vị trí mới cho các ảnh còn lại
-          const positionMapping: Record<string, string> = {};
-          compactedImages.forEach(img => {
-            if (img.id !== undefined) {
-              positionMapping[img.id.toString()] = img.position.toString();
-              console.log(`Mapping image ID ${img.id} to position ${img.position}`);
-            }
-          });
-
-          // Thêm mapping vào formData
-          Object.entries(positionMapping).forEach(([imageId, newPosition]) => {
-            formData.append(`image_positions[${imageId}]`, newPosition);
-          });
-
           // Gọi API cập nhật chapter
-          console.log("Calling API to delete image...");
-          const response = await chapterApi.updateChapter(mangaId, chapterId, formData);
-          console.log("API response after deletion:", response);
-
-          // Đợi một khoảng thời gian ngắn để đảm bảo backend đã xử lý xong
-          console.log("Waiting for backend to process deletion...");
-          await new Promise(resolve => setTimeout(resolve, 1000));
-
-          // Tải lại dữ liệu từ server để đảm bảo đồng bộ
-          console.log("Reloading data from server...");
-          const reloadResponse = await chapterApi.getChapter(mangaId, chapterId);
-          console.log("Server response after deletion:", reloadResponse);
-
-          // Cập nhật state với dữ liệu mới
-          const sortedImages = [...reloadResponse.images || []].sort((a, b) => a.position - b.position);
-          const serverCompactedImages = sortedImages.map((img, index) => ({
-            ...img,
-            position: index
-          }));
-
-          console.log("Final images from server:", serverCompactedImages);
-          setCurrentImages(serverCompactedImages);
-          setMaxPosition(serverCompactedImages.length);
+          await chapterApi.updateChapter(mangaId, chapterId, formData);
 
           setSuccess(true);
         } catch (err) {
@@ -689,10 +649,7 @@ export default function EditChapter(props: Props){
         }
       });
 
-      console.log("Positions to delete:", positionsToDelete);
-
       positionsToDelete.forEach(position => {
-        console.log(`Adding position ${position} to image_positions_to_delete[]`);
         formData.append("image_positions_to_delete[]", position.toString());
       });
 
@@ -704,10 +661,7 @@ export default function EditChapter(props: Props){
         }
       });
 
-      console.log("Position mapping:", positionMapping);
-
       Object.entries(positionMapping).forEach(([imageId, newPosition]) => {
-        console.log(`Setting image ID ${imageId} to position ${newPosition}`);
         formData.append(`image_positions[${imageId}]`, newPosition);
       });
 
@@ -716,20 +670,15 @@ export default function EditChapter(props: Props){
         if (image.is_external && image.external_url) {
           // Nếu là ảnh từ nguồn ngoài, thêm URL
           formData.append("new_images[]", image.external_url);
-          console.log(`Adding external image at position ${image.position}`);
         } else if (image.file) {
           // Nếu là file upload từ máy tính
           formData.append("new_images[]", image.file);
-          console.log(`Adding uploaded image at position ${image.position}`);
         }
         formData.append("new_image_positions[]", image.position.toString());
       });
 
-      console.log("Sending update to API...");
-
       // Gọi API cập nhật chapter
-      const updateResponse = await chapterApi.updateChapter(mangaId, chapterId, formData);
-      console.log("API update response:", updateResponse);
+      await chapterApi.updateChapter(mangaId, chapterId, formData);
 
       // Lọc bỏ các ảnh đã đánh dấu xóa khỏi UI trước khi tải lại dữ liệu
       const filteredImages = currentImages.filter(img => !imagesToDelete.includes(img.position));
@@ -747,14 +696,8 @@ export default function EditChapter(props: Props){
       // Đặt lại danh sách ảnh cần xóa
       setImagesToDelete([]);
 
-      // Đợi một khoảng thời gian ngắn để đảm bảo backend đã xử lý xong
-      console.log("Waiting for backend to process changes...");
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
       // Tải lại dữ liệu chapter để đảm bảo đồng bộ với server
-      console.log("Reloading chapter data from server...");
       const response = await chapterApi.getChapter(mangaId, chapterId);
-      console.log("Server response after update:", response);
 
       // Cập nhật state
       setTitle(response.title);
@@ -762,15 +705,12 @@ export default function EditChapter(props: Props){
 
       // Sắp xếp ảnh theo position
       const sortedImages = [...response.images || []].sort((a, b) => a.position - b.position);
-      console.log("Sorted images from server:", sortedImages);
 
       // Nén vị trí ảnh để không có khoảng trống
       const updatedCompactedImages = sortedImages.map((img, index) => ({
         ...img,
         position: index
       }));
-
-      console.log("Final compacted images:", updatedCompactedImages);
 
       // Cập nhật state với ảnh mới
       setCurrentImages(updatedCompactedImages);
