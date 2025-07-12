@@ -66,14 +66,8 @@ module Api
 
         # Increment manga view count if not viewed recently by this IP
         unless manga_viewed
-          @chapter.manga.increment!(:view_count)
-
-          # Track manga view in Redis for rankings
-          begin
-            ViewTrackerService.instance.track_manga_view(@chapter.manga_id)
-          rescue Redis::CannotConnectError => e
-            Rails.logger.error "Redis connection error when tracking view: #{e.message}"
-          end
+          # Track manga view in database
+          @chapter.manga.track_view
 
           # Set cache to expire after 30 minutes
           Rails.cache.write(manga_key, true, expires_in: 30.minutes)

@@ -1,8 +1,9 @@
 module Api
   module V1
     class MangasController < BaseController
-      skip_before_action :authenticate_user!, only: [:index, :show, :rankings_day, :rankings_week, :rankings_month]
       before_action :set_manga, only: [:show, :update, :destroy]
+      before_action :authorize_admin, only: [:create, :update, :destroy]
+      skip_before_action :authenticate_user!, only: [:index, :show, :rankings_day, :rankings_week, :rankings_month]
 
       def index
         @mangas = Manga.includes(:genres, :chapters)
@@ -114,55 +115,38 @@ module Api
 
       # Lấy danh sách manga với lượt xem theo thời gian
       def get_mangas_with_views(period)
-        tracker = ViewTrackerService.instance
+        # Lấy tất cả manga với thông tin cần thiết
+        mangas = Manga.includes(:genres, :chapters).limit(100)
 
-        # Nếu Redis không khả dụng, sử dụng view_count từ database
-        begin
-          # Lấy tất cả manga với thông tin cần thiết
-          mangas = Manga.includes(:genres, :chapters).limit(100)
+        # Tính lượt xem cho từng manga theo thời gian
+        mangas_with_views = mangas.map do |manga|
+          # Lấy lượt xem theo thời gian từ database
+          period_views = case period
+                        when :day
+                          manga.views_for_day
+                        when :week
+                          manga.views_for_week
+                        when :month
+                          manga.views_for_month
+                        end
 
-          # Tính lượt xem cho từng manga theo thời gian
-          mangas_with_views = mangas.map do |manga|
-            # Lấy lượt xem theo thời gian từ Redis
-            period_views = case period
-                          when :day
-                            tracker.get_manga_views_for_day(manga.id)
-                          when :week
-                            tracker.get_manga_views_for_week(manga.id)
-                          when :month
-                            tracker.get_manga_views_for_month(manga.id)
-                          end
+          # Nếu không có lượt xem, sử dụng view_count từ manga
+          period_views = manga.view_count if period_views == 0
 
-            # Nếu không có lượt xem trong Redis, sử dụng view_count từ database
-            period_views = manga.view_count if period_views == 0
+          # Lấy chapter mới nhất
+          latest_chapter = manga.chapters.order(number: :desc).first
 
-            # Lấy chapter mới nhất
-            latest_chapter = manga.chapters.order(number: :desc).first
+          # Tạo hash với thông tin manga và lượt xem
+          manga_data = manga.as_json(include: [:genres])
+          manga_data['period_views'] = period_views
+          manga_data['latest_chapter'] = latest_chapter.as_json(only: [:id, :number, :title]) if latest_chapter
+          manga_data['chapters_count'] = manga.chapters.count
 
-            # Tạo hash với thông tin manga và lượt xem
-            manga_data = manga.as_json(include: [:genres])
-            manga_data['period_views'] = period_views
-            manga_data['latest_chapter'] = latest_chapter.as_json(only: [:id, :number, :title]) if latest_chapter
-            manga_data['chapters_count'] = manga.chapters.count
-
-            manga_data
-          end
-
-          # Sắp xếp theo lượt xem giảm dần
-          mangas_with_views.sort_by { |m| -m['period_views'] }
-        rescue Redis::CannotConnectError => e
-          Rails.logger.error "Redis connection error: #{e.message}"
-
-          # Fallback: Sử dụng view_count từ database
-          mangas = Manga.includes(:genres, :chapters).order(view_count: :desc).limit(limit)
-          mangas.map do |manga|
-            latest_chapter = manga.chapters.order(number: :desc).first
-            manga_data = manga.as_json(include: [:genres])
-            manga_data['latest_chapter'] = latest_chapter.as_json(only: [:id, :number, :title]) if latest_chapter
-            manga_data['chapters_count'] = manga.chapters.count
-            manga_data
-          end
+          manga_data
         end
+
+        # Sắp xếp theo lượt xem giảm dần
+        mangas_with_views.sort_by { |m| -m['period_views'] }
       end
 
       def increment_manga_view_count
@@ -175,14 +159,8 @@ module Api
 
         # Increment manga view count if not viewed recently by this IP
         unless manga_viewed
-          @manga.increment!(:view_count)
-
-          # Track view in Redis for rankings
-          begin
-            ViewTrackerService.instance.track_manga_view(@manga.id)
-          rescue Redis::CannotConnectError => e
-            Rails.logger.error "Redis connection error when tracking view: #{e.message}"
-          end
+          # Track view in database
+          @manga.track_view
 
           # Set cache to expire after 30 minutes
           Rails.cache.write(manga_key, true, expires_in: 30.minutes)

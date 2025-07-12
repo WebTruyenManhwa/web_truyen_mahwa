@@ -1,5 +1,7 @@
-view_sync_job:
-  cron: '0 */12 * * *'  # Chạy mỗi 12 giờ
-  class: ViewSyncJob
-  queue: default
-  description: "Đồng bộ lượt xem từ Redis vào database"
+# Add your scheduled jobs here
+# Example:
+# daily_cleanup:
+#   cron: '0 0 * * *'  # Runs at midnight every day
+#   class: CleanupJob
+#   queue: default
+#   description: "Daily cleanup job"

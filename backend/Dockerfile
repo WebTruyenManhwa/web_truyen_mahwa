@@ -1,7 +1,7 @@
 # check=error=true
 
 # This Dockerfile is designed for production deployment on Render
-# It runs both Rails web server and Sidekiq in the same container
+# It runs the Rails web server
 
 # Make sure RUBY_VERSION matches the Ruby version in .ruby-version
 ARG RUBY_VERSION=3.3.0
@@ -23,8 +23,7 @@ RUN apt-get update -qq && \
       libjemalloc2 \
       libvips \
       postgresql-client \
-      imagemagick \
-      supervisor && \
+      imagemagick && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 # Set production environment
@@ -72,10 +71,6 @@ RUN getent group rails >/dev/null || groupadd --system --gid 1000 rails \
 RUN mkdir -p /rails/public/uploads /rails/tmp/sockets /rails/tmp/pids \
  && chown -R rails:rails /rails /rails/public/uploads /rails/tmp /rails/log /rails/storage
 
-# Create supervisor configuration
-RUN mkdir -p /etc/supervisor/conf.d
-COPY --chown=root:root --chmod=644 docker/supervisor.conf /etc/supervisor/conf.d/app.conf
-
 # Chuyển xuống chạy dưới user rails
 USER rails
 
@@ -86,5 +81,5 @@ ENTRYPOINT ["sh", "/rails/entrypoint.sh"]
 # Expose port
 EXPOSE 80
 
-# Start supervisor to manage both Rails and Sidekiq
-CMD ["supervisord", "-c", "/etc/supervisor/conf.d/app.conf"]
+# Start Rails server
+CMD ["./bin/thrust", "./bin/rails", "server"]

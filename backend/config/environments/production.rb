@@ -46,22 +46,13 @@ Rails.application.configure do
   # Replace the default in-process memory cache store with a durable alternative.
   config.cache_store = :solid_cache_store
 
-  # Replace the default in-process and non-durable queuing backend for Active Job.
+  # Use database for Active Job queue adapter
   config.active_job.queue_adapter = :solid_queue
   config.solid_queue.connects_to = { database: { writing: :queue } }
 
-  # Use a real queuing backend for Active Job (and separate queues per environment)
-  config.active_job.queue_adapter = :sidekiq
-
-  # Cấu hình Redis cho cache và session store
-  config.cache_store = :redis_cache_store, {
-    url: ENV.fetch('REDIS_URL', 'redis://localhost:6379/0'),
-    connect_timeout: 5,
-    read_timeout: 5,
-    write_timeout: 5,
-    reconnect_attempts: 3
-  }
-  config.session_store :cache_store, key: '_web_truyen_mahwa_session'
+  # Cấu hình cache và session store sử dụng database thay vì Redis
+  config.cache_store = :solid_cache_store
+  config.session_store :cookie_store, key: '_web_truyen_mahwa_session'
 
   # Ignore bad email addresses and do not raise email delivery errors.
   # Set this to true and configure the email server for immediate delivery to raise delivery errors.

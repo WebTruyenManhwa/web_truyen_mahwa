@@ -15,12 +15,6 @@ until bundle exec rails runner "ActiveRecord::Base.connection"; do
   sleep 2
 done
 
-# Chờ Redis sẵn sàng
-until bundle exec rails runner "Redis.new(url: ENV.fetch('REDIS_URL', 'redis://localhost:6379/0')).ping"; do
-  echo "⏳ Waiting for Redis..."
-  sleep 2
-done
-
 # Chạy migration
 echo "🏃 Running migrations..."
 bundle exec rails db:migrate

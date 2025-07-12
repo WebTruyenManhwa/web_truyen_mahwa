@@ -12,6 +12,7 @@ class Manga < ApplicationRecord
   has_many :favorites, dependent: :destroy
   has_many :comments, as: :commentable, dependent: :destroy
   has_many :ratings, dependent: :destroy
+  has_many :manga_views, dependent: :destroy
 
   # Validations
   validates :title, presence: true
@@ -27,6 +28,26 @@ class Manga < ApplicationRecord
   # Callbacks
   before_create :set_defaults
   before_save :set_slug
+
+  # Track a new view for this manga
+  def track_view
+    MangaView.increment_view(id)
+  end
+
+  # Get views for today
+  def views_for_day(date = Date.today)
+    MangaView.views_for_day(id, date)
+  end
+
+  # Get views for the past week
+  def views_for_week(end_date = Date.today)
+    MangaView.views_for_week(id, end_date)
+  end
+
+  # Get views for the past month
+  def views_for_month(end_date = Date.today)
+    MangaView.views_for_month(id, end_date)
+  end
 
   def update_rating_stats
     if ratings.any?

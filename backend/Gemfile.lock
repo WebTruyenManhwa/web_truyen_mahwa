@@ -562,6 +562,7 @@ DEPENDENCIES
   bootsnap
   brakeman
   carrierwave (~> 3.0)
+  connection_pool (~> 2.4)
   debug
   devise
   devise-jwt

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_07_12_200001) do
+ActiveRecord::Schema[8.0].define(version: 2025_07_13_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -79,6 +79,17 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_12_200001) do
     t.datetime "updated_at", null: false
     t.index ["genre_id"], name: "index_manga_genres_on_genre_id"
     t.index ["manga_id"], name: "index_manga_genres_on_manga_id"
+  end
+
+  create_table "manga_views", force: :cascade do |t|
+    t.bigint "manga_id", null: false
+    t.date "view_date", null: false
+    t.integer "view_count", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["manga_id", "view_date"], name: "index_manga_views_on_manga_id_and_view_date", unique: true
+    t.index ["manga_id"], name: "index_manga_views_on_manga_id"
+    t.index ["view_date"], name: "index_manga_views_on_view_date"
   end
 
   create_table "mangas", force: :cascade do |t|
@@ -158,6 +169,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_12_200001) do
   add_foreign_key "favorites", "users"
   add_foreign_key "manga_genres", "genres"
   add_foreign_key "manga_genres", "mangas"
+  add_foreign_key "manga_views", "mangas"
   add_foreign_key "ratings", "mangas"
   add_foreign_key "ratings", "users"
   add_foreign_key "reading_histories", "chapters"
