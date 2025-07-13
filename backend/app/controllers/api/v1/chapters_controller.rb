@@ -109,9 +109,9 @@ module Api
         end
 
         # Xóa cache của manga để đảm bảo dữ liệu mới nhất được trả về
-        manga_cache_key = "mangas/show/#{@chapter.manga_id}-#{@chapter.manga.updated_at.to_i}"
-        Rails.cache.delete(manga_cache_key)
-        Rails.logger.info "=== Deleted manga cache key: #{manga_cache_key} ==="
+        cache_key_pattern = "mangas/show/#{@chapter.manga_id}-*"
+        Rails.cache.delete_matched(cache_key_pattern)
+        Rails.logger.info "=== Deleted manga cache keys: #{cache_key_pattern} ==="
       end
 
       def set_manga

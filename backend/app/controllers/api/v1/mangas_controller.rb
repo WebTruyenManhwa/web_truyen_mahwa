@@ -92,7 +92,9 @@ module Api
 
         if @manga.update(manga_params)
           # Xóa cache khi cập nhật manga
-          Rails.cache.delete("mangas/show/#{@manga.id}-#{@manga.updated_at.to_i}")
+          # Use the same cache key pattern as other methods
+          cache_key_pattern = "mangas/show/#{@manga.id}-*"
+          Rails.cache.delete_matched(cache_key_pattern)
           Rails.cache.delete_matched("mangas/index/*")
           render json: @manga
         else
@@ -102,7 +104,9 @@ module Api
 
       def destroy
         # Xóa cache khi xóa manga
-        Rails.cache.delete("mangas/show/#{@manga.id}-#{@manga.updated_at.to_i}")
+        # Use the same cache key pattern as other methods
+        cache_key_pattern = "mangas/show/#{@manga.id}-*"
+        Rails.cache.delete_matched(cache_key_pattern)
         Rails.cache.delete_matched("mangas/index/*")
         @manga.destroy
         head :no_content
@@ -226,9 +230,10 @@ module Api
           Rails.logger.info "=== Incremented view count for manga page #{@manga.id} (#{@manga.title}) ==="
 
           # Xóa cache của manga để đảm bảo dữ liệu mới nhất được trả về
-          cache_key = "mangas/show/#{@manga.id}-#{@manga.updated_at.to_i}"
-          Rails.cache.delete(cache_key)
-          Rails.logger.info "=== Deleted manga cache key: #{cache_key} ==="
+          # Use the same cache key format as the show method
+          cache_key_pattern = "mangas/show/#{@manga.id}-*"
+          Rails.cache.delete_matched(cache_key_pattern)
+          Rails.logger.info "=== Deleted manga cache keys: #{cache_key_pattern} ==="
         end
       end
 

@@ -16,9 +16,17 @@ class Rating < ApplicationRecord
     total_votes = manga_ratings.count
     average_rating = total_votes > 0 ? manga_ratings.average(:value).to_f : 0
 
+    # Log the rating calculation
+    Rails.logger.info "=== Updating manga rating: manga_id=#{manga.id}, new_rating=#{average_rating}, total_votes=#{total_votes} ==="
+
     manga.update_columns(
       rating: average_rating,
       total_votes: total_votes
     )
+
+    # Clear the cache for this manga to ensure fresh data is returned
+    cache_key_pattern = "mangas/show/#{manga.id}-*"
+    Rails.cache.delete_matched(cache_key_pattern)
+    Rails.logger.info "=== Cleared cache for manga: #{cache_key_pattern} ==="
   end
-end 
+end

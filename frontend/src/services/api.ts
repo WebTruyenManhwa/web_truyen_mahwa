@@ -23,7 +23,15 @@ api.interceptors.request.use((config) => {
 // API cho manga
 export const mangaApi = {
   // Lấy danh sách manga với phân trang và lọc
-  getMangas: async (params?: { page?: number; limit?: number; genre?: string; status?: string; sort?: string; search?: string }) => {
+  getMangas: async (params?: {
+    page?: number;
+    limit?: number;
+    genre?: string;
+    status?: string;
+    sort?: string;
+    search?: string;
+    _?: number; // Add timestamp for cache busting
+  }) => {
     const response = await api.get('/v1/mangas', { params });
     return response.data;
   },
@@ -53,6 +61,22 @@ export const mangaApi = {
     const numericId = typeof mangaId === 'string' ? parseInt(mangaId) : mangaId;
     const response = await api.get(`/v1/users/favorites/check/${numericId}`);
     return response.data;
+  },
+
+  // Lấy đánh giá của người dùng hiện tại cho một manga
+  getUserRating: async (mangaId: string | number) => {
+    // Ensure mangaId is a number
+    const numericId = typeof mangaId === 'string' ? parseInt(mangaId) : mangaId;
+    try {
+      const response = await api.get(`/v1/mangas/${numericId}/ratings/user`);
+      return response.data;
+    } catch (error: any) {
+      // If the user hasn't rated this manga yet, return null
+      if (error.response && error.response.status === 404) {
+        return null;
+      }
+      throw error;
+    }
   },
 
   // Tạo manga mới (cần quyền admin)
