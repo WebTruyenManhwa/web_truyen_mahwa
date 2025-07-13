@@ -110,21 +110,21 @@ export default function ChapterReader() {
       const scrollPosition = window.scrollY;
       const windowHeight = window.innerHeight;
       // const documentHeight = document.documentElement.scrollHeight;
-      
+
       // Hiển thị navigation khi scroll xuống 20% trang
       setShowBottomNav(scrollPosition > windowHeight * 0.2);
 
       // Tính toán trang hiện tại dựa trên scroll position
       const images = document.querySelectorAll('.chapter-image');
       let currentImageIndex = 0;
-      
+
       images.forEach((image, index) => {
         const rect = image.getBoundingClientRect();
         if (rect.top <= windowHeight / 2) {
           currentImageIndex = index;
         }
       });
-      
+
       setCurrentPage(currentImageIndex);
     };
 
@@ -185,7 +185,7 @@ export default function ChapterReader() {
       } catch (err) {
         console.error("Failed to fetch chapter:", err);
         setError("Không thể tải chapter. Vui lòng thử lại sau.");
-        
+
         // Fallback to mock data
         setChapter({
           id: parseInt(chapterId),
@@ -230,6 +230,8 @@ export default function ChapterReader() {
   }, [mangaId, chapterId, isAuthenticated]);
 
   // Hàm debug để kiểm tra cấu trúc dữ liệu chapter
+  // Xóa useEffect này để tránh gọi API hai lần
+  /*
   useEffect(() => {
     if (chapter) {
       console.log("Chapter structure:", {
@@ -241,6 +243,7 @@ export default function ChapterReader() {
       });
     }
   }, [chapter]);
+  */
 
   const insertStickerAtCursor = (stickerUrl: string) => {
     const el = commentInputRef.current;
@@ -367,7 +370,7 @@ export default function ChapterReader() {
     // Scroll to comment form
     document.getElementById('comment-form')?.scrollIntoView({ behavior: 'smooth' });
   };
-  
+
   const cancelReply = () => {
     setReplyingTo(null);
   };
@@ -420,7 +423,7 @@ export default function ChapterReader() {
               <p className="text-sm text-gray-400 truncate">Chapter {chapter.number || ""} {chapter.title ? `- ${chapter.title}` : ""}</p>
             </div>
           </div>
-          
+
           <div className="flex flex-wrap gap-2 items-center">
             {/* <button
               onClick={toggleReadingMode}
@@ -442,7 +445,7 @@ export default function ChapterReader() {
                 </>
               )}
             </button> */}
-            
+
             <div className="flex flex-1 min-w-0 gap-2 flex-wrap sm:flex-nowrap">
               <Link
                 href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.prev_chapter?.slug || chapter.prev_chapter?.id}`}
@@ -450,7 +453,7 @@ export default function ChapterReader() {
               >
                 Chương trước
               </Link>
-              
+
               <div className="relative flex-1 min-w-0 w-full" ref={dropdownRef}>
                 <button
                   className="w-full bg-gray-700 text-white px-3 py-1 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-500 flex items-center justify-between"
@@ -468,7 +471,7 @@ export default function ChapterReader() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                
+
                 {isDropdownOpen && (
                   <div className="absolute z-50 w-full mt-1 bg-gray-700 rounded shadow-lg max-w-full left-0 right-0">
                     <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
@@ -488,7 +491,7 @@ export default function ChapterReader() {
                   </div>
                 )}
               </div>
-              
+
               <Link
                 href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.next_chapter?.slug || chapter.next_chapter?.id}`}
                 className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm whitespace-nowrap"
@@ -499,12 +502,12 @@ export default function ChapterReader() {
           </div>
         </div>
       </div>
-      
+
       {/* Chapter Images */}
       <div className={`space-y-1`}>
         {(chapter.images || []).map((image, _index) => (
-          <div 
-            key={`image-${image.position}`} 
+          <div
+            key={`image-${image.position}`}
             className={`chapter-image`}
           >
             <img
@@ -517,7 +520,7 @@ export default function ChapterReader() {
           </div>
         ))}
       </div>
-      
+
       {/* Floating Navigation Buttons */}
       {showBottomNav && (
         <div className="fixed bottom-4 right-4 flex gap-2">
@@ -532,7 +535,7 @@ export default function ChapterReader() {
               Chapter trước
             </Link>
           )}
-          
+
           {chapter.next_chapter && (
             <Link
               href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.next_chapter?.slug || chapter.next_chapter?.id}`}
@@ -546,7 +549,7 @@ export default function ChapterReader() {
           )}
         </div>
       )}
-      
+
       {/* Comments Section */}
       <div className="mt-8">
         <h2 className="text-xl font-bold mb-4 pb-2 border-b border-gray-700">Bình luận</h2>
@@ -581,8 +584,8 @@ export default function ChapterReader() {
                 </div>
                 <div className="mt-2 flex justify-between items-center">
                   <div className="relative" ref={stickerPickerRef}>
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => setShowStickerPicker(!showStickerPicker)}
                       className="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded"
                     >
@@ -600,7 +603,7 @@ export default function ChapterReader() {
                             width={32}
                             height={32}
                             className="w-8 h-8"
-                          />                        
+                          />
                         </button>
                         <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742751.png')} className="p-1 hover:bg-gray-600 rounded">
                           <img src="https://cdn-icons-png.flaticon.com/128/742/742751.png" alt="Sticker 2" className="w-8 h-8" />
@@ -626,8 +629,8 @@ export default function ChapterReader() {
                       </div>
                     )}
                   </div>
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     disabled={isSubmitting || (!commentHtml.trim() && selectedStickers.length === 0)}
                     className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -655,11 +658,11 @@ export default function ChapterReader() {
                     <div className="flex items-center">
                       <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center mr-2">
                         {comment.user && comment.user.avatar ? (
-                          <Image 
-                            src={comment.user.avatar} 
-                            alt={comment.user.username || 'User'} 
-                            width={32} 
-                            height={32} 
+                          <Image
+                            src={comment.user.avatar}
+                            alt={comment.user.username || 'User'}
+                            width={32}
+                            height={32}
                             className="rounded-full"
                           />
                         ) : (
@@ -674,7 +677,7 @@ export default function ChapterReader() {
                       </div>
                     </div>
                     {isAuthenticated && (
-                      <button 
+                      <button
                         onClick={() => handleReplyToComment(comment)}
                         className="text-sm text-gray-400 hover:text-white"
                       >
@@ -704,8 +707,8 @@ export default function ChapterReader() {
                         <div className="text-sm">
                           Đang trả lời <span className="font-semibold text-blue-500">{replyingTo.user?.username || 'Unknown'}</span>
                         </div>
-                        <button 
-                          type="button" 
+                        <button
+                          type="button"
                           onClick={cancelReply}
                           className="text-gray-400 hover:text-white"
                         >
@@ -740,8 +743,8 @@ export default function ChapterReader() {
                       </div>
                       <div className="mt-2 flex justify-between items-center">
                         <div className="relative" ref={stickerPickerRef}>
-                          <button 
-                            type="button" 
+                          <button
+                            type="button"
                             onClick={() => setShowStickerPicker(!showStickerPicker)}
                             className="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded"
                           >
@@ -759,7 +762,7 @@ export default function ChapterReader() {
                                   width={32}
                                   height={32}
                                   className="w-8 h-8"
-                                />                        
+                                />
                               </button>
                               <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742751.png')} className="p-1 hover:bg-gray-600 rounded">
                                 <img src="https://cdn-icons-png.flaticon.com/128/742/742751.png" alt="Sticker 2" className="w-8 h-8" />
@@ -785,8 +788,8 @@ export default function ChapterReader() {
                             </div>
                           )}
                         </div>
-                        <button 
-                          type="submit" 
+                        <button
+                          type="submit"
                           disabled={isSubmitting || (!commentHtml.trim() && selectedStickers.length === 0)}
                           className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -810,11 +813,11 @@ export default function ChapterReader() {
                           <div className="flex items-center">
                             <div className="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center mr-2">
                               {reply.user && reply.user.avatar ? (
-                                <Image 
-                                  src={reply.user.avatar} 
-                                  alt={reply.user.username || 'User'} 
-                                  width={24} 
-                                  height={24} 
+                                <Image
+                                  src={reply.user.avatar}
+                                  alt={reply.user.username || 'User'}
+                                  width={24}
+                                  height={24}
                                   className="rounded-full"
                                 />
                               ) : (
@@ -857,4 +860,4 @@ export default function ChapterReader() {
       </div>
     </div>
   );
-} 
+}

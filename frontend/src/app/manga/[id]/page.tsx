@@ -56,7 +56,8 @@ export default function MangaDetail(props: Props) {
     const fetchManga = async () => {
       try {
         setIsLoading(true);
-        const data = await mangaApi.getManga(mangaId);
+        // Thêm tham số noCache=true để bỏ qua cache và lấy dữ liệu mới nhất
+        const data = await mangaApi.getManga(mangaId, true);
 
         const normalized = {
           ...data,
@@ -420,7 +421,8 @@ export default function MangaDetail(props: Props) {
                 {chapter.title && <span className="ml-2 text-gray-400">- {chapter.title}</span>}
               </div>
               <div className="flex items-center space-x-4 text-sm text-gray-400">
-                {chapter.view_count && (
+                {/* Xóa console.log và hiển thị view_count nếu có */}
+                {typeof chapter.view_count === 'number' && (
                   <span className="flex items-center">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"

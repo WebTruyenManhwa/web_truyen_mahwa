@@ -29,8 +29,9 @@ export const mangaApi = {
   },
 
   // Lấy chi tiết một manga
-  getManga: async (id: string | number) => {
-    const response = await api.get(`/v1/mangas/${id}`);
+  getManga: async (id: string | number, noCache: boolean = false) => {
+    const params = noCache ? { _: Date.now() } : {};
+    const response = await api.get(`/v1/mangas/${id}`, { params });
     return response.data;
   },
 

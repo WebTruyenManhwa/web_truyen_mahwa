@@ -7,18 +7,38 @@ class MangaView < ApplicationRecord
 
   # Class method to increment view count for a manga on a specific date
   def self.increment_view(manga_id, date = Date.today)
-    # Find or create a record for this manga and date
-    record = find_or_initialize_by(manga_id: manga_id, view_date: date)
+    # Use a transaction with retry logic to handle race conditions
+    attempts = 0
+    max_attempts = 3
 
-    # Increment the view count
-    record.view_count = (record.view_count || 0) + 1
-    record.save!
+    begin
+      attempts += 1
 
-    # Also increment the manga's total view count
-    manga = Manga.find(manga_id)
-    manga.increment!(:view_count)
+      # Try to find an existing record first
+      record = find_by(manga_id: manga_id, view_date: date)
 
-    record
+      if record
+        # If record exists, use update_counters which is atomic
+        MangaView.update_counters(record.id, view_count: 1)
+      else
+        # If no record, create a new one with view_count = 1
+        record = create!(manga_id: manga_id, view_date: date, view_count: 1)
+      end
+
+      # Also increment the manga's total view count (this is separate from the unique constraint)
+      Manga.update_counters(manga_id, view_count: 1)
+
+      return record
+    rescue ActiveRecord::RecordNotUnique => e
+      # If we get a unique constraint violation, retry if we haven't exceeded max attempts
+      if attempts < max_attempts
+        Rails.logger.info "Retrying increment_view for manga_id=#{manga_id} after RecordNotUnique (attempt #{attempts})"
+        retry
+      else
+        Rails.logger.error "Failed to increment view after #{max_attempts} attempts: #{e.message}"
+        raise e
+      end
+    end
   end
 
   # Get views for a manga within a date range

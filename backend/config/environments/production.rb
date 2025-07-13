@@ -54,6 +54,15 @@ Rails.application.configure do
   config.cache_store = :solid_cache_store
   config.session_store :cookie_store, key: '_web_truyen_mahwa_session'
 
+  # Bật HTTP caching
+  config.action_controller.perform_caching = true
+
+  # Thiết lập thời gian cache mặc định
+  config.action_controller.default_url_options = { protocol: 'https' }
+
+  # Thiết lập ETags cho API responses
+  config.middleware.use Rack::ETag
+
   # Ignore bad email addresses and do not raise email delivery errors.
   # Set this to true and configure the email server for immediate delivery to raise delivery errors.
   # config.action_mailer.raise_delivery_errors = false

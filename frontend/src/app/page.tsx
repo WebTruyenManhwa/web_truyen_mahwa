@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 // import Image from "next/image";
 import Link from "next/link";
-import { mangaApi, genreApi } from "../services/api";
+// import { mangaApi, genreApi } from "../services/api";
 import React from "react";
+import useSWR from 'swr';
 
 interface Manga {
   id: number;
@@ -25,179 +26,100 @@ interface Genre {
   name: string;
 }
 
+// API base URL từ environment
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+
+// Hàm fetcher cho SWR
+const fetcher = async (url: string) => {
+  const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+  const response = await fetch(fullUrl);
+  if (!response.ok) {
+    throw new Error('An error occurred while fetching the data.');
+  }
+  return response.json();
+};
+
+// Hàm tạo key cho cache đã được tích hợp trực tiếp trong các lời gọi SWR
+// Nếu cần sử dụng riêng, có thể uncomment lại
+/*
+const createCacheKey = (endpoint: string, params?: Record<string, any>) => {
+  let key = endpoint;
+  if (params) {
+    const queryParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        queryParams.append(key, String(value));
+      }
+    });
+    const queryString = queryParams.toString();
+    if (queryString) {
+      key += `?${queryString}`;
+    }
+  }
+  return key;
+};
+*/
+
 export default function Home() {
-  const [featuredManga, setFeaturedManga] = useState<Manga | null>(null);
-  const [popularMangas, setPopularMangas] = useState<Manga[]>([]);
-  const [latestUpdates, setLatestUpdates] = useState<Manga[]>([]);
-  const [genres, setGenres] = useState<Genre[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("latest");
   const [activeRanking, setActiveRanking] = useState<'day' | 'week' | 'month'>('day');
 
-  // Define rankings with proper typing
-  const [rankings, setRankings] = useState<{
-    day: Manga[];
-    week: Manga[];
-    month: Manga[];
-  }>({
-    day: [],
-    week: [],
-    month: []
-  });
+  // Sử dụng SWR để fetch và cache data
+  const { data: popularData, error: popularError, isLoading: popularLoading } = useSWR(
+    '/v1/mangas?sort=popularity&limit=12',
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 300000 } // Cache trong 5 phút
+  );
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
+  const { data: latestData, error: latestError, isLoading: latestLoading } = useSWR(
+    '/v1/mangas?sort=updatedAt&limit=20',
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 300000 }
+  );
 
-        // Fetch popular mangas
-        const popularData = await mangaApi.getMangas({
-          sort: "popularity",
-          limit: 12
-        });
-        const mappedPopular = popularData.mangas.map((m: { cover_image: { url: any; }; }) => ({
-          ...m,
-          coverImage: m.cover_image?.url
-        }));
-        setPopularMangas(mappedPopular);
+  const { data: genresData } = useSWR(
+    '/v1/genres',
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 3600000 } // Cache trong 1 giờ
+  );
 
-        // Fetch latest updates
-        const latestUpdates = await mangaApi.getMangas({
-          sort: "updatedAt",
-          limit: 20
-        });
-        const mappedLatest = latestUpdates.mangas.map((m: { cover_image: { url: any; }; }) => ({
-          ...m,
-          coverImage: m.cover_image?.url ?? ""
-        }));
-        setLatestUpdates(mappedLatest);
+  const { data: dayRankings } = useSWR(
+    '/v1/mangas/rankings/day?limit=6',
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 600000 } // Cache trong 10 phút
+  );
 
-        // Set featured manga (first popular manga)
-        if (popularData.mangas && popularData.mangas.length > 0) {
-          const featured = await mangaApi.getManga(popularData.mangas[0].id);
-          setFeaturedManga({
-            ...featured,
-            coverImage: featured.cover_image?.url,
-          });
-        }
+  const { data: weekRankings } = useSWR(
+    '/v1/mangas/rankings/week?limit=6',
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 1800000 } // Cache trong 30 phút
+  );
 
-        // Fetch genres
-        try {
-          const genresData = await genreApi.getGenres();
-          setGenres(genresData || []);
-        } catch (err) {
-          console.error("Failed to fetch genres:", err);
-        }
+  const { data: monthRankings } = useSWR(
+    '/v1/mangas/rankings/month?limit=6',
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 3600000 } // Cache trong 1 giờ
+  );
 
-        // Fetch rankings data for each time period
-        try {
-          const [dayRankings, weekRankings, monthRankings] = await Promise.all([
-            mangaApi.getRankings('day', 6),
-            mangaApi.getRankings('week', 6),
-            mangaApi.getRankings('month', 6)
-          ]);
+  // Xử lý dữ liệu
+  const popularMangas = popularData?.mangas?.map((m: any) => ({
+    ...m,
+    coverImage: m.cover_image?.url
+  })) || [];
 
-          // Map the data to our format
-          const mapRankingData = (data: any[]) => data.map((m: any) => ({
-            ...m,
-            coverImage: m.cover_image?.url,
-            id: m.id,
-            title: m.title,
-            slug: m.slug,
-            view_count: m.view_count,
-            chapter: m.latest_chapter?.number || m.chapters_count || 0,
-            latestChapter: m.latest_chapter?.number || m.chapters_count || 0
-          }));
+  const latestUpdates = latestData?.mangas?.map((m: any) => ({
+    ...m,
+    coverImage: m.cover_image?.url ?? ""
+  })) || [];
 
-          setRankings({
-            day: mapRankingData(dayRankings.mangas || []),
-            week: mapRankingData(weekRankings.mangas || []),
-            month: mapRankingData(monthRankings.mangas || [])
-          });
-        } catch (err) {
-          console.error("Failed to fetch rankings:", err);
+  const featuredManga = popularMangas.length > 0 ? {
+    ...popularMangas[0],
+    coverImage: popularMangas[0].cover_image?.url,
+  } : null;
 
-          // Fallback to using popular mangas as rankings if API fails
-          setRankings({
-            day: mappedPopular.slice(0, 6),
-            week: mappedPopular.slice(0, 6).sort(() => Math.random() - 0.5),
-            month: mappedPopular.slice(0, 6).sort(() => Math.random() - 0.5)
-          });
-        }
-      } catch (err) {
-        console.error("Failed to fetch data:", err);
-        setError("Không thể tải dữ liệu. Vui lòng thử lại sau.");
+  const genres: Genre[] = genresData || [];
 
-        // Fallback to mock data
-        setFeaturedManga({
-          id: 1,
-          title: "One Piece",
-          coverImage: "https://m.media-amazon.com/images/I/51FVFCrSp0L._AC_UF1000,1000_QL80_.jpg",
-          description:
-            "Gol D. Roger, vua hải tặc với khối tài sản vô giá One Piece, đã bị xử tử. Trước khi chết, ông tiết lộ rằng kho báu của mình được giấu ở Grand Line. Monkey D. Luffy, một cậu bé với ước mơ trở thành vua hải tặc, vô tình ăn phải trái ác quỷ Gomu Gomu, biến cơ thể cậu thành cao su. Giờ đây, cậu cùng các đồng đội hải tặc mũ rơm bắt đầu cuộc hành trình tìm kiếm kho báu One Piece.",
-        });
-
-        // Add mock ranking data
-        const mockMangas = [
-          {
-            id: 1,
-            title: "One Piece",
-            coverImage: "https://m.media-amazon.com/images/I/51FVFCrSp0L._AC_UF1000,1000_QL80_.jpg",
-            latestChapter: 1088,
-            view_count: 15000000,
-          },
-          {
-            id: 2,
-            title: "Naruto",
-            coverImage: "https://m.media-amazon.com/images/I/71QYLrc-IQL._AC_UF1000,1000_QL80_.jpg",
-            latestChapter: 700,
-            view_count: 12000000,
-          },
-          {
-            id: 3,
-            title: "Jujutsu Kaisen",
-            coverImage: "https://m.media-amazon.com/images/I/81TmHlRleJL._AC_UF1000,1000_QL80_.jpg",
-            latestChapter: 223,
-            view_count: 8000000,
-          },
-          {
-            id: 4,
-            title: "Demon Slayer",
-            coverImage: "https://m.media-amazon.com/images/I/81ZNkhqRvVL._AC_UF1000,1000_QL80_.jpg",
-            latestChapter: 205,
-            view_count: 9500000,
-          },
-          {
-            id: 5,
-            title: "My Hero Academia",
-            coverImage: "https://m.media-amazon.com/images/I/51FZ6JzhBEL._AC_UF1000,1000_QL80_.jpg",
-            latestChapter: 402,
-            view_count: 7800000,
-          },
-          {
-            id: 6,
-            title: "Attack on Titan",
-            coverImage: "https://m.media-amazon.com/images/I/91M9VaZWxOL._AC_UF1000,1000_QL80_.jpg",
-            latestChapter: 139,
-            view_count: 11000000,
-          },
-        ];
-
-        setRankings({
-          day: [...mockMangas].sort((a, b) => (b.view_count || 0) - (a.view_count || 0)),
-          week: [...mockMangas].sort((a, b) => (b.view_count || 0) - (a.view_count || 0)),
-          month: [...mockMangas].sort((a, b) => (b.view_count || 0) - (a.view_count || 0))
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  // Danh sách thể loại mặc định
+  // Danh sách thể loại mặc định (fallback)
   const defaultGenres = [
     { id: 1, name: "Action" },
     { id: 2, name: "Adventure" },
@@ -213,6 +135,17 @@ export default function Home() {
     { id: 12, name: "Supernatural" }
   ];
 
+  // Xử lý rankings
+  const rankings = {
+    day: dayRankings?.mangas || [],
+    week: weekRankings?.mangas || [],
+    month: monthRankings?.mangas || []
+  };
+
+  // Kiểm tra trạng thái loading
+  const isLoading = popularLoading || latestLoading;
+  const error = popularError || latestError;
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-96">
@@ -224,7 +157,7 @@ export default function Home() {
   if (error && !featuredManga) {
     return (
       <div className="text-center py-10">
-        <p className="text-red-500 mb-4">{error}</p>
+        <p className="text-red-500 mb-4">Không thể tải dữ liệu. Vui lòng thử lại sau.</p>
         <button
           onClick={() => window.location.reload()}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
@@ -289,21 +222,15 @@ export default function Home() {
 
       {/* Manga Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
-        {(activeTab === "latest" ? latestUpdates : popularMangas).map((manga) => (
+        {(activeTab === "latest" ? latestUpdates : popularMangas).map((manga: Manga) => (
           <div key={manga.id} className="group">
             <Link href={`/manga/${manga.slug || manga.id}`} className="block">
               <div className="relative aspect-[2/3] rounded overflow-hidden mb-2 bg-gray-800">
-                {/* <Image
-                  src={manga.coverImage}
-                  alt={manga.title}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-300"
-                  sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
-                /> */}
                 <img
                   src={manga.coverImage}
                   alt={manga.title}
                   className="object-cover w-full h-full"
+                  loading="lazy" // Thêm lazy loading
                 />
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/70 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
@@ -393,7 +320,7 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
-          {rankings[activeRanking].map((manga, index) => (
+          {rankings[activeRanking].map((manga: { id: React.Key | null | undefined; slug: any; coverImage: any; title: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; latestChapter: any; chapter: any; period_views: any; view_count: any; }, index: number) => (
             <div key={manga.id} className="group">
               <Link href={`/manga/${manga.slug || manga.id}`} className="block">
                 <div className="relative aspect-[2/3] rounded overflow-hidden mb-2 bg-gray-800">
@@ -404,8 +331,9 @@ export default function Home() {
 
                   <img
                     src={manga.coverImage || "/placeholder-manga.jpg"}
-                    alt={manga.title}
+                    alt={manga.title as string}
                     className="object-cover w-full h-full"
+                    loading="lazy" // Thêm lazy loading
                   />
                   <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/70 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
@@ -457,10 +385,10 @@ export default function Home() {
       <section className="mt-12">
         <h2 className="text-xl font-bold mb-4 pb-2 border-b border-gray-700">Thể loại</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {(genres.length > 0 ? genres : defaultGenres).map((genre) => (
+          {(genres.length > 0 ? genres : defaultGenres).map((genre: { id: React.Key | null | undefined; name: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; }) => (
             <Link
               key={genre.id}
-              href={`/genres/${genre.name.toLowerCase()}`}
+              href={`/genres/${String(genre.name).toLowerCase()}`}
               className="bg-gray-800 hover:bg-gray-700 text-center py-3 rounded-lg transition-colors hover:text-red-500"
             >
               {genre.name}
