@@ -43,14 +43,14 @@ Rails.application.configure do
   # Don't log any deprecations.
   config.active_support.report_deprecations = false
 
-  # Use a combination of memory store and solid_cache_store for better reliability
-  # This helps avoid nil cache issues in production
-  begin
-  config.cache_store = :solid_cache_store
-  rescue => e
-    Rails.logger.warn "Failed to initialize solid_cache_store: #{e.message}. Falling back to memory_store."
-    config.cache_store = :memory_store, { size: 64.megabytes }
-  end
+  # Sử dụng memory_store với kích thước giới hạn thay vì solid_cache_store
+  # Điều này giúp tránh sử dụng quá nhiều RAM và giảm áp lực lên database
+  config.cache_store = :memory_store, {
+    size: 64.megabytes,
+    expires_in: 1.hour,
+    race_condition_ttl: 10,
+    compress: true
+  }
 
   # Use database for Active Job queue adapter
   config.active_job.queue_adapter = :solid_queue
@@ -94,16 +94,11 @@ Rails.application.configure do
   # Only use :id for inspections in production.
   config.active_record.attributes_for_inspect = [ :id ]
 
-  config.active_record.verbose_query_logs = true
+  # Tắt verbose query logs để giảm kích thước log và tăng hiệu suất
+  config.active_record.verbose_query_logs = false
 
   config.public_file_server.enabled = true
 
-  # Enable DNS rebinding protection and other `Host` header attacks.
-  # config.hosts = [
-  #   "example.com",     # Allow requests from example.com
-  #   /.*\.example\.com/ # Allow requests from subdomains like `www.example.com`
-  # ]
-  #
-  # Skip DNS rebinding protection for the default health check endpoint.
-  # config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
+  # Giới hạn số lượng worker processes để giảm sử dụng RAM
+  config.active_job.queue_adapter = :sidekiq
 end

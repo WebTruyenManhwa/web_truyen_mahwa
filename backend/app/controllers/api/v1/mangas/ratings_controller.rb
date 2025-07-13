@@ -64,7 +64,21 @@ module Api
         private
 
         def set_manga
-          @manga = Manga.find(params[:manga_id])
+          # Tìm manga theo slug hoặc id
+          manga_id = params[:manga_id]
+          @manga = if manga_id.to_i.to_s == manga_id.to_s
+                    # Nếu manga_id là số, tìm theo id
+                    Manga.find_by(id: manga_id)
+                  else
+                    # Nếu không, tìm theo slug
+                    Manga.find_by(slug: manga_id)
+                  end
+
+          # Nếu không tìm thấy manga, trả về lỗi 404
+          unless @manga
+            render json: { error: "Manga not found" }, status: :not_found
+            return
+          end
         end
 
         def set_rating

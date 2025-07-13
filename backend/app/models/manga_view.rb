@@ -1,80 +1,24 @@
 class MangaView < ApplicationRecord
   belongs_to :manga
 
-  validates :view_date, presence: true
-  validates :view_count, numericality: { greater_than_or_equal_to: 0 }
-  validates :manga_id, uniqueness: { scope: :view_date, message: "should have only one view record per day" }
+  # Tăng lượt xem cho manga
+  def self.increment_view(manga_id)
+    today = Date.today
+    view = find_or_initialize_by(manga_id: manga_id, created_at: today.beginning_of_day..today.end_of_day)
 
-  # Class method to increment view count for a manga on a specific date
-  def self.increment_view(manga_id, date = Date.today)
-    # Use a transaction with retry logic to handle race conditions
-    attempts = 0
-    max_attempts = 5
-
-    begin
-      attempts += 1
-
-      # Try to find an existing record first
-      record = find_by(manga_id: manga_id, view_date: date)
-
-      if record
-        # If record exists, use update_counters which is atomic
-        MangaView.update_counters(record.id, view_count: 1)
-      else
-        # If no record, create a new one with view_count = 1
-        record = create!(manga_id: manga_id, view_date: date, view_count: 1)
-      end
-
-      # Also increment the manga's total view count (this is separate from the unique constraint)
-      begin
-        Manga.update_counters(manga_id, view_count: 1)
-      rescue => e
-        Rails.logger.error "Failed to update manga view count: #{e.message}"
-        # Continue execution even if this fails
-      end
-
-      return record
-    rescue ActiveRecord::RecordNotUnique => e
-      # If we get a unique constraint violation, retry if we haven't exceeded max attempts
-      if attempts < max_attempts
-        Rails.logger.info "Retrying increment_view for manga_id=#{manga_id} after RecordNotUnique (attempt #{attempts})"
-        sleep(0.1 * attempts) # Add exponential backoff
-        retry
-      else
-        Rails.logger.error "Failed to increment view after #{max_attempts} attempts: #{e.message}"
-        # Don't raise the error, just return nil to avoid breaking the user experience
-        return nil
-      end
-    rescue ActiveRecord::ConnectionTimeoutError, PG::ConnectionBad => e
-      Rails.logger.error "Database connection error when incrementing view: #{e.message}"
-      # Don't raise the error, just return nil
-      return nil
-    rescue => e
-      Rails.logger.error "Unexpected error when incrementing view: #{e.class.name} - #{e.message}"
-      # Don't raise the error, just return nil
-      return nil
+    if view.new_record?
+      view.view_count = 1
+      view.save
+    else
+      # Sử dụng update_column để tránh callbacks và validations
+      view.update_column(:view_count, view.view_count + 1)
     end
+
+    # Cập nhật tổng lượt xem của manga
+    manga = Manga.find(manga_id)
+    manga.update_column(:view_count, manga.view_count + 1)
   end
 
-  # Get views for a manga within a date range
-  def self.views_in_range(manga_id, start_date, end_date)
-    where(manga_id: manga_id, view_date: start_date..end_date).sum(:view_count)
-  end
-
-  # Get views for a manga for a specific day
-  def self.views_for_day(manga_id, date = Date.today)
-    where(manga_id: manga_id, view_date: date).sum(:view_count)
-  end
-
-  # Get views for a manga for the past week
-  def self.views_for_week(manga_id, end_date = Date.today)
-    start_date = end_date - 6.days
-    views_in_range(manga_id, start_date, end_date)
-  end
-
-  # Get views for a manga for the past month
-  def self.views_for_month(manga_id, end_date = Date.today)
-    start_date = end_date - 29.days
-    views_in_range(manga_id, start_date, end_date)
-  end
+  # Các phương thức views_for_day, views_for_week, views_for_month đã được chuyển sang
+  # model Manga để tối ưu hóa và tránh N+1 queries
 end

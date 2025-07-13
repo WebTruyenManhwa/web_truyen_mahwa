@@ -46,30 +46,50 @@ class Manga < ApplicationRecord
     end
   end
 
-  # Get views for today
+  # Get views for today - tối ưu để giảm sử dụng RAM
   def views_for_day(date = Date.today)
     begin
-      MangaView.views_for_day(id, date)
+      # Cache kết quả trong 1 giờ để giảm truy vấn database
+      Rails.cache.fetch("manga/#{id}/views/day/#{date}", expires_in: 1.hour) do
+        # Sử dụng SQL count thay vì tải tất cả records vào memory
+        MangaView.where(manga_id: id)
+                .where('DATE(created_at) = ?', date)
+                .sum(:view_count)
+      end
     rescue => e
       Rails.logger.error "Error getting daily views: #{e.message}"
       0 # Return 0 as fallback
     end
   end
 
-  # Get views for the past week
+  # Get views for the past week - tối ưu để giảm sử dụng RAM
   def views_for_week(end_date = Date.today)
     begin
-      MangaView.views_for_week(id, end_date)
+      # Cache kết quả trong 1 giờ để giảm truy vấn database
+      Rails.cache.fetch("manga/#{id}/views/week/#{end_date}", expires_in: 1.hour) do
+        # Sử dụng SQL sum thay vì tải tất cả records vào memory
+        start_date = end_date - 6.days
+        MangaView.where(manga_id: id)
+                .where('DATE(created_at) BETWEEN ? AND ?', start_date, end_date)
+                .sum(:view_count)
+      end
     rescue => e
       Rails.logger.error "Error getting weekly views: #{e.message}"
       0 # Return 0 as fallback
     end
   end
 
-  # Get views for the past month
+  # Get views for the past month - tối ưu để giảm sử dụng RAM
   def views_for_month(end_date = Date.today)
     begin
-      MangaView.views_for_month(id, end_date)
+      # Cache kết quả trong 1 giờ để giảm truy vấn database
+      Rails.cache.fetch("manga/#{id}/views/month/#{end_date}", expires_in: 1.hour) do
+        # Sử dụng SQL sum thay vì tải tất cả records vào memory
+        start_date = end_date - 29.days
+        MangaView.where(manga_id: id)
+                .where('DATE(created_at) BETWEEN ? AND ?', start_date, end_date)
+                .sum(:view_count)
+      end
     rescue => e
       Rails.logger.error "Error getting monthly views: #{e.message}"
       0 # Return 0 as fallback
@@ -102,36 +122,16 @@ class Manga < ApplicationRecord
   def set_slug
     return if slug.present?
 
-    base_slug = custom_slugify(title)
-    new_slug = base_slug
-    counter = 2
+    base_slug = title.to_s.parameterize
+    temp_slug = base_slug
+    counter = 0
 
-    # Kiểm tra xem slug đã tồn tại chưa
-    while Manga.where(slug: new_slug).where.not(id: id).exists?
-      new_slug = "#{base_slug}-#{counter}"
+    # Kiểm tra xem slug đã tồn tại chưa, nếu có thì thêm số vào sau
+    while Manga.where(slug: temp_slug).where.not(id: id).exists?
       counter += 1
+      temp_slug = "#{base_slug}-#{counter}"
     end
 
-    self.slug = new_slug
-  end
-
-  # Custom slugify method to preserve Vietnamese characters
-  def custom_slugify(text)
-    # Replace spaces with hyphens
-    result = text.gsub(/\s+/, '-')
-
-    # Remove special characters except Vietnamese ones
-    result = result.gsub(/[^\p{L}\p{N}\-]/u, '')
-
-    # Convert to lowercase
-    result = result.downcase
-
-    # Replace multiple hyphens with a single one
-    result = result.gsub(/-+/, '-')
-
-    # Remove leading and trailing hyphens
-    result = result.gsub(/^-|-$/, '')
-
-    result
+    self.slug = temp_slug
   end
 end

@@ -77,15 +77,19 @@ production:
   primary:
     url: <%= ENV['DATABASE_URL'] %>
     migrations_paths: db/migrate
+    pool: <%= ENV.fetch("DB_POOL", 5).to_i %>
 
   cache:
     url: <%= ENV['DATABASE_CACHE_URL'] || ENV['DATABASE_URL'] %>
     migrations_paths: db/cache_migrate
+    pool: <%= ENV.fetch("DB_POOL", 5).to_i %>
 
   queue:
     url: <%= ENV['DATABASE_QUEUE_URL'] || ENV['DATABASE_URL'] %>
     migrations_paths: db/queue_migrate
+    pool: <%= ENV.fetch("DB_POOL", 5).to_i %>
 
   cable:
     url: <%= ENV['DATABASE_CABLE_URL'] || ENV['DATABASE_URL'] %>
     migrations_paths: db/cable_migrate
+    pool: <%= ENV.fetch("DB_POOL", 5).to_i %>
