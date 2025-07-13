@@ -1,41 +1,42 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect } from "react";
 // import Image from "next/image";
 import Link from "next/link";
-import { mangaApi } from "../../../services/api";
+// import { mangaApi } from "../../../services/api";
 import { useAuth } from "../../../hooks/useAuth";
-import { userApi } from "../../../services/api";
+// import { userApi } from "../../../services/api";
 import React from "react";
+import { useManga, useFavoriteStatus, useUserRating, mangaAPI, userAPI } from "../../../services/swrApi";
 
-interface Chapter {
-  id: number;
-  number: number;
-  title: string;
-  created_at: string;  // Changed from createdAt to created_at
-  view_count?: number;
-  slug?: string;
-}
+// interface Chapter {
+//   id: number;
+//   number: number;
+//   title: string;
+//   created_at: string;  // Changed from createdAt to created_at
+//   view_count?: number;
+//   slug?: string;
+// }
 
-interface Manga {
-  id: number;
-  title: string;
-  description: string;
-  coverImage: string | { url: string; thumb?: any; small?: any };
-  author: string;
-  artist?: string;
-  status: string;
-  releaseYear?: number;
-  genres: string[];
-  chapters: Chapter[];
-  view_count?: number;
-  rating?: number;
-  totalVotes?: number;
-  total_votes?: number;
-  translationTeam?: string;
-  slug?: string;
-}
+// interface Manga {
+//   id: number;
+//   title: string;
+//   description: string;
+//   coverImage: string | { url: string; thumb?: any; small?: any };
+//   author: string;
+//   artist?: string;
+//   status: string;
+//   releaseYear?: number;
+//   genres: string[];
+//   chapters: Chapter[];
+//   view_count?: number;
+//   rating?: number;
+//   totalVotes?: number;
+//   total_votes?: number;
+//   translationTeam?: string;
+//   slug?: string;
+// }
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -43,115 +44,46 @@ type Props = {
 
 export default function MangaDetail(props: Props) {
   // Trích xuất id từ params và lưu vào biến riêng để tránh cảnh báo
-  const { id: mangaId } = use(props.params);
+  const { id: mangaId } = React.use(props.params);
   const { isAuthenticated } = useAuth();
-  const [manga, setManga] = useState<Manga | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
   const [isFavorite, setIsFavorite] = useState(false);
   const [userRating, setUserRating] = useState<number>(0);
   const [isRating, setIsRating] = useState(false);
   const [hoverRating, setHoverRating] = useState<number>(0);
 
+  // Sử dụng SWR hooks
+  const { data: mangaData, error: mangaError, isLoading: mangaLoading, mutate: refreshManga } = useManga(mangaId);
+  const { data: favoriteData } = useFavoriteStatus(mangaId, isAuthenticated);
+  const { data: userRatingData } = useUserRating(mangaId, isAuthenticated, {
+    onError: () => {
+      // Reset user rating on error (user hasn't rated this manga)
+      setUserRating(0);
+    }
+  });
+
+  // Xử lý dữ liệu manga
+  const manga = mangaData ? {
+    ...mangaData,
+    coverImage: mangaData.cover_image?.url ?? '',
+    totalVotes: mangaData.total_votes || mangaData.totalVotes || 0,
+    chapters: mangaData.chapters ? [...mangaData.chapters].sort(
+      (a: { number: number; }, b: { number: number; }) => b.number - a.number
+    ) : []
+  } : null;
+
+  // Cập nhật trạng thái favorite khi dữ liệu thay đổi
   useEffect(() => {
-    const fetchManga = async () => {
-      try {
-        setIsLoading(true);
-        // Always use noCache=true to ensure we get the latest data
-        // Loại bỏ biến timestamp không sử dụng
-        const data = await mangaApi.getManga(mangaId, true);
+    if (favoriteData) {
+      setIsFavorite(favoriteData.is_favorite);
+    }
+  }, [favoriteData]);
 
-        const normalized = {
-          ...data,
-          coverImage: data.cover_image?.url ?? '',
-          // Make sure we use the correct property name for total_votes
-          totalVotes: data.total_votes || data.totalVotes || 0,
-        };
-
-        // Sắp xếp chapters
-        if (normalized.chapters) {
-          normalized.chapters = normalized.chapters.sort(
-            (a: { number: number; }, b: { number: number; }) => b.number - a.number
-          );
-        }
-
-        setManga(normalized);
-
-        // Kiểm tra xem manga có trong danh sách yêu thích không và lấy đánh giá của người dùng
-        if (isAuthenticated) {
-          try {
-            // Use the numeric ID from the fetched manga data
-            const numericId = normalized.id;
-
-            // Check if manga is in favorites
-            const favorites = await mangaApi.checkFavorite(numericId);
-            setIsFavorite(favorites.is_favorite);
-
-            // Also fetch the user's rating for this manga
-            try {
-              const userRatingData = await mangaApi.getUserRating(numericId);
-              if (userRatingData && userRatingData.rating) {
-                setUserRating(userRatingData.rating);
-              } else {
-                // Reset user rating if they haven't rated this manga
-                setUserRating(0);
-              }
-            } catch {
-              // Reset user rating on error
-              setUserRating(0);
-            }
-          } catch {
-            // Error handling silently
-          }
-        } else {
-          // Reset user rating when not authenticated
-          setUserRating(0);
-        }
-      } catch {
-        setError("Không thể tải thông tin truyện. Vui lòng thử lại sau.");
-
-        // Fallback to mock data
-        setManga({
-          id: parseInt(mangaId),
-          title: "One Piece",
-          description: "Gol D. Roger, vua hải tặc với khối tài sản vô giá One Piece, đã bị xử tử. Trước khi chết, ông tiết lộ rằng kho báu của mình được giấu ở Grand Line. Monkey D. Luffy, một cậu bé với ước mơ trở thành vua hải tặc, vô tình ăn phải trái ác quỷ Gomu Gomu, biến cơ thể cậu thành cao su. Giờ đây, cậu cùng các đồng đội hải tặc mũ rơm bắt đầu cuộc hành trình tìm kiếm kho báu One Piece.",
-          coverImage: {url:"https://m.media-amazon.com/images/I/51FVFCrSp0L._AC_UF1000,1000_QL80_.jpg" },
-          author: "Eiichiro Oda",
-          status: "ongoing",
-          releaseYear: 1999,
-          genres: ["Action", "Adventure", "Comedy", "Fantasy", "Shounen", "Super Power"],
-          chapters: [
-            {
-              id: 1,
-              number: 1088,
-              title: "Cuộc chiến cuối cùng",
-              created_at: "2023-08-10",
-              view_count: 150000,
-            },
-            {
-              id: 2,
-              number: 1087,
-              title: "Luffy vs Kaido",
-              created_at: "2023-08-03",
-              view_count: 145000,
-            },
-            {
-              id: 3,
-              number: 1086,
-              title: "Bí mật của Laugh Tale",
-              created_at: "2023-07-27",
-              view_count: 140000,
-            },
-          ],
-          view_count: 15000000,
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchManga();
-  }, [mangaId, isAuthenticated]);
+  // Cập nhật user rating khi dữ liệu thay đổi
+  useEffect(() => {
+    if (userRatingData && userRatingData.rating) {
+      setUserRating(userRatingData.rating);
+    }
+  }, [userRatingData]);
 
   const toggleFavorite = async () => {
     if (!isAuthenticated) {
@@ -160,11 +92,27 @@ export default function MangaDetail(props: Props) {
     }
 
     try {
-      // Ensure we're using the numeric ID, not the slug
-      const numericId = manga?.id || parseInt(mangaId);
-      await userApi.toggleFavorite(numericId);
+      // Đảm bảo sử dụng ID số
+      const numericId = manga?.id || (mangaId && !isNaN(Number(mangaId)) ? parseInt(mangaId) : null);
+
+      if (!numericId) {
+        throw new Error('Không thể xác định ID manga');
+      }
+
+      // Sử dụng hàm toggleFavorite từ userAPI
+      await userAPI.toggleFavorite(numericId);
+
+      // Cập nhật trạng thái UI
       setIsFavorite(!isFavorite);
-    } catch {
+
+      // Làm mới dữ liệu favorite
+      const favoriteKey = `/v1/users/favorites/check/${numericId}`;
+      const mutate = (window as any).SWRGlobalState?.get('_key')?.get(favoriteKey)?.get(1)?.mutate;
+      if (mutate) {
+        mutate();
+      }
+    } catch (error) {
+      console.error('Lỗi khi thêm/xóa yêu thích:', error);
       alert("Không thể thực hiện. Vui lòng thử lại sau.");
     }
   };
@@ -177,51 +125,24 @@ export default function MangaDetail(props: Props) {
 
     try {
       setIsRating(true);
-      // Ensure we're using the numeric ID, not the slug
-      const numericId = manga?.id || parseInt(mangaId);
-      const response = await mangaApi.rateManga(numericId, rating);
+
+      // Đảm bảo sử dụng ID số
+      const numericId = manga?.id || (mangaId && !isNaN(Number(mangaId)) ? parseInt(mangaId) : null);
+
+      if (!numericId) {
+        throw new Error('Không thể xác định ID manga');
+      }
+
+      // Sử dụng hàm rateManga từ mangaAPI
+      await mangaAPI.rateManga(numericId, rating);
 
       // Set the user rating immediately
       setUserRating(rating);
 
-      // Update the manga with the new overall rating data from the response
-      setManga(prev => {
-        if (!prev) return null;
-
-        return {
-          ...prev,
-          // Use the overall rating from the response, not the user's personal rating
-          rating: response.rating,
-          totalVotes: response.totalVotes || response.total_votes,
-          total_votes: response.totalVotes || response.total_votes
-        };
-      });
-
-      // Fetch fresh data from the server to ensure we have the latest rating
-      try {
-        const freshData = await mangaApi.getManga(numericId, true);
-
-        if (freshData) {
-          const normalized = {
-            ...freshData,
-            coverImage: freshData.cover_image?.url ?? '',
-            totalVotes: freshData.total_votes || freshData.totalVotes || 0,
-          };
-
-          // Preserve the chapters sorting
-          if (normalized.chapters && manga?.chapters) {
-            normalized.chapters = normalized.chapters.sort(
-              (a: { number: number; }, b: { number: number; }) => b.number - a.number
-            );
-          }
-
-          // Keep the user's rating when updating the manga data
-          setManga(normalized);
-        }
-      } catch {
-        // We already updated the UI with the response data, so no need for additional handling
-      }
-    } catch {
+      // Refresh manga data to get updated ratings
+      refreshManga();
+    } catch (error) {
+      console.error('Lỗi khi đánh giá:', error);
       alert("Không thể đánh giá. Vui lòng thử lại sau.");
     } finally {
       setIsRating(false);
@@ -236,31 +157,67 @@ export default function MangaDetail(props: Props) {
           const isHalfStar = manga?.rating && manga.rating >= star - 0.5 && manga.rating < star;
 
           return (
-            <button
-              key={star}
-              onClick={() => handleRate(star)}
-              onMouseEnter={() => setHoverRating(star)}
-              onMouseLeave={() => setHoverRating(0)}
-              disabled={isRating}
-              className={`text-2xl transition-colors duration-200 ${
-                isRating ? 'cursor-not-allowed opacity-50' :
-                hoverRating >= star ? 'text-yellow-400' :
+          <button
+            key={star}
+            onClick={() => handleRate(star)}
+            onMouseEnter={() => setHoverRating(star)}
+            onMouseLeave={() => setHoverRating(0)}
+            disabled={isRating}
+            className={`text-2xl transition-colors duration-200 ${
+              isRating ? 'cursor-not-allowed opacity-50' :
+              hoverRating >= star ? 'text-yellow-400' :
                 // When hovering or after rating, show the user's rating
-                userRating >= star ? 'text-yellow-400' :
+              userRating >= star ? 'text-yellow-400' :
                 // Otherwise show the manga's overall rating
                 manga?.rating && manga.rating >= star ? 'text-yellow-400' :
                 isHalfStar ? 'text-yellow-200' : 'text-gray-600'
-              } hover:text-yellow-400`}
-            >
-              ★
-            </button>
+            } hover:text-yellow-400`}
+          >
+            ★
+          </button>
           );
         })}
       </div>
     );
   };
 
-  if (isLoading) {
+  // Fallback manga data khi có lỗi
+  // const fallbackManga = {
+  //   id: parseInt(mangaId),
+  //   title: "One Piece",
+  //   description: "Gol D. Roger, vua hải tặc với khối tài sản vô giá One Piece, đã bị xử tử. Trước khi chết, ông tiết lộ rằng kho báu của mình được giấu ở Grand Line. Monkey D. Luffy, một cậu bé với ước mơ trở thành vua hải tặc, vô tình ăn phải trái ác quỷ Gomu Gomu, biến cơ thể cậu thành cao su. Giờ đây, cậu cùng các đồng đội hải tặc mũ rơm bắt đầu cuộc hành trình tìm kiếm kho báu One Piece.",
+  //   coverImage: {url:"https://m.media-amazon.com/images/I/51FVFCrSp0L._AC_UF1000,1000_QL80_.jpg" },
+  //   author: "Eiichiro Oda",
+  //   status: "ongoing",
+  //   releaseYear: 1999,
+  //   genres: ["Action", "Adventure", "Comedy", "Fantasy", "Shounen", "Super Power"],
+  //   chapters: [
+  //     {
+  //       id: 1,
+  //       number: 1088,
+  //       title: "Cuộc chiến cuối cùng",
+  //       created_at: "2023-08-10",
+  //       view_count: 150000,
+  //     },
+  //     {
+  //       id: 2,
+  //       number: 1087,
+  //       title: "Luffy vs Kaido",
+  //       created_at: "2023-08-03",
+  //       view_count: 145000,
+  //     },
+  //     {
+  //       id: 3,
+  //       number: 1086,
+  //       title: "Bí mật của Laugh Tale",
+  //       created_at: "2023-07-27",
+  //       view_count: 140000,
+  //     },
+  //   ],
+  //   view_count: 15000000,
+  // };
+
+  if (mangaLoading) {
     return (
       <div className="flex justify-center items-center h-96">
         <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-red-500"></div>
@@ -268,10 +225,10 @@ export default function MangaDetail(props: Props) {
     );
   }
 
-  if (error || !manga) {
+  if (mangaError || !manga) {
     return (
       <div className="text-center py-10">
-        <p className="text-red-500 mb-4">{error || "Không tìm thấy truyện"}</p>
+        <p className="text-red-500 mb-4">{mangaError?.message || "Không tìm thấy truyện"}</p>
         <Link href="/" className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">
           Quay lại trang chủ
         </Link>
@@ -279,6 +236,7 @@ export default function MangaDetail(props: Props) {
     );
   }
 
+  // Phần còn lại của component giữ nguyên
   return (
     <div>
       {/* Manga Info Section */}
@@ -400,7 +358,7 @@ export default function MangaDetail(props: Props) {
             <div className="mb-4">
               <h2 className="text-sm text-gray-400 mb-2">Thể loại:</h2>
               <div className="flex flex-wrap gap-2">
-                {manga.genres && manga.genres.map((genre, index) => {
+                {manga.genres && manga.genres.map((genre: { name?: string; title?: string; id?: number | string; } | null | undefined, index: React.Key | null | undefined) => {
                   // Xử lý genre dựa trên kiểu dữ liệu
                   let genreName = '';
 
@@ -474,7 +432,7 @@ export default function MangaDetail(props: Props) {
         <h2 className="text-xl font-bold mb-4 pb-2 border-b border-gray-700">Danh sách chương</h2>
 
         <div className="space-y-2">
-          {manga.chapters.map((chapter) => (
+          {manga.chapters.map((chapter: { id: React.Key | null | undefined; slug: any; number: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; title: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; view_count: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; created_at: string | number | Date; }) => (
             <Link
               key={chapter.id}
               href={`/manga/${manga.slug || manga.id}/chapter/${chapter.slug || chapter.id}`}

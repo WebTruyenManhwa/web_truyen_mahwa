@@ -6,7 +6,7 @@ import { useState } from "react";
 import Link from "next/link";
 // import { mangaApi, genreApi } from "../services/api";
 import React from "react";
-import useSWR from 'swr';
+import { useMangas, useRankings, useGenres } from '../services/swrApi';
 
 interface Manga {
   id: number;
@@ -26,80 +26,26 @@ interface Genre {
   name: string;
 }
 
-// API base URL từ environment
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-
-// Hàm fetcher cho SWR
-const fetcher = async (url: string) => {
-  const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
-  const response = await fetch(fullUrl);
-  if (!response.ok) {
-    throw new Error('An error occurred while fetching the data.');
-  }
-  return response.json();
-};
-
-// Hàm tạo key cho cache đã được tích hợp trực tiếp trong các lời gọi SWR
-// Nếu cần sử dụng riêng, có thể uncomment lại
-/*
-const createCacheKey = (endpoint: string, params?: Record<string, any>) => {
-  let key = endpoint;
-  if (params) {
-    const queryParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        queryParams.append(key, String(value));
-      }
-    });
-    const queryString = queryParams.toString();
-    if (queryString) {
-      key += `?${queryString}`;
-    }
-  }
-  return key;
-};
-*/
-
 export default function Home() {
   const [activeTab, setActiveTab] = useState("latest");
   const [activeRanking, setActiveRanking] = useState<'day' | 'week' | 'month'>('day');
 
-  // Sử dụng SWR để fetch và cache data
-  const { data: popularData, error: popularError, isLoading: popularLoading } = useSWR(
-    '/v1/mangas?sort=popularity&limit=12',
-    fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 300000 } // Cache trong 5 phút
-  );
+  // Sử dụng SWR hooks
+  const { data: popularData, error: popularError, isLoading: popularLoading } = useMangas({
+    sort: 'popularity',
+    limit: 12
+  });
 
-  const { data: latestData, error: latestError, isLoading: latestLoading } = useSWR(
-    '/v1/mangas?sort=updatedAt&limit=20',
-    fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 300000 }
-  );
+  const { data: latestData, error: latestError, isLoading: latestLoading } = useMangas({
+    sort: 'updatedAt',
+    limit: 20
+  });
 
-  const { data: genresData } = useSWR(
-    '/v1/genres',
-    fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 3600000 } // Cache trong 1 giờ
-  );
+  const { data: genresData } = useGenres();
 
-  const { data: dayRankings } = useSWR(
-    '/v1/mangas/rankings/day?limit=6',
-    fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 600000 } // Cache trong 10 phút
-  );
-
-  const { data: weekRankings } = useSWR(
-    '/v1/mangas/rankings/week?limit=6',
-    fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 1800000 } // Cache trong 30 phút
-  );
-
-  const { data: monthRankings } = useSWR(
-    '/v1/mangas/rankings/month?limit=6',
-    fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 3600000 } // Cache trong 1 giờ
-  );
+  const { data: dayRankings } = useRankings('day', 6);
+  const { data: weekRankings } = useRankings('week', 6);
+  const { data: monthRankings } = useRankings('month', 6);
 
   // Xử lý dữ liệu
   const popularMangas = popularData?.mangas?.map((m: any) => ({
@@ -132,7 +78,14 @@ export default function Home() {
     { id: 9, name: "Sci-Fi" },
     { id: 10, name: "Slice of Life" },
     { id: 11, name: "Sports" },
-    { id: 12, name: "Supernatural" }
+    { id: 12, name: "Supernatural" },
+    { id: 13, name: "Hentai" },
+    { id: 14, name: "Ecchi" },
+    { id: 15, name: "School Life" },
+    { id: 16, name: "Shounen" },
+    { id: 17, name: "Shoujo" },
+    { id: 18, name: "Shounen Ai" },
+    { id: 19, name: "Shoujo Ai" }
   ];
 
   // Xử lý rankings
