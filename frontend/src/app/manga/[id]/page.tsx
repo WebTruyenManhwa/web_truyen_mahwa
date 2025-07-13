@@ -32,6 +32,7 @@ interface Manga {
   view_count?: number;
   rating?: number;
   totalVotes?: number;
+  total_votes?: number;
   translationTeam?: string;
   slug?: string;
 }
@@ -56,12 +57,18 @@ export default function MangaDetail(props: Props) {
     const fetchManga = async () => {
       try {
         setIsLoading(true);
-        // Thêm tham số noCache=true để bỏ qua cache và lấy dữ liệu mới nhất
+        // Always use noCache=true to ensure we get the latest data
+        const timestamp = Date.now();
+        console.log("Fetching manga data with timestamp:", timestamp);
         const data = await mangaApi.getManga(mangaId, true);
+        // Log the raw data from the API
+        console.log("Raw API response:", data);
 
         const normalized = {
           ...data,
           coverImage: data.cover_image?.url ?? '',
+          // Make sure we use the correct property name for total_votes
+          totalVotes: data.total_votes || data.totalVotes || 0,
         };
 
         // Sắp xếp chapters
@@ -73,17 +80,36 @@ export default function MangaDetail(props: Props) {
 
         setManga(normalized);
 
-        // Kiểm tra xem manga có trong danh sách yêu thích không
+        // Kiểm tra xem manga có trong danh sách yêu thích không và lấy đánh giá của người dùng
         if (isAuthenticated) {
           try {
             // Use the numeric ID from the fetched manga data
             const numericId = normalized.id;
+
+            // Check if manga is in favorites
             const favorites = await mangaApi.checkFavorite(numericId);
             setIsFavorite(favorites.is_favorite);
-            // debugger
+
+            // Also fetch the user's rating for this manga
+            try {
+              const userRatingData = await mangaApi.getUserRating(numericId);
+              if (userRatingData && userRatingData.rating) {
+                setUserRating(userRatingData.rating);
+              } else {
+                // Reset user rating if they haven't rated this manga
+                setUserRating(0);
+              }
+            } catch (ratingErr) {
+              console.error("Failed to fetch user rating:", ratingErr);
+              // Reset user rating on error
+              setUserRating(0);
+            }
           } catch (err) {
             console.error("Failed to check favorite status:", err);
           }
+        } else {
+          // Reset user rating when not authenticated
+          setUserRating(0);
         }
       } catch (err) {
         console.error("Failed to fetch manga:", err);
@@ -132,6 +158,13 @@ export default function MangaDetail(props: Props) {
     fetchManga();
   }, [mangaId, isAuthenticated]);
 
+  // Add a useEffect to log rating data when it changes
+  useEffect(() => {
+    if (manga) {
+      console.log("Manga rating data:", manga.rating, manga.totalVotes || manga.total_votes);
+    }
+  }, [manga?.rating, manga?.totalVotes, manga?.total_votes]);
+
   const toggleFavorite = async () => {
     if (!isAuthenticated) {
       alert("Vui lòng đăng nhập để thêm truyện vào danh sách yêu thích");
@@ -159,13 +192,56 @@ export default function MangaDetail(props: Props) {
       setIsRating(true);
       // Ensure we're using the numeric ID, not the slug
       const numericId = manga?.id || parseInt(mangaId);
+      console.log("Submitting rating:", rating, "for manga ID:", numericId);
       const response = await mangaApi.rateManga(numericId, rating);
-      setManga(prev => prev ? {
-        ...prev,
-        rating: response.rating,
-        totalVotes: response.totalVotes
-      } : null);
+
+      console.log("Rating response:", response);
+
+      // Set the user rating immediately
       setUserRating(rating);
+
+      // Update the manga with the new overall rating data from the response
+      setManga(prev => {
+        if (!prev) return null;
+
+        console.log("Updating manga with new rating data:", response.rating, response.totalVotes || response.total_votes);
+
+        return {
+          ...prev,
+          // Use the overall rating from the response, not the user's personal rating
+          rating: response.rating,
+          totalVotes: response.totalVotes || response.total_votes,
+          total_votes: response.totalVotes || response.total_votes
+        };
+      });
+
+      // Fetch fresh data from the server to ensure we have the latest rating
+      try {
+        console.log("Fetching fresh data after rating");
+        const freshData = await mangaApi.getManga(numericId, true);
+        console.log("Fresh data after rating:", freshData);
+
+        if (freshData) {
+          const normalized = {
+            ...freshData,
+            coverImage: freshData.cover_image?.url ?? '',
+            totalVotes: freshData.total_votes || freshData.totalVotes || 0,
+          };
+
+          // Preserve the chapters sorting
+          if (normalized.chapters && manga?.chapters) {
+            normalized.chapters = normalized.chapters.sort(
+              (a: { number: number; }, b: { number: number; }) => b.number - a.number
+            );
+          }
+
+          // Keep the user's rating when updating the manga data
+          setManga(normalized);
+        }
+      } catch (refreshErr) {
+        console.error("Failed to refresh manga data:", refreshErr);
+        // We already updated the UI with the response data, so no need for additional handling
+      }
     } catch (err) {
       console.error("Failed to rate manga:", err);
       alert("Không thể đánh giá. Vui lòng thử lại sau.");
@@ -177,23 +253,31 @@ export default function MangaDetail(props: Props) {
   const renderRatingStars = () => {
     return (
       <div className="flex justify-center mb-2">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <button
-            key={star}
-            onClick={() => handleRate(star)}
-            onMouseEnter={() => setHoverRating(star)}
-            onMouseLeave={() => setHoverRating(0)}
-            disabled={isRating}
-            className={`text-2xl transition-colors duration-200 ${
-              isRating ? 'cursor-not-allowed opacity-50' :
-              hoverRating >= star ? 'text-yellow-400' :
-              userRating >= star ? 'text-yellow-400' :
-              manga?.rating && manga.rating >= star ? 'text-yellow-400' : 'text-gray-500'
-            } hover:text-yellow-400`}
-          >
-            ★
-          </button>
-        ))}
+        {[1, 2, 3, 4, 5].map((star) => {
+          // For half stars, we need to check if the rating is at least star-0.5
+          const isHalfStar = manga?.rating && manga.rating >= star - 0.5 && manga.rating < star;
+
+          return (
+            <button
+              key={star}
+              onClick={() => handleRate(star)}
+              onMouseEnter={() => setHoverRating(star)}
+              onMouseLeave={() => setHoverRating(0)}
+              disabled={isRating}
+              className={`text-2xl transition-colors duration-200 ${
+                isRating ? 'cursor-not-allowed opacity-50' :
+                hoverRating >= star ? 'text-yellow-400' :
+                // When hovering or after rating, show the user's rating
+                userRating >= star ? 'text-yellow-400' :
+                // Otherwise show the manga's overall rating
+                manga?.rating && manga.rating >= star ? 'text-yellow-400' :
+                isHalfStar ? 'text-yellow-200' : 'text-gray-600'
+              } hover:text-yellow-400`}
+            >
+              ★
+            </button>
+          );
+        })}
       </div>
     );
   };
@@ -239,12 +323,14 @@ export default function MangaDetail(props: Props) {
             <div className="bg-gray-700/50 rounded-lg p-4 mb-4">
               {renderRatingStars()}
               <div className="text-center text-gray-300">
+                {/* Display the rating value */}
                 <span className="text-xl font-bold">
-                  {typeof manga.rating === 'number' ? manga.rating.toFixed(1) : "0.0"}
+                  {/* Always show the manga's overall rating */}
+                  {Number(manga.rating || 0).toFixed(1)}
                 </span>
                 <span className="text-sm"> / 5</span>
                 <span className="text-gray-400 text-sm block">
-                  của {manga.totalVotes || 0} lượt đánh giá
+                  của {manga.totalVotes || manga.total_votes || 0} lượt đánh giá
                 </span>
                 {isAuthenticated && userRating > 0 && (
                   <span className="text-sm text-yellow-400 mt-2 block">

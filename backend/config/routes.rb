@@ -42,6 +42,9 @@ Rails.application.routes.draw do
           get 'rankings/week', to: 'mangas#rankings_week'
           get 'rankings/month', to: 'mangas#rankings_month'
         end
+
+        # Add route for getting user's rating for a manga
+        get 'ratings/user', to: 'mangas/ratings#show_user_rating'
       end
 
       # Add a specific route for getting chapters with manga_id

@@ -46,16 +46,22 @@ module Api
 
       def show
         # Thêm caching cho chi tiết manga
-        cache_key = "mangas/show/#{@manga.id}-#{@manga.updated_at.to_i}"
+        # Include rating and total_votes in the cache key to ensure we get fresh data when ratings change
+        cache_key = "mangas/show/#{@manga.id}-#{@manga.updated_at.to_i}-rating#{@manga.rating}-votes#{@manga.total_votes}"
 
         # Kiểm tra tham số noCache để quyết định có sử dụng cache hay không
-        if params[:noCache].present? && params[:noCache] == 'true'
-          # Nếu có tham số noCache=true, bỏ qua cache và lấy dữ liệu mới
+        if params[:noCache].present? || params[:_].present?
+          # Nếu có tham số noCache=true hoặc timestamp parameter, bỏ qua cache và lấy dữ liệu mới
+          Rails.logger.info "=== Bypassing cache for manga #{@manga.id} (#{@manga.title}), rating: #{@manga.rating}, votes: #{@manga.total_votes} ==="
+
+          # Make sure we have the latest data from the database
+          @manga.reload
+
           increment_manga_view_count
           manga_data = @manga.as_json(include: [:genres, chapters: { only: [:id, :title, :number, :created_at, :view_count, :slug] }])
         else
           # Sử dụng cache như bình thường
-          manga_data = Rails.cache.fetch(cache_key, expires_in: 30.minutes) do
+          manga_data = Rails.cache.fetch(cache_key, expires_in: 10.minutes) do
             # Increment manga view count with rate limiting
             increment_manga_view_count
 
