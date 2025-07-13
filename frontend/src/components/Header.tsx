@@ -87,7 +87,7 @@ export default function Header() {
           dropdownElement.removeEventListener('mouseleave', handleMouseLeave);
         }
       };
-    }, 1500); // ⏳ Delay 1.5s
+    }, 2500); // ⏳ Delay 1.5s
 
     // Cleanup timeout if component unmounts early
     return () => clearTimeout(timeout);
@@ -183,7 +183,7 @@ export default function Header() {
 
   const renderUserDropdown = () => {
     if (!isAuthenticated) {
-      return (
+  return (
         <div className="flex space-x-2">
           <Link
             href="/auth/login"
@@ -196,7 +196,7 @@ export default function Header() {
             className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded-full text-sm"
           >
             Đăng ký
-          </Link>
+            </Link>
         </div>
       );
     }
@@ -207,59 +207,59 @@ export default function Header() {
         ref={dropdownRef}
 
       >
-        <button
+                  <button
           className="flex items-center text-gray-300 hover:text-white bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded-full text-sm"
           onMouseEnter={() => setIsDropdownOpen(true)}
         >
-          <span className="mr-1">{user?.username}</span>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-4 w-4"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fillRule="evenodd"
-              d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
+                    <span className="mr-1">{user?.username}</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </button>
         {isDropdownOpen && (
           <div className="absolute right-0 mt-1 w-48 bg-gray-800 rounded-lg shadow-lg py-1 z-20 border border-gray-700">
-            <Link
-              href="/profile"
-              className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
-            >
-              Trang cá nhân
-            </Link>
-            <Link
-              href="/favorites"
-              className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
-            >
-              Truyện yêu thích
-            </Link>
-            <Link
-              href="/history"
-              className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
-            >
-              Lịch sử đọc
-            </Link>
-            {user?.role === 'admin' && (
-              <Link
-                href="/admin/dashboard"
-                className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
-              >
-                Quản trị
-              </Link>
-            )}
-            <button
-              onClick={handleLogout}
-              className="block w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
-            >
-              Đăng xuất
-            </button>
-          </div>
+                    <Link
+                      href="/profile"
+                      className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
+                    >
+                      Trang cá nhân
+                    </Link>
+                    <Link
+                      href="/favorites"
+                      className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
+                    >
+                      Truyện yêu thích
+                    </Link>
+                    <Link
+                      href="/history"
+                      className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
+                    >
+                      Lịch sử đọc
+                    </Link>
+                    {user?.role === 'admin' && (
+                      <Link
+                        href="/admin/dashboard"
+                        className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
+                      >
+                        Quản trị
+                      </Link>
+                    )}
+                    <button
+                      onClick={handleLogout}
+                      className="block w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
+                    >
+                      Đăng xuất
+                    </button>
+                  </div>
         )}
       </div>
     );
@@ -316,7 +316,7 @@ export default function Header() {
             </div>
           </div>
         )}
-      </div>
+                </div>
     );
   };
 
@@ -405,17 +405,17 @@ export default function Header() {
                                   </div>
                                 )}
                               </div>
-                            </Link>
+                  </Link>
                           ))}
                         </div>
                         <div className="p-2 border-t border-gray-700">
-                          <Link
+                  <Link
                             href={`/search?q=${encodeURIComponent(searchQuery)}`}
                             onClick={() => setShowSearchResults(false)}
                             className="text-red-500 text-xs hover:underline block text-center"
-                          >
+                  >
                             Xem tất cả kết quả
-                          </Link>
+                  </Link>
                         </div>
                       </div>
                     ) : (
@@ -423,8 +423,8 @@ export default function Header() {
                         Không tìm thấy truyện nào
                       </div>
                     )}
-                  </div>
-                )}
+                </div>
+              )}
               </div>
 
               {/* Authentication */}
@@ -490,38 +490,38 @@ export default function Header() {
             {/* Mobile Search */}
             <div ref={searchRef} className="relative mb-4">
               <form onSubmit={handleSearch} className="flex">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => {
                     if (searchResults.length > 0) {
                       setShowSearchResults(true);
                     }
                   }}
-                  placeholder="Tìm kiếm truyện..."
-                  className="w-full bg-gray-800 text-white px-4 py-2 rounded-l focus:outline-none focus:ring-1 focus:ring-red-500"
-                />
-                <button
-                  type="submit"
-                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-r"
+                placeholder="Tìm kiếm truyện..."
+                className="w-full bg-gray-800 text-white px-4 py-2 rounded-l focus:outline-none focus:ring-1 focus:ring-red-500"
+              />
+              <button
+                type="submit"
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-r"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
-                </button>
-              </form>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              </button>
+            </form>
 
               {/* Mobile Search Results Dropdown */}
               {showSearchResults && (

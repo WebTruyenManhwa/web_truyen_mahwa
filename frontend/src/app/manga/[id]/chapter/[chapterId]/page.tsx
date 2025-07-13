@@ -86,6 +86,8 @@ export default function ChapterReader() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const stickerPickerRef = useRef<HTMLDivElement>(null);
   const commentInputRef = useRef<HTMLDivElement>(null);
+  const [isMainCommentFocused, setIsMainCommentFocused] = useState(false);
+  const [isReplyFocused, setIsReplyFocused] = useState(false);
 
   // Add click outside handler
   useEffect(() => {
@@ -553,11 +555,12 @@ export default function ChapterReader() {
       </div>
 
       {/* Chapter Images */}
-      <div className={`space-y-1`}>
+      <div className="space-y-0">
         {(chapter.images || []).map((image, _index) => (
           <div
             key={`image-${image.position}`}
-            className={`chapter-image`}
+            className="chapter-image"
+            style={{ marginBottom: 0, lineHeight: 0 }}
           >
             <img
               src={getImageUrl(image)}
@@ -565,6 +568,7 @@ export default function ChapterReader() {
               width={800}
               height={1200}
               className="w-full h-auto"
+              style={{ display: 'block' }}
             />
           </div>
         ))}
@@ -628,14 +632,19 @@ export default function ChapterReader() {
                   contentEditable
                   onInput={handleInput}
                   suppressContentEditableWarning={true}
-                  onTouchStart={() => {
-                    // Special handling for mobile devices
+                  onFocus={() => {
+                    setIsMainCommentFocused(true);
                     if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
                       focusContentEditableForMobile(commentInputRef.current);
                     }
                   }}
+                  onBlur={() => {
+                    if (!commentHtml.trim()) {
+                      setIsMainCommentFocused(false);
+                    }
+                  }}
                 >
-                  {commentHtml === "" && <span className="text-gray-400 pointer-events-none select-none absolute left-3 top-3">Viết bình luận của bạn...</span>}
+                  {commentHtml === "" && !isMainCommentFocused && <span className="text-gray-400 absolute left-3 top-3 opacity-70">Viết bình luận của bạn...</span>}
                 </div>
                 <div className="mt-2 flex justify-between items-center">
                   <div className="relative" ref={stickerPickerRef}>
@@ -793,14 +802,19 @@ export default function ChapterReader() {
                         contentEditable
                         onInput={handleInput}
                         suppressContentEditableWarning={true}
-                        onTouchStart={() => {
-                          // Special handling for mobile devices
+                        onFocus={() => {
+                          setIsReplyFocused(true);
                           if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
                             focusContentEditableForMobile(commentInputRef.current);
                           }
                         }}
+                        onBlur={() => {
+                          if (!commentHtml.trim()) {
+                            setIsReplyFocused(false);
+                          }
+                        }}
                       >
-                        {commentHtml === "" && <span className="text-gray-400 pointer-events-none select-none absolute left-3 top-3">Viết trả lời của bạn...</span>}
+                        {commentHtml === "" && !isReplyFocused && <span className="text-gray-400 absolute left-3 top-3 opacity-70 pointer-events-none">Viết trả lời của bạn...</span>}
                       </div>
                       <div className="mt-2 flex justify-between items-center">
                         <div className="relative" ref={stickerPickerRef}>
