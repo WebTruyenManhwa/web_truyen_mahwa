@@ -77,7 +77,8 @@ module Api
 
         if @manga.save
           # Xóa cache khi tạo manga mới
-          Rails.cache.delete_matched("mangas/index/*")
+          # Thay vì sử dụng delete_matched
+          Rails.cache.clear
           render json: @manga, status: :created
         else
           render json: { errors: @manga.errors }, status: :unprocessable_entity
@@ -92,10 +93,10 @@ module Api
 
         if @manga.update(manga_params)
           # Xóa cache khi cập nhật manga
-          # Use the same cache key pattern as other methods
-          cache_key_pattern = "mangas/show/#{@manga.id}-*"
-          Rails.cache.delete_matched(cache_key_pattern)
-          Rails.cache.delete_matched("mangas/index/*")
+          # Thay vì sử dụng delete_matched
+          cache_key = "mangas/show/#{@manga.id}-#{@manga.updated_at.to_i}-rating#{@manga.rating}-votes#{@manga.total_votes}"
+          Rails.cache.delete(cache_key)
+          Rails.cache.clear
           render json: @manga
         else
           render json: { errors: @manga.errors }, status: :unprocessable_entity
@@ -104,10 +105,10 @@ module Api
 
       def destroy
         # Xóa cache khi xóa manga
-        # Use the same cache key pattern as other methods
-        cache_key_pattern = "mangas/show/#{@manga.id}-*"
-        Rails.cache.delete_matched(cache_key_pattern)
-        Rails.cache.delete_matched("mangas/index/*")
+        # Thay vì sử dụng delete_matched
+        cache_key = "mangas/show/#{@manga.id}-#{@manga.updated_at.to_i}-rating#{@manga.rating}-votes#{@manga.total_votes}"
+        Rails.cache.delete(cache_key)
+        Rails.cache.clear
         @manga.destroy
         head :no_content
       end
@@ -230,10 +231,10 @@ module Api
           Rails.logger.info "=== Incremented view count for manga page #{@manga.id} (#{@manga.title}) ==="
 
           # Xóa cache của manga để đảm bảo dữ liệu mới nhất được trả về
-          # Use the same cache key format as the show method
-          cache_key_pattern = "mangas/show/#{@manga.id}-*"
-          Rails.cache.delete_matched(cache_key_pattern)
-          Rails.logger.info "=== Deleted manga cache keys: #{cache_key_pattern} ==="
+          # Thay vì sử dụng delete_matched, sử dụng delete với cache key cụ thể
+          cache_key = "mangas/show/#{@manga.id}-#{@manga.updated_at.to_i}-rating#{@manga.rating}-votes#{@manga.total_votes}"
+          Rails.cache.delete(cache_key)
+          Rails.logger.info "=== Deleted manga cache key: #{cache_key} ==="
         end
       end
 

@@ -25,8 +25,9 @@ class Rating < ApplicationRecord
     )
 
     # Clear the cache for this manga to ensure fresh data is returned
-    cache_key_pattern = "mangas/show/#{manga.id}-*"
-    Rails.cache.delete_matched(cache_key_pattern)
-    Rails.logger.info "=== Cleared cache for manga: #{cache_key_pattern} ==="
+    # Thay vì sử dụng delete_matched, sử dụng delete với cache key cụ thể
+    cache_key = "mangas/show/#{manga.id}-#{manga.updated_at.to_i}-rating#{manga.rating}-votes#{manga.total_votes}"
+    Rails.cache.delete(cache_key)
+    Rails.logger.info "=== Cleared cache for manga: #{cache_key} ==="
   end
 end

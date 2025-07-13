@@ -58,11 +58,8 @@ export default function MangaDetail(props: Props) {
       try {
         setIsLoading(true);
         // Always use noCache=true to ensure we get the latest data
-        const timestamp = Date.now();
-        console.log("Fetching manga data with timestamp:", timestamp);
+        // Loại bỏ biến timestamp không sử dụng
         const data = await mangaApi.getManga(mangaId, true);
-        // Log the raw data from the API
-        console.log("Raw API response:", data);
 
         const normalized = {
           ...data,
@@ -99,20 +96,18 @@ export default function MangaDetail(props: Props) {
                 // Reset user rating if they haven't rated this manga
                 setUserRating(0);
               }
-            } catch (ratingErr) {
-              console.error("Failed to fetch user rating:", ratingErr);
+            } catch {
               // Reset user rating on error
               setUserRating(0);
             }
-          } catch (err) {
-            console.error("Failed to check favorite status:", err);
+          } catch {
+            // Error handling silently
           }
         } else {
           // Reset user rating when not authenticated
           setUserRating(0);
         }
-      } catch (err) {
-        console.error("Failed to fetch manga:", err);
+      } catch {
         setError("Không thể tải thông tin truyện. Vui lòng thử lại sau.");
 
         // Fallback to mock data
@@ -158,13 +153,6 @@ export default function MangaDetail(props: Props) {
     fetchManga();
   }, [mangaId, isAuthenticated]);
 
-  // Add a useEffect to log rating data when it changes
-  useEffect(() => {
-    if (manga) {
-      console.log("Manga rating data:", manga.rating, manga.totalVotes || manga.total_votes);
-    }
-  }, [manga?.rating, manga?.totalVotes, manga?.total_votes]);
-
   const toggleFavorite = async () => {
     if (!isAuthenticated) {
       alert("Vui lòng đăng nhập để thêm truyện vào danh sách yêu thích");
@@ -176,8 +164,7 @@ export default function MangaDetail(props: Props) {
       const numericId = manga?.id || parseInt(mangaId);
       await userApi.toggleFavorite(numericId);
       setIsFavorite(!isFavorite);
-    } catch (err) {
-      console.error("Failed to toggle favorite:", err);
+    } catch {
       alert("Không thể thực hiện. Vui lòng thử lại sau.");
     }
   };
@@ -192,10 +179,7 @@ export default function MangaDetail(props: Props) {
       setIsRating(true);
       // Ensure we're using the numeric ID, not the slug
       const numericId = manga?.id || parseInt(mangaId);
-      console.log("Submitting rating:", rating, "for manga ID:", numericId);
       const response = await mangaApi.rateManga(numericId, rating);
-
-      console.log("Rating response:", response);
 
       // Set the user rating immediately
       setUserRating(rating);
@@ -203,8 +187,6 @@ export default function MangaDetail(props: Props) {
       // Update the manga with the new overall rating data from the response
       setManga(prev => {
         if (!prev) return null;
-
-        console.log("Updating manga with new rating data:", response.rating, response.totalVotes || response.total_votes);
 
         return {
           ...prev,
@@ -217,9 +199,7 @@ export default function MangaDetail(props: Props) {
 
       // Fetch fresh data from the server to ensure we have the latest rating
       try {
-        console.log("Fetching fresh data after rating");
         const freshData = await mangaApi.getManga(numericId, true);
-        console.log("Fresh data after rating:", freshData);
 
         if (freshData) {
           const normalized = {
@@ -238,12 +218,10 @@ export default function MangaDetail(props: Props) {
           // Keep the user's rating when updating the manga data
           setManga(normalized);
         }
-      } catch (refreshErr) {
-        console.error("Failed to refresh manga data:", refreshErr);
+      } catch {
         // We already updated the UI with the response data, so no need for additional handling
       }
-    } catch (err) {
-      console.error("Failed to rate manga:", err);
+    } catch {
       alert("Không thể đánh giá. Vui lòng thử lại sau.");
     } finally {
       setIsRating(false);
@@ -507,7 +485,7 @@ export default function MangaDetail(props: Props) {
                 {chapter.title && <span className="ml-2 text-gray-400">- {chapter.title}</span>}
               </div>
               <div className="flex items-center space-x-4 text-sm text-gray-400">
-                {/* Xóa console.log và hiển thị view_count nếu có */}
+                {/* Hiển thị view_count nếu có */}
                 {typeof chapter.view_count === 'number' && (
                   <span className="flex items-center">
                     <svg
