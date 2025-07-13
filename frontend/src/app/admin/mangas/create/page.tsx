@@ -18,6 +18,8 @@ export default function CreateManga() {
   const [status, setStatus] = useState("ongoing");
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [coverImagePreview, setCoverImagePreview] = useState("");
+  const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [imageSource, setImageSource] = useState<"file" | "url">("file");
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [availableGenres, setAvailableGenres] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -75,12 +77,22 @@ export default function CreateManga() {
     const file = e.target.files?.[0];
     if (file) {
       setCoverImage(file);
+      setCoverImageUrl("");
+      setImageSource("file");
       const reader = new FileReader();
       reader.onloadend = () => {
         setCoverImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleImageUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const url = e.target.value;
+    setCoverImageUrl(url);
+    setCoverImage(null);
+    setImageSource("url");
+    setCoverImagePreview(url);
   };
 
   const handleGenreChange = (genre: string) => {
@@ -96,7 +108,7 @@ export default function CreateManga() {
     setError("");
     setSuccess(false);
 
-    if (!title || !description || !author || !coverImage) {
+    if (!title || !description || !author || !(coverImage || coverImageUrl)) {
       setError("Vui lòng điền đầy đủ thông tin bắt buộc");
       return;
     }
@@ -114,18 +126,25 @@ export default function CreateManga() {
       formData.append("title", title);
       formData.append("description", description);
       formData.append("author", author);
-      
+
       if (artist) {
         formData.append("artist", artist);
       }
-      
+
       if (releaseYear) {
         formData.append("releaseYear", releaseYear);
       }
-      
+
       formData.append("status", status);
-      formData.append("coverImage", coverImage);
-      
+
+      // Thêm ảnh bìa từ file hoặc URL
+      if (imageSource === "file" && coverImage) {
+        formData.append("cover_image", coverImage);
+      } else if (imageSource === "url" && coverImageUrl) {
+        formData.append("remote_cover_image_url", coverImageUrl);
+        formData.append("use_remote_url", "1");
+      }
+
       // Thêm genres
       selectedGenres.forEach((genre) => {
         formData.append("genres[]", genre);
@@ -133,7 +152,7 @@ export default function CreateManga() {
 
       // Gọi API để tạo manga mới
       const newManga = await mangaApi.createManga(formData);
-      
+
       setSuccess(true);
       // Reset form
       setTitle("");
@@ -144,8 +163,10 @@ export default function CreateManga() {
       setStatus("ongoing");
       setCoverImage(null);
       setCoverImagePreview("");
+      setCoverImageUrl("");
+      setImageSource("file");
       setSelectedGenres([]);
-      
+
       // Chuyển hướng đến trang chi tiết manga sau 2 giây
       setTimeout(() => {
         router.push(`/admin/mangas/${newManga.id}`);
@@ -315,6 +336,50 @@ export default function CreateManga() {
               <label className="block text-sm font-medium mb-2">
                 Ảnh bìa <span className="text-red-500">*</span>
               </label>
+
+              <div className="mb-4">
+                <div className="flex space-x-4 mb-4">
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="upload-file"
+                      name="image-source"
+                      checked={imageSource === "file"}
+                      onChange={() => setImageSource("file")}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-600 rounded"
+                    />
+                    <label htmlFor="upload-file" className="ml-2 block text-sm">
+                      Tải lên từ máy tính
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="upload-url"
+                      name="image-source"
+                      checked={imageSource === "url"}
+                      onChange={() => setImageSource("url")}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-600 rounded"
+                    />
+                    <label htmlFor="upload-url" className="ml-2 block text-sm">
+                      Sử dụng URL hình ảnh
+                    </label>
+                  </div>
+                </div>
+
+                {imageSource === "url" && (
+                  <div className="mb-4">
+                    <input
+                      type="text"
+                      value={coverImageUrl}
+                      onChange={handleImageUrlChange}
+                      placeholder="Nhập URL hình ảnh"
+                      className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className="border-2 border-dashed border-gray-600 rounded-lg p-4 text-center">
                 {coverImagePreview ? (
                   <div className="relative aspect-[2/3] mb-2">
@@ -328,6 +393,8 @@ export default function CreateManga() {
                       onClick={() => {
                         setCoverImage(null);
                         setCoverImagePreview("");
+                        setCoverImageUrl("");
+                        setImageSource("file");
                       }}
                       className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700"
                     >
@@ -427,4 +494,4 @@ export default function CreateManga() {
       </main>
     </div>
   );
-} 
+}

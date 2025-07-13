@@ -2,6 +2,13 @@ class Manga < ApplicationRecord
   # CarrierWave
   mount_uploader :cover_image, CoverImageUploader
 
+  # Remote URL for cover image
+  attr_accessor :remote_cover_image_url
+  attr_accessor :use_remote_url
+
+  # Handle remote cover image URL
+  before_save :set_cover_image_from_url
+
   # Enums
   enum :status, { ongoing: 0, completed: 1, hiatus: 2, cancelled: 3 }
 
@@ -28,6 +35,15 @@ class Manga < ApplicationRecord
   # Callbacks
   before_create :set_defaults
   before_save :set_slug
+
+  # Get the cover image URL, either from CarrierWave or direct URL
+  def cover_image_url
+    if read_attribute(:cover_image).present? && read_attribute(:cover_image).start_with?('http')
+      read_attribute(:cover_image)
+    else
+      cover_image.url
+    end
+  end
 
   # Track a new view for this manga
   def track_view
@@ -111,7 +127,43 @@ class Manga < ApplicationRecord
     slug
   end
 
+  # Check if the manga is using a remote URL for its cover image
+  def using_remote_cover_image?
+    read_attribute(:cover_image).present? && read_attribute(:cover_image).start_with?('http')
+  end
+
+  # Include cover_image_url and using_remote_cover_image in serialized data
+  def as_json(options = {})
+    super(options).tap do |json|
+      json['cover_image_url'] = cover_image_url
+      json['using_remote_cover_image'] = using_remote_cover_image?
+    end
+  end
+
   private
+
+  def set_cover_image_from_url
+    # If remote_cover_image_url is present, try to use it
+    if remote_cover_image_url.present?
+      Rails.logger.info "Processing remote cover image URL: #{remote_cover_image_url}"
+
+      # Check if the URL is valid
+      begin
+        uri = URI.parse(remote_cover_image_url)
+        if uri.is_a?(URI::HTTP) || uri.is_a?(URI::HTTPS)
+          Rails.logger.info "Valid URL detected, setting cover image to: #{remote_cover_image_url}"
+          # Store the URL directly in the database column
+          self.cover_image = nil # Clear any existing file upload
+          write_attribute(:cover_image, remote_cover_image_url)
+        else
+          Rails.logger.error "Invalid URL scheme (not HTTP/HTTPS): #{remote_cover_image_url}"
+        end
+      rescue URI::InvalidURIError => e
+        # Invalid URL, ignore it
+        Rails.logger.error "Invalid URL for cover image: #{remote_cover_image_url}, error: #{e.message}"
+      end
+    end
+  end
 
   def set_defaults
     self.view_count ||= 0

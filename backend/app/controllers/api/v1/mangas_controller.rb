@@ -80,7 +80,7 @@ module Api
             manga_json['latest_chapter'] = latest_chapters[manga.id]
           end
           # Add cover image if available
-          manga_json['cover_image'] = { url: manga.cover_image.url } if manga.cover_image.present?
+          manga_json['cover_image'] = { url: manga.cover_image_url } if manga.cover_image.present?
 
           manga_json
         end
@@ -112,7 +112,9 @@ module Api
               chapters: { only: [:id, :title, :number, :created_at, :view_count, :slug] }
             }
           )
-          manga_data['cover_image'] = { url: @manga.cover_image.url } if @manga.cover_image.present?
+
+          manga_data['cover_image'] = { url: @manga.cover_image_url } if @manga.cover_image.present?
+          manga_data['using_remote_cover_image'] = @manga.using_remote_cover_image?
         else
           # Sử dụng cache như bình thường
           manga_data = Rails.cache.fetch(cache_key, expires_in: 10.minutes) do
@@ -126,7 +128,9 @@ module Api
                 chapters: { only: [:id, :title, :number, :created_at, :view_count, :slug] }
               }
             )
-            data['cover_image'] = { url: @manga.cover_image.url } if @manga.cover_image.present?
+
+            data['cover_image'] = { url: @manga.cover_image_url } if @manga.cover_image.present?
+            data['using_remote_cover_image'] = @manga.using_remote_cover_image?
             data
           end
         end
@@ -316,7 +320,7 @@ module Api
           manga_data['chapters_count'] = chapters_count[manga.id] || 0
 
           # Add cover image
-          manga_data['cover_image'] = { url: manga.cover_image.url } if manga.cover_image.present?
+          manga_data['cover_image'] = { url: manga.cover_image_url } if manga.cover_image.present?
 
           manga_data
         end
@@ -356,10 +360,19 @@ module Api
 
       def manga_params
         # Handle both JSON and multipart form data
+        params_to_permit = [:title, :description, :cover_image, :remote_cover_image_url, :status, :author, :artist, :release_year, genre_ids: []]
+
+        # If remote_cover_image_url is present, automatically set use_remote_url to '1'
+        if params[:remote_cover_image_url].present? || params[:manga]&.dig(:remote_cover_image_url).present?
+          params[:use_remote_url] = '1' if params[:use_remote_url].nil?
+          params[:manga][:use_remote_url] = '1' if params[:manga] && params[:manga][:use_remote_url].nil?
+          params_to_permit << :use_remote_url
+        end
+
         if request.content_type =~ /multipart\/form-data/
-          params.permit(:title, :description, :cover_image, :status, :author, :artist, :release_year, genre_ids: [])
+          params.permit(*params_to_permit)
         else
-          params.require(:manga).permit(:title, :description, :cover_image, :status, :author, :artist, :release_year, genre_ids: [])
+          params.require(:manga).permit(*params_to_permit)
         end
       end
     end

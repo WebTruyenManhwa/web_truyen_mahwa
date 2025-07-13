@@ -36,7 +36,7 @@ export default function ManageManga() {
         limit: 10,
         search: searchTerm || undefined
       });
-      
+
       setMangas(response.mangas || []);
       setTotalPages(response.pagination?.totalPages || 1);
     } catch (err) {
@@ -165,13 +165,13 @@ export default function ManageManga() {
                         {manga.author}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                          ${manga.status === 'ongoing' ? 'bg-green-900 text-green-200' : 
-                            manga.status === 'completed' ? 'bg-blue-900 text-blue-200' : 
-                            manga.status === 'hiatus' ? 'bg-yellow-900 text-yellow-200' : 
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                          ${manga.status === 'ongoing' ? 'bg-green-900 text-green-200' :
+                            manga.status === 'completed' ? 'bg-blue-900 text-blue-200' :
+                            manga.status === 'hiatus' ? 'bg-yellow-900 text-yellow-200' :
                             'bg-red-900 text-red-200'}`}>
-                          {manga.status === 'ongoing' ? 'Đang tiến hành' : 
-                           manga.status === 'completed' ? 'Hoàn thành' : 
+                          {manga.status === 'ongoing' ? 'Đang tiến hành' :
+                           manga.status === 'completed' ? 'Hoàn thành' :
                            manga.status === 'hiatus' ? 'Tạm ngưng' : 'Đã hủy'}
                         </span>
                       </td>
@@ -213,11 +213,11 @@ export default function ManageManga() {
               >
                 Trang trước
               </button>
-              
+
               <span className="text-gray-300">
                 Trang {currentPage} / {totalPages}
               </span>
-              
+
               <button
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
@@ -235,4 +235,4 @@ export default function ManageManga() {
       </main>
     </div>
   );
-} 
+}

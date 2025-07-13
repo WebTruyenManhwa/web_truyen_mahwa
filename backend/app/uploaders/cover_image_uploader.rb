@@ -47,10 +47,10 @@ class CoverImageUploader < CarrierWave::Uploader::Base
   # def filename
   #   "something.jpg" if original_filename
   # end
-  
+
   # Optimizing images
   process :optimize
-  
+
   def optimize
     manipulate! do |img|
       img.strip
@@ -61,5 +61,29 @@ class CoverImageUploader < CarrierWave::Uploader::Base
       end
       img
     end
+  rescue => e
+    Rails.logger.error "Failed to optimize image: #{e.message}"
+    nil
   end
-end 
+
+  # Override url method to handle remote URLs
+  def url(version = nil)
+    # First check if the model's attribute contains a direct URL
+    stored_value = model.read_attribute(mounted_as)
+    if stored_value.present? && stored_value.start_with?('http')
+      if version && respond_to?(version)
+        # For versions, we can't provide the remote URL directly
+        # Return the default URL for versions
+        default_url(version)
+      else
+        # For original size, return the remote URL
+        stored_value
+      end
+    elsif file.present?
+      Rails.logger.debug "CoverImageUploader: Using CarrierWave file URL"
+      super
+    else
+      default_url(version)
+    end
+  end
+end

@@ -29,6 +29,8 @@ export default function MangaDetailAdmin() {
   const [status, setStatus] = useState("ongoing");
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [coverImagePreview, setCoverImagePreview] = useState("");
+  const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [imageSource, setImageSource] = useState<"file" | "url">("file");
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [availableGenres, setAvailableGenres] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,7 +45,7 @@ export default function MangaDetailAdmin() {
         // Fetch manga details
         const mangaData = await mangaApi.getManga(params.id);
         setManga(mangaData);
-        
+
         // Set form values
         setTitle(mangaData.title || "");
         setDescription(mangaData.description || "");
@@ -52,14 +54,22 @@ export default function MangaDetailAdmin() {
         setReleaseYear(mangaData.releaseYear?.toString() || "");
         setStatus(mangaData.status || "ongoing");
         setCoverImagePreview(mangaData.coverImage || "");
-        
+
+        // Set image source based on whether the cover image is a URL
+        if (mangaData.coverImage && mangaData.coverImage.startsWith('http')) {
+          setCoverImageUrl(mangaData.coverImage);
+          setImageSource("url");
+        } else {
+          setImageSource("file");
+        }
+
         // Set selected genres
         if (mangaData.genres && Array.isArray(mangaData.genres)) {
-          setSelectedGenres(mangaData.genres.map((genre: any) => 
+          setSelectedGenres(mangaData.genres.map((genre: any) =>
             typeof genre === 'string' ? genre : genre.name
           ));
         }
-        
+
         // Fetch available genres
         const genresData = await genreApi.getGenres();
         if (genresData && genresData.length > 0) {
@@ -67,8 +77,8 @@ export default function MangaDetailAdmin() {
         } else {
           // Fallback to default genres
           setAvailableGenres([
-            "Action", "Adventure", "Comedy", "Drama", "Fantasy", 
-            "Horror", "Mystery", "Romance", "Sci-Fi", "Slice of Life", 
+            "Action", "Adventure", "Comedy", "Drama", "Fantasy",
+            "Horror", "Mystery", "Romance", "Sci-Fi", "Slice of Life",
             "Sports", "Supernatural", "Thriller"
           ]);
         }
@@ -87,12 +97,22 @@ export default function MangaDetailAdmin() {
     const file = e.target.files?.[0];
     if (file) {
       setCoverImage(file);
+      setCoverImageUrl("");
+      setImageSource("file");
       const reader = new FileReader();
       reader.onloadend = () => {
         setCoverImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleImageUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const url = e.target.value;
+    setCoverImageUrl(url);
+    setCoverImage(null);
+    setImageSource("url");
+    setCoverImagePreview(url);
   };
 
   const handleGenreChange = (genre: string) => {
@@ -107,40 +127,44 @@ export default function MangaDetailAdmin() {
     e.preventDefault();
     setError("");
     setSuccess("");
-    
+
     if (!title || !description || !author) {
       setError("Vui lòng điền đầy đủ thông tin bắt buộc");
       return;
     }
-    
+
     if (selectedGenres.length === 0) {
       setError("Vui lòng chọn ít nhất một thể loại");
       return;
     }
-    
+
     setIsSaving(true);
-    
+
     try {
       // Tạo FormData để gửi dữ liệu bao gồm file
       const formData = new FormData();
       formData.append("title", title);
       formData.append("description", description);
       formData.append("author", author);
-      
+
       if (artist) {
         formData.append("artist", artist);
       }
-      
+
       if (releaseYear) {
         formData.append("release_year", releaseYear);
       }
-      
+
       formData.append("status", status);
-      
-      if (coverImage) {
+
+      // Thêm ảnh bìa từ file hoặc URL
+      if (imageSource === "file" && coverImage) {
         formData.append("cover_image", coverImage);
+      } else if (imageSource === "url" && coverImageUrl) {
+        formData.append("remote_cover_image_url", coverImageUrl);
+        formData.append("use_remote_url", "1");
       }
-      
+
       // Thêm genres
       selectedGenres.forEach((genre) => {
         formData.append("genres[]", genre);
@@ -148,9 +172,9 @@ export default function MangaDetailAdmin() {
 
       // Gọi API để cập nhật manga
       await mangaApi.updateManga(params.id, formData);
-      
+
       setSuccess("Cập nhật thông tin truyện thành công");
-      
+
       // Cập nhật lại dữ liệu manga
       const updatedManga = await mangaApi.getManga(params.id);
       setManga(updatedManga);
@@ -263,7 +287,7 @@ export default function MangaDetailAdmin() {
                     required
                   />
                 </div>
-                
+
                 <div>
                   <label htmlFor="artist" className="block text-sm font-medium mb-2">
                     Họa sĩ
@@ -295,7 +319,7 @@ export default function MangaDetailAdmin() {
                     placeholder="Nhập năm phát hành"
                   />
                 </div>
-                
+
                 <div>
                   <label htmlFor="status" className="block text-sm font-medium mb-2">
                     Trạng thái <span className="text-red-500">*</span>
@@ -345,6 +369,50 @@ export default function MangaDetailAdmin() {
               <label className="block text-sm font-medium mb-2">
                 Ảnh bìa <span className="text-red-500">*</span>
               </label>
+
+              <div className="mb-4">
+                <div className="flex space-x-4 mb-4">
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="upload-file"
+                      name="image-source"
+                      checked={imageSource === "file"}
+                      onChange={() => setImageSource("file")}
+                      className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+                    />
+                    <label htmlFor="upload-file" className="ml-2 text-sm font-medium text-gray-300">
+                      Tải lên từ máy tính
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="upload-url"
+                      name="image-source"
+                      checked={imageSource === "url"}
+                      onChange={() => setImageSource("url")}
+                      className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+                    />
+                    <label htmlFor="upload-url" className="ml-2 text-sm font-medium text-gray-300">
+                      Sử dụng URL hình ảnh
+                    </label>
+                  </div>
+                </div>
+
+                {imageSource === "url" && (
+                  <div className="mb-4">
+                    <input
+                      type="text"
+                      value={coverImageUrl}
+                      onChange={handleImageUrlChange}
+                      placeholder="Nhập URL hình ảnh"
+                      className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className="border-2 border-dashed border-gray-600 rounded-lg p-4 text-center">
                 {coverImagePreview ? (
                   <div className="relative aspect-[2/3] mb-2">
@@ -358,6 +426,13 @@ export default function MangaDetailAdmin() {
                       onClick={() => {
                         setCoverImage(null);
                         setCoverImagePreview(manga?.coverImage || "");
+                        if (manga?.coverImage && manga.coverImage.startsWith('http')) {
+                          setCoverImageUrl(manga.coverImage);
+                          setImageSource("url");
+                        } else {
+                          setCoverImageUrl("");
+                          setImageSource("file");
+                        }
                       }}
                       className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700"
                     >
@@ -457,4 +532,4 @@ export default function MangaDetailAdmin() {
       </main>
     </div>
   );
-} 
+}

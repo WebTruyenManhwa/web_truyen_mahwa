@@ -20,7 +20,25 @@ export const fetcher = async (url: string) => {
     throw new Error('An error occurred while fetching the data.');
   }
 
-  return response.json();
+  const data = await response.json();
+
+  // Process manga data to ensure consistent format
+  if (url.match(/\/v1\/mangas\/\d+$/) && data) {
+    // Single manga endpoint
+    if (data.cover_image?.url && !data.coverImage) {
+      data.coverImage = data.cover_image.url;
+    }
+  } else if ((url.startsWith('/v1/mangas') || url.includes('rankings')) && data.mangas) {
+    // Manga list or rankings endpoint
+    data.mangas = data.mangas.map((manga: any) => {
+      if (manga.cover_image?.url && !manga.coverImage) {
+        manga.coverImage = manga.cover_image.url;
+      }
+      return manga;
+    });
+  }
+
+  return data;
 };
 
 // Cấu hình SWR mặc định
@@ -55,7 +73,52 @@ export const useMangas = (params?: {
 };
 
 export const useManga = (id: string | number, config?: SWRConfiguration): SWRResponse<any, any> => {
-  return useSWR(id ? `/v1/mangas/${id}` : null, fetcher, { ...defaultSWRConfig, ...config });
+  const { data, error, isLoading, mutate, isValidating } = useSWR(id ? `/v1/mangas/${id}` : null, async (url) => {
+    const result = await fetcher(url);
+
+    // If the cover image is missing but we have an ID, try to get it directly
+    if (result && !result.cover_image?.url && !result.coverImage && !result.cover_image_url && result.id) {
+      try {
+        // Add a timestamp to bypass cache
+        const directUrl = `${API_BASE_URL}/v1/mangas/${result.id}?_=${Date.now()}`;
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+        const directResponse = await fetch(directUrl, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          }
+        });
+
+        if (directResponse.ok) {
+          const directData = await directResponse.json();
+          // If we got a cover image from the direct call, use it
+          if (directData.cover_image?.url) {
+            result.cover_image = directData.cover_image;
+          }
+        }
+      } catch (e) {
+        console.error("Error fetching direct manga data:", e);
+      }
+    }
+
+    return result;
+  }, { ...defaultSWRConfig, ...config });
+
+  // Process the data to ensure consistent format
+  const processedData = data ? {
+    ...data,
+    coverImage: data.using_remote_cover_image ? data.cover_image?.url :
+                data.cover_image?.url || data.coverImage || data.cover_image_url || '',
+  } : null;
+
+  return {
+    data: processedData,
+    error,
+    isLoading,
+    mutate,
+    isValidating
+  };
 };
 
 export const useMangaChapters = (mangaId: string | number, config?: SWRConfiguration): SWRResponse<any, any> => {

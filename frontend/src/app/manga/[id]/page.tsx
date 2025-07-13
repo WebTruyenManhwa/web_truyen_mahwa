@@ -64,7 +64,6 @@ export default function MangaDetail(props: Props) {
   // Xử lý dữ liệu manga
   const manga = mangaData ? {
     ...mangaData,
-    coverImage: mangaData.cover_image?.url ?? '',
     totalVotes: mangaData.total_votes || mangaData.totalVotes || 0,
     chapters: mangaData.chapters ? [...mangaData.chapters].sort(
       (a: { number: number; }, b: { number: number; }) => b.number - a.number
@@ -246,12 +245,9 @@ export default function MangaDetail(props: Props) {
           <div className="md:w-1/4">
             <div className="relative aspect-[2/3] rounded-lg overflow-hidden mb-4">
             <img
-              src={typeof manga.coverImage === 'string'
-                ? manga.coverImage
-                : manga.coverImage?.url ?? "/placeholder-manga.jpg"
-              }
+              src={manga.coverImage || manga.cover_image?.url || manga.cover_image_url || (typeof manga.cover_image === 'string' ? manga.cover_image : null) || "/placeholder-manga.jpg"}
               alt={manga.title}
-              className="object-cover"
+              className="object-cover w-full h-full"
             />
             </div>
 
