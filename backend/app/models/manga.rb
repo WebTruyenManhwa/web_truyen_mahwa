@@ -31,22 +31,49 @@ class Manga < ApplicationRecord
 
   # Track a new view for this manga
   def track_view
-    MangaView.increment_view(id)
+    begin
+      MangaView.increment_view(id)
+    rescue => e
+      # Log error but don't let it affect user experience
+      Rails.logger.error "Error tracking manga view: #{e.message}"
+      # Increment the counter directly if possible
+      begin
+        self.increment!(:view_count)
+      rescue => inner_e
+        Rails.logger.error "Failed to increment manga view count directly: #{inner_e.message}"
+      end
+      nil
+    end
   end
 
   # Get views for today
   def views_for_day(date = Date.today)
-    MangaView.views_for_day(id, date)
+    begin
+      MangaView.views_for_day(id, date)
+    rescue => e
+      Rails.logger.error "Error getting daily views: #{e.message}"
+      0 # Return 0 as fallback
+    end
   end
 
   # Get views for the past week
   def views_for_week(end_date = Date.today)
-    MangaView.views_for_week(id, end_date)
+    begin
+      MangaView.views_for_week(id, end_date)
+    rescue => e
+      Rails.logger.error "Error getting weekly views: #{e.message}"
+      0 # Return 0 as fallback
+    end
   end
 
   # Get views for the past month
   def views_for_month(end_date = Date.today)
-    MangaView.views_for_month(id, end_date)
+    begin
+      MangaView.views_for_month(id, end_date)
+    rescue => e
+      Rails.logger.error "Error getting monthly views: #{e.message}"
+      0 # Return 0 as fallback
+    end
   end
 
   def update_rating_stats

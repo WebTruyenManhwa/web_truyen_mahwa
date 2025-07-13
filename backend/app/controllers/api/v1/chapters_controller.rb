@@ -69,9 +69,13 @@ module Api
         Rails.logger.debug "Chapter cache exists: #{chapter_viewed}"
         Rails.logger.debug "Manga from chapter cache exists: #{manga_from_chapter_viewed}"
 
-        # Kiểm tra tất cả các keys liên quan đến chapter này
-        all_keys = Rails.cache.instance_variable_get(:@data).keys.select { |k| k.to_s.include?("view_count:chapter:#{@chapter.id}") }
-        Rails.logger.debug "All related chapter cache keys: #{all_keys}"
+        # Kiểm tra tất cả các keys liên quan đến chapter này - Safely check if @data exists
+        all_keys = []
+        cache_data = Rails.cache.instance_variable_get(:@data)
+        if cache_data.respond_to?(:keys)
+          all_keys = cache_data.keys.select { |k| k.to_s.include?("view_count:chapter:#{@chapter.id}") }
+          Rails.logger.debug "All related chapter cache keys: #{all_keys}"
+        end
 
         # Đảm bảo view_count không phải là nil
         if @chapter.view_count.nil?

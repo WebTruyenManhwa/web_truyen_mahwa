@@ -43,15 +43,20 @@ Rails.application.configure do
   # Don't log any deprecations.
   config.active_support.report_deprecations = false
 
-  # Replace the default in-process memory cache store with a durable alternative.
-  config.cache_store = :solid_cache_store
+  # Use a combination of memory store and solid_cache_store for better reliability
+  # This helps avoid nil cache issues in production
+  begin
+    config.cache_store = :solid_cache_store
+  rescue => e
+    Rails.logger.warn "Failed to initialize solid_cache_store: #{e.message}. Falling back to memory_store."
+    config.cache_store = :memory_store, { size: 64.megabytes }
+  end
 
   # Use database for Active Job queue adapter
   config.active_job.queue_adapter = :solid_queue
   config.solid_queue.connects_to = { database: { writing: :queue } }
 
-  # Cấu hình cache và session store sử dụng database thay vì Redis
-  config.cache_store = :solid_cache_store
+  # Session store configuration
   config.session_store :cookie_store, key: '_web_truyen_mahwa_session'
 
   # Bật HTTP caching

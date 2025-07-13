@@ -9,7 +9,7 @@ class MangaView < ApplicationRecord
   def self.increment_view(manga_id, date = Date.today)
     # Use a transaction with retry logic to handle race conditions
     attempts = 0
-    max_attempts = 3
+    max_attempts = 5
 
     begin
       attempts += 1
@@ -26,18 +26,33 @@ class MangaView < ApplicationRecord
       end
 
       # Also increment the manga's total view count (this is separate from the unique constraint)
-      Manga.update_counters(manga_id, view_count: 1)
+      begin
+        Manga.update_counters(manga_id, view_count: 1)
+      rescue => e
+        Rails.logger.error "Failed to update manga view count: #{e.message}"
+        # Continue execution even if this fails
+      end
 
       return record
     rescue ActiveRecord::RecordNotUnique => e
       # If we get a unique constraint violation, retry if we haven't exceeded max attempts
       if attempts < max_attempts
         Rails.logger.info "Retrying increment_view for manga_id=#{manga_id} after RecordNotUnique (attempt #{attempts})"
+        sleep(0.1 * attempts) # Add exponential backoff
         retry
       else
         Rails.logger.error "Failed to increment view after #{max_attempts} attempts: #{e.message}"
-        raise e
+        # Don't raise the error, just return nil to avoid breaking the user experience
+        return nil
       end
+    rescue ActiveRecord::ConnectionTimeoutError, PG::ConnectionBad => e
+      Rails.logger.error "Database connection error when incrementing view: #{e.message}"
+      # Don't raise the error, just return nil
+      return nil
+    rescue => e
+      Rails.logger.error "Unexpected error when incrementing view: #{e.class.name} - #{e.message}"
+      # Don't raise the error, just return nil
+      return nil
     end
   end
 
