@@ -249,6 +249,28 @@ export default function ChapterReader() {
     const el = commentInputRef.current;
     if (!el) return;
     el.focus();
+
+    // Special handling for mobile devices
+    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+      try {
+        // Force focus for mobile
+        setTimeout(() => {
+          el.focus();
+          // Create a range at the end of the content
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          range.collapse(false);
+          const selection = window.getSelection();
+          if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+        }, 100);
+      } catch (e) {
+        console.error("Mobile focus error:", e);
+      }
+    }
+
     const selection = window.getSelection();
     if (!selection || !selection.rangeCount) return;
     const range = selection.getRangeAt(0);
@@ -265,6 +287,26 @@ export default function ChapterReader() {
     // Cập nhật state
     setCommentHtml(el.innerHTML);
     setShowStickerPicker(false);
+  };
+
+  // Helper function for mobile focus
+  const focusContentEditableForMobile = (el: HTMLElement | null) => {
+    if (!el) return;
+
+    el.focus();
+    try {
+      // Create a range at the end of the content
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    } catch (e) {
+      console.error("Mobile focus error:", e);
+    }
   };
 
   const handleSelectSticker = (sticker: string) => {
@@ -369,6 +411,13 @@ export default function ChapterReader() {
     setReplyingTo(comment);
     // Scroll to comment form
     document.getElementById('comment-form')?.scrollIntoView({ behavior: 'smooth' });
+
+    // Force focus for mobile devices after a short delay
+    setTimeout(() => {
+      if (commentInputRef.current && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        focusContentEditableForMobile(commentInputRef.current);
+      }
+    }, 500);
   };
 
   const cancelReply = () => {
@@ -579,6 +628,12 @@ export default function ChapterReader() {
                   contentEditable
                   onInput={handleInput}
                   suppressContentEditableWarning={true}
+                  onTouchStart={() => {
+                    // Special handling for mobile devices
+                    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+                      focusContentEditableForMobile(commentInputRef.current);
+                    }
+                  }}
                 >
                   {commentHtml === "" && <span className="text-gray-400 pointer-events-none select-none absolute left-3 top-3">Viết bình luận của bạn...</span>}
                 </div>
@@ -738,6 +793,12 @@ export default function ChapterReader() {
                         contentEditable
                         onInput={handleInput}
                         suppressContentEditableWarning={true}
+                        onTouchStart={() => {
+                          // Special handling for mobile devices
+                          if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+                            focusContentEditableForMobile(commentInputRef.current);
+                          }
+                        }}
                       >
                         {commentHtml === "" && <span className="text-gray-400 pointer-events-none select-none absolute left-3 top-3">Viết trả lời của bạn...</span>}
                       </div>

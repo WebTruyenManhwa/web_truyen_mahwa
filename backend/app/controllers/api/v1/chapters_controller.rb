@@ -122,23 +122,23 @@ module Api
         Rails.logger.debug "Setting chapter with params: manga_id=#{params[:manga_id]}, id=#{params[:id]}"
 
         if params[:manga_id].present?
-          # If manga_id is provided, find the chapter within that manga's chapters
+                # If manga_id is provided, find the chapter within that manga's chapters
           manga = Manga.find_by(slug: params[:manga_id]) || Manga.find_by(id: params[:manga_id])
           Rails.logger.debug "Found manga: #{manga&.id} - #{manga&.title}"
 
-          # Extract ID from combined ID-slug parameter if present
+                # Extract ID from combined ID-slug parameter if present
           chapter_id = nil
           if params[:id].to_s.match(/^\d+-/)
             chapter_id = params[:id].to_s.split('-').first
             Rails.logger.debug "Extracted chapter_id from slug: #{chapter_id}"
           end
 
-          if chapter_id.present?
-            # If ID is part of the parameter, find by ID
+                if chapter_id.present?
+                  # If ID is part of the parameter, find by ID
             @chapter = manga.chapters.find_by(id: chapter_id)
             Rails.logger.debug "Found chapter by ID: #{@chapter&.id} - #{@chapter&.title}"
-          else
-            # Try to find by slug or ID
+                else
+                  # Try to find by slug or ID
             @chapter = manga.chapters.find_by(slug: params[:id])
             Rails.logger.debug "Found chapter by slug: #{@chapter&.id} - #{@chapter&.title}" if @chapter
 
@@ -152,22 +152,22 @@ module Api
                 raise
               end
             end
-          end
-        else
-          # For routes that don't include manga_id in the URL, find the chapter first
-          # Extract ID from combined ID-slug parameter if present
+                end
+              else
+                # For routes that don't include manga_id in the URL, find the chapter first
+                # Extract ID from combined ID-slug parameter if present
           chapter_id = nil
           if params[:id].to_s.match(/^\d+-/)
             chapter_id = params[:id].to_s.split('-').first
             Rails.logger.debug "Extracted chapter_id from slug (no manga): #{chapter_id}"
           end
 
-          if chapter_id.present?
-            # If ID is part of the parameter, find by ID
+                if chapter_id.present?
+                  # If ID is part of the parameter, find by ID
             @chapter = Chapter.find_by(id: chapter_id)
             Rails.logger.debug "Found chapter by ID (no manga): #{@chapter&.id} - #{@chapter&.title}"
-          else
-            # Try to find by slug or ID
+                else
+                  # Try to find by slug or ID
             @chapter = Chapter.find_by(slug: params[:id])
             Rails.logger.debug "Found chapter by slug (no manga): #{@chapter&.id} - #{@chapter&.title}" if @chapter
 
@@ -190,18 +190,18 @@ module Api
           error_message += " for Manga with id=#{params[:manga_id]}" if params[:manga_id].present?
           Rails.logger.error error_message
           raise ActiveRecord::RecordNotFound, error_message
-        end
+                end
 
-        # If chapter_form_params includes manga_id, verify the chapter belongs to that manga
+                # If chapter_form_params includes manga_id, verify the chapter belongs to that manga
         if params[:manga_id].present?
           manga_id = params[:manga_id]
-          manga = Manga.find_by(slug: manga_id) || Manga.find_by(id: manga_id)
+                  manga = Manga.find_by(slug: manga_id) || Manga.find_by(id: manga_id)
           unless @chapter.manga_id.to_s == manga&.id.to_s
             error_message = "Couldn't find Chapter with id=#{params[:id]} for Manga with id=#{manga_id}"
             Rails.logger.error error_message
             raise ActiveRecord::RecordNotFound, error_message
-          end
-        end
+                end
+              end
       end
 
       def chapter_form_params

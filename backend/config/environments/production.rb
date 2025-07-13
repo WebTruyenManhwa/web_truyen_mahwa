@@ -46,7 +46,7 @@ Rails.application.configure do
   # Use a combination of memory store and solid_cache_store for better reliability
   # This helps avoid nil cache issues in production
   begin
-    config.cache_store = :solid_cache_store
+  config.cache_store = :solid_cache_store
   rescue => e
     Rails.logger.warn "Failed to initialize solid_cache_store: #{e.message}. Falling back to memory_store."
     config.cache_store = :memory_store, { size: 64.megabytes }
