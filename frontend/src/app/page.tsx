@@ -65,6 +65,23 @@ export default function Home() {
 
   const genres: Genre[] = genresData || [];
 
+  // Xử lý rankings - đảm bảo có coverImage
+  const processedRankings = {
+    day: dayRankings?.mangas?.map((m: any) => ({
+      ...m,
+      // Xử lý cả hai trường hợp: cover_image.url hoặc cover_image_url
+      coverImage: m.cover_image?.url || m.cover_image_url || ""
+    })) || [],
+    week: weekRankings?.mangas?.map((m: any) => ({
+      ...m,
+      coverImage: m.cover_image?.url || m.cover_image_url || ""
+    })) || [],
+    month: monthRankings?.mangas?.map((m: any) => ({
+      ...m,
+      coverImage: m.cover_image?.url || m.cover_image_url || ""
+    })) || []
+  };
+
   // Danh sách thể loại mặc định (fallback)
   const defaultGenres = [
     { id: 1, name: "Action" },
@@ -87,13 +104,6 @@ export default function Home() {
     { id: 18, name: "Shounen Ai" },
     { id: 19, name: "Shoujo Ai" }
   ];
-
-  // Xử lý rankings
-  const rankings = {
-    day: dayRankings?.mangas || [],
-    week: weekRankings?.mangas || [],
-    month: monthRankings?.mangas || []
-  };
 
   // Kiểm tra trạng thái loading
   const isLoading = popularLoading || latestLoading;
@@ -273,7 +283,7 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
-          {rankings[activeRanking].map((manga: { id: React.Key | null | undefined; slug: any; coverImage: any; title: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; latestChapter: any; chapter: any; period_views: any; view_count: any; }, index: number) => (
+          {processedRankings[activeRanking].map((manga: { id: React.Key | null | undefined; slug: any; coverImage: any; title: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; latestChapter: any; chapter: any; period_views: any; view_count: any; }, index: number) => (
             <div key={manga.id} className="group">
               <Link href={`/manga/${manga.slug || manga.id}`} className="block">
                 <div className="relative aspect-[2/3] rounded overflow-hidden mb-2 bg-gray-800">
@@ -281,7 +291,6 @@ export default function Home() {
                   <div className="absolute top-0 right-0 bg-gray-900/80 text-red-500 font-bold px-2 py-1 text-sm z-10">
                     #{index + 1}
                   </div>
-
                   <img
                     src={manga.coverImage || "/placeholder-manga.jpg"}
                     alt={manga.title as string}

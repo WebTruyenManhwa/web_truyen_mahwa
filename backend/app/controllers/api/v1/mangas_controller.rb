@@ -246,7 +246,7 @@ module Api
       # Lấy danh sách manga với lượt xem theo thời gian
       def get_mangas_with_views(period, limit = 20)
         # Lấy tất cả manga với thông tin cần thiết, giới hạn số lượng
-        mangas = Manga.select(:id, :title, :slug, :view_count, :rating, :total_votes)
+        mangas = Manga.select(:id, :title, :slug, :view_count, :rating, :total_votes, :cover_image)
                      .includes(:genres)
                      .limit(limit)
 
