@@ -4,10 +4,15 @@ class MangaView < ApplicationRecord
   # Tăng lượt xem cho manga
   def self.increment_view(manga_id)
     today = Date.today
-    view = find_or_initialize_by(manga_id: manga_id, created_at: today.beginning_of_day..today.end_of_day)
 
-    if view.new_record?
-      view.view_count = 1
+    # Tìm bản ghi cho ngày hôm nay
+    view = where(manga_id: manga_id)
+           .where('DATE(created_at) = ?', today)
+           .first
+
+    if view.nil?
+      # Nếu không tìm thấy, tạo bản ghi mới
+      view = new(manga_id: manga_id, view_count: 1, view_date: today)
       view.save
     else
       # Sử dụng update_column để tránh callbacks và validations
