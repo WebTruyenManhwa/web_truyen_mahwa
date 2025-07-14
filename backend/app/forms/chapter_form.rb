@@ -5,7 +5,7 @@ class ChapterForm
                 :image_positions, :new_images, :new_image_positions
   
   validates :title, presence: true
-  validates :number, presence: true, numericality: { greater_than: 0 }
+  validates :number, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :manga_id, presence: true
   
   # Validate images nếu có
