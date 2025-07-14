@@ -88,6 +88,9 @@ export default function ChapterReader() {
   const commentInputRef = useRef<HTMLDivElement>(null);
   const [isMainCommentFocused, setIsMainCommentFocused] = useState(false);
   const [isReplyFocused, setIsReplyFocused] = useState(false);
+  // Thêm state để kiểm soát việc hiển thị thanh điều hướng
+  const [showTopNav, setShowTopNav] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
 
   // Add click outside handler
   useEffect(() => {
@@ -111,7 +114,18 @@ export default function ChapterReader() {
     const handleScroll = () => {
       const scrollPosition = window.scrollY;
       const windowHeight = window.innerHeight;
-      // const documentHeight = document.documentElement.scrollHeight;
+
+      // Xác định hướng cuộn
+      if (scrollPosition > lastScrollY) {
+        // Cuộn xuống - ẩn thanh điều hướng
+        setShowTopNav(false);
+      } else {
+        // Cuộn lên - hiện thanh điều hướng
+        setShowTopNav(true);
+      }
+
+      // Lưu vị trí cuộn hiện tại
+      setLastScrollY(scrollPosition);
 
       // Hiển thị navigation khi scroll xuống 20% trang
       setShowBottomNav(scrollPosition > windowHeight * 0.2);
@@ -132,7 +146,33 @@ export default function ChapterReader() {
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [lastScrollY]);
+
+  // Thêm xử lý phím mũi tên để chuyển chương
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Kiểm tra nếu đang focus vào input hoặc textarea thì không xử lý
+      if (document.activeElement?.tagName === 'INPUT' ||
+          document.activeElement?.tagName === 'TEXTAREA' ||
+          document.activeElement?.getAttribute('contenteditable') === 'true') {
+        return;
+      }
+
+      if (e.key === 'ArrowLeft' && chapter?.prev_chapter) {
+        // Chuyển đến chapter trước
+        window.location.href = `/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.prev_chapter?.slug || chapter.prev_chapter?.id}`;
+      } else if (e.key === 'ArrowRight' && chapter?.next_chapter) {
+        // Chuyển đến chapter sau
+        window.location.href = `/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.next_chapter?.slug || chapter.next_chapter?.id}`;
+      } else if (e.key === 'Escape' && chapter) {
+        // Quay lại trang manga
+        window.location.href = `/manga/${chapter.manga?.slug || mangaId}`;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [chapter, mangaId]);
 
   useEffect(() => {
     const fetchChapter = async () => {
@@ -457,7 +497,7 @@ export default function ChapterReader() {
   return (
     <div className="max-w-[53rem] mx-auto px-2">
       {/* Top Navigation Bar */}
-      <div className="bg-gray-800 p-4 rounded mb-4 sticky top-0 z-10">
+      <div className={`bg-gray-800 p-4 rounded mb-4 sticky top-0 z-10 transition-transform duration-300 ${showTopNav ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="flex flex-col space-y-3">
           <div className="flex items-center">
             <Link href={`/manga/${mangaId}`} className="text-gray-300 hover:text-red-500 mr-2">
