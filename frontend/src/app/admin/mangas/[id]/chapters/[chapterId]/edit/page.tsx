@@ -452,25 +452,31 @@ export default function EditChapter(props: Props){
 
       setSuccess(true);
       console.log("Empty position deleted successfully");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to update chapter:", err);
 
       // Hiển thị chi tiết lỗi từ API nếu có
-      if (err.response?.data?.errors) {
-        // Nếu lỗi là một object với nhiều trường
-        if (typeof err.response.data.errors === 'object' && !Array.isArray(err.response.data.errors)) {
-          const errorMessages = Object.entries(err.response.data.errors)
-            .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
-            .join('; ');
-          setError(`Lỗi: ${errorMessages}`);
-        }
-        // Nếu lỗi là một mảng
-        else if (Array.isArray(err.response.data.errors)) {
-          setError(`Lỗi: ${err.response.data.errors.join(', ')}`);
-        }
-        // Nếu lỗi là một string
-        else {
-          setError(`Lỗi: ${err.response.data.errors}`);
+      if (err && typeof err === 'object' && 'response' in err) {
+        const errorResponse = err as {response?: {data?: {errors?: unknown}}};
+        if (errorResponse.response?.data?.errors) {
+          // Nếu lỗi là một object với nhiều trường
+          if (typeof errorResponse.response.data.errors === 'object' && !Array.isArray(errorResponse.response.data.errors)) {
+            const errorObj = errorResponse.response.data.errors as Record<string, string | string[]>;
+            const errorMessages = Object.entries(errorObj)
+              .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
+              .join('; ');
+            setError(`Lỗi: ${errorMessages}`);
+          }
+          // Nếu lỗi là một mảng
+          else if (Array.isArray(errorResponse.response.data.errors)) {
+            setError(`Lỗi: ${(errorResponse.response.data.errors as string[]).join(', ')}`);
+          }
+          // Nếu lỗi là một string
+          else {
+            setError(`Lỗi: ${String(errorResponse.response.data.errors)}`);
+          }
+        } else {
+          setError("Cập nhật chapter thất bại. Vui lòng thử lại sau.");
         }
       } else {
         setError("Cập nhật chapter thất bại. Vui lòng thử lại sau.");
@@ -635,28 +641,48 @@ export default function EditChapter(props: Props){
       setSuccess(true);
       setShowDeleteEmptyConfirm(false);
       console.log("All empty positions deleted successfully");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to update chapter:", err);
 
       // Hiển thị chi tiết lỗi từ API nếu có
-      if (err.response?.data?.errors) {
-        // Nếu lỗi là một object với nhiều trường
-        if (typeof err.response.data.errors === 'object' && !Array.isArray(err.response.data.errors)) {
-          const errorMessages = Object.entries(err.response.data.errors)
-            .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
-            .join('; ');
-          setError(`Lỗi: ${errorMessages}`);
-        }
-        // Nếu lỗi là một mảng
-        else if (Array.isArray(err.response.data.errors)) {
-          setError(`Lỗi: ${err.response.data.errors.join(', ')}`);
-        }
-        // Nếu lỗi là một string
-        else {
-          setError(`Lỗi: ${err.response.data.errors}`);
+      if (err && typeof err === 'object' && 'response' in err) {
+        const errorResponse = err as {response?: {data?: {errors?: unknown}}};
+        if (errorResponse.response?.data?.errors) {
+          // Nếu lỗi là một object với nhiều trường
+          if (typeof errorResponse.response.data.errors === 'object' && !Array.isArray(errorResponse.response.data.errors)) {
+            const errorObj = errorResponse.response.data.errors as Record<string, string | string[]>;
+            const errorMessages = Object.entries(errorObj)
+              .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
+              .join('; ');
+            setError(`Lỗi: ${errorMessages}`);
+          }
+          // Nếu lỗi là một mảng
+          else if (Array.isArray(errorResponse.response.data.errors)) {
+            setError(`Lỗi: ${(errorResponse.response.data.errors as string[]).join(', ')}`);
+          }
+          // Nếu lỗi là một string
+          else {
+            setError(`Lỗi: ${String(errorResponse.response.data.errors)}`);
+          }
+        } else {
+          setError("Cập nhật chapter thất bại. Vui lòng thử lại sau.");
         }
       } else {
         setError("Cập nhật chapter thất bại. Vui lòng thử lại sau.");
+      }
+
+      // Nếu API thất bại, tải lại dữ liệu từ server để đảm bảo UI đồng bộ
+      try {
+        const response = await chapterApi.getChapter(mangaId, chapterId);
+        const sortedImages = [...response.images || []].sort((a, b) => a.position - b.position);
+        const compactedImages = sortedImages.map((img, index) => ({
+          ...img,
+          position: index
+        }));
+        setCurrentImages(compactedImages);
+        setMaxPosition(compactedImages.length);
+      } catch (reloadErr) {
+        console.error("Failed to reload chapter data:", reloadErr);
       }
     } finally {
       setIsLoading(false);
@@ -763,25 +789,31 @@ export default function EditChapter(props: Props){
       setNewImagesPreviews([]);
 
       setSuccess(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to update chapter:", err);
 
       // Hiển thị chi tiết lỗi từ API nếu có
-      if (err.response?.data?.errors) {
-        // Nếu lỗi là một object với nhiều trường
-        if (typeof err.response.data.errors === 'object' && !Array.isArray(err.response.data.errors)) {
-          const errorMessages = Object.entries(err.response.data.errors)
-            .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
-            .join('; ');
-          setError(`Lỗi: ${errorMessages}`);
-        }
-        // Nếu lỗi là một mảng
-        else if (Array.isArray(err.response.data.errors)) {
-          setError(`Lỗi: ${err.response.data.errors.join(', ')}`);
-        }
-        // Nếu lỗi là một string
-        else {
-          setError(`Lỗi: ${err.response.data.errors}`);
+      if (err && typeof err === 'object' && 'response' in err) {
+        const errorResponse = err as {response?: {data?: {errors?: unknown}}};
+        if (errorResponse.response?.data?.errors) {
+          // Nếu lỗi là một object với nhiều trường
+          if (typeof errorResponse.response.data.errors === 'object' && !Array.isArray(errorResponse.response.data.errors)) {
+            const errorObj = errorResponse.response.data.errors as Record<string, string | string[]>;
+            const errorMessages = Object.entries(errorObj)
+              .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
+              .join('; ');
+            setError(`Lỗi: ${errorMessages}`);
+          }
+          // Nếu lỗi là một mảng
+          else if (Array.isArray(errorResponse.response.data.errors)) {
+            setError(`Lỗi: ${(errorResponse.response.data.errors as string[]).join(', ')}`);
+          }
+          // Nếu lỗi là một string
+          else {
+            setError(`Lỗi: ${String(errorResponse.response.data.errors)}`);
+          }
+        } else {
+          setError("Cập nhật chapter thất bại. Vui lòng thử lại sau.");
         }
       } else {
         setError("Cập nhật chapter thất bại. Vui lòng thử lại sau.");

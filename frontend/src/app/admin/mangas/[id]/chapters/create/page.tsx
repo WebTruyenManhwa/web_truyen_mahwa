@@ -144,7 +144,7 @@ export default function CreateChapter(props: Props) {
         // Moving from external to uploaded
         const sourceExternalIndex = index - images.length;
         const sourceExternalImage = newExternalImages[sourceExternalIndex];
-        const targetImage = newImages[targetIndex];
+        // const targetImage = newImages[targetIndex];
 
         // Remove from source and add to target
         if (sourceExternalImage) {
@@ -445,25 +445,31 @@ export default function CreateChapter(props: Props) {
       setTimeout(() => {
         router.push(`/admin/mangas/${mangaId}`);
       }, 2000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to create chapter:", err);
 
       // Hiển thị chi tiết lỗi từ API nếu có
-      if (err.response?.data?.errors) {
-        // Nếu lỗi là một object với nhiều trường
-        if (typeof err.response.data.errors === 'object' && !Array.isArray(err.response.data.errors)) {
-          const errorMessages = Object.entries(err.response.data.errors)
-            .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
-            .join('; ');
-          setError(`Lỗi: ${errorMessages}`);
-        }
-        // Nếu lỗi là một mảng
-        else if (Array.isArray(err.response.data.errors)) {
-          setError(`Lỗi: ${err.response.data.errors.join(', ')}`);
-        }
-        // Nếu lỗi là một string
-        else {
-          setError(`Lỗi: ${err.response.data.errors}`);
+      if (err && typeof err === 'object' && 'response' in err) {
+        const errorResponse = err as {response?: {data?: {errors?: unknown}}};
+        if (errorResponse.response?.data?.errors) {
+          // Nếu lỗi là một object với nhiều trường
+          if (typeof errorResponse.response.data.errors === 'object' && !Array.isArray(errorResponse.response.data.errors)) {
+            const errorObj = errorResponse.response.data.errors as Record<string, string | string[]>;
+            const errorMessages = Object.entries(errorObj)
+              .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
+              .join('; ');
+            setError(`Lỗi: ${errorMessages}`);
+          }
+          // Nếu lỗi là một mảng
+          else if (Array.isArray(errorResponse.response.data.errors)) {
+            setError(`Lỗi: ${(errorResponse.response.data.errors as string[]).join(', ')}`);
+          }
+          // Nếu lỗi là một string
+          else {
+            setError(`Lỗi: ${String(errorResponse.response.data.errors)}`);
+          }
+        } else {
+          setError("Tạo chapter thất bại. Vui lòng thử lại sau.");
         }
       } else {
         setError("Tạo chapter thất bại. Vui lòng thử lại sau.");
