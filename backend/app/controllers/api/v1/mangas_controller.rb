@@ -308,7 +308,7 @@ module Api
 
           # Tạo hash với thông tin manga và lượt xem
           manga_data = manga.as_json(
-            only: [:id, :title, :slug, :view_count, :rating, :total_votes],
+            only: [:id, :title, :slug, :view_count, :rating, :total_votes, :cover_image],
             include: { genres: { only: [:id, :name] } }
           )
           manga_data['period_views'] = period_views
