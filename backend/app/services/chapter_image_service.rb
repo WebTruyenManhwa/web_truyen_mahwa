@@ -87,6 +87,40 @@ class ChapterImageService
     end
   end
 
+  # Xử lý thêm ảnh từ URL bên ngoài
+  def add_external_images(external_urls)
+    return if external_urls.blank?
+
+    # Đảm bảo có image collection
+    chapter.ensure_image_collection
+
+    current_images = chapter.images
+    new_images_data = []
+
+    # Tính vị trí bắt đầu cho ảnh mới
+    start_position = (current_images.map { |img| img['position'].to_i }.max || -1) + 1
+
+    Array(external_urls).each_with_index do |url, index|
+      next unless url.is_a?(String) && url =~ URI::regexp(%w[http https])
+
+      position = start_position + index
+      Rails.logger.debug "Adding external image at position #{position}: #{url}"
+
+      new_images_data << {
+        'image' => nil,
+        'position' => position,
+        'is_external' => true,
+        'external_url' => url
+      }
+    end
+
+    # Thêm ảnh mới vào collection nếu có
+    if new_images_data.present?
+      updated_images = current_images + new_images_data
+      chapter.chapter_image_collection.update(images: updated_images)
+    end
+  end
+
   private
 
   # Tạo dữ liệu cho một ảnh
@@ -102,11 +136,11 @@ class ChapterImageService
         Rails.logger.debug "File path: #{uploader.path}" if uploader.path.present?
 
       {
-          'image' => uploader.identifier,
-          'position' => position.to_i,
+        'image' => uploader.identifier,
+        'position' => position.to_i,
         'is_external' => false,
         'external_url' => nil,
-          'storage_path' => uploader.store_path
+        'storage_path' => uploader.store_path
       }
       else
         Rails.logger.error "Failed to upload file directly"

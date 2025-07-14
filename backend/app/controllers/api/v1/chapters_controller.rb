@@ -213,7 +213,8 @@ module Api
           image_positions_to_delete: [],
           image_positions: {},
           new_images: [],
-          new_image_positions: []
+          new_image_positions: [],
+          external_image_urls: []
         )
       end
     end

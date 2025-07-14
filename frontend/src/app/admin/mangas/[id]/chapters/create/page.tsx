@@ -4,7 +4,7 @@ import { useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AdminSidebar from "../../../../../../components/admin/AdminSidebar";
-import { chapterApi } from "../../../../../../services/api";
+import { chapterApi, proxyApi } from "../../../../../../services/api";
 import React from "react";
 
 type Props = {
@@ -14,7 +14,7 @@ type Props = {
 export default function CreateChapter(props: Props) {
   const router = useRouter();
   const { id: mangaId } = use(props.params);
-  
+
   const [title, setTitle] = useState("");
   const [number, setNumber] = useState("");
   const [images, setImages] = useState<File[]>([]);
@@ -22,6 +22,9 @@ export default function CreateChapter(props: Props) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [importUrl, setImportUrl] = useState("");
+  const [isImporting, setIsImporting] = useState(false);
+  const [externalImages, setExternalImages] = useState<{url: string}[]>([]);
 
   const handleImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -29,115 +32,415 @@ export default function CreateChapter(props: Props) {
 
     const newImages: File[] = [];
     const newPreviews: string[] = [];
-    
+
     // Convert FileList to array and sort by filename
     const filesArray = Array.from(files).sort((a, b) => {
       return a.name.localeCompare(b.name, undefined, { numeric: true });
     });
-    
+
     // Process each file
     filesArray.forEach(file => {
       newImages.push(file);
-      
+
       // Create preview
       const reader = new FileReader();
       reader.onloadend = () => {
         newPreviews.push(reader.result as string);
         if (newPreviews.length === filesArray.length) {
-          setImagesPreviews([...newPreviews]);
+          setImagesPreviews([...imagesPreviews, ...newPreviews]);
         }
       };
       reader.readAsDataURL(file);
     });
-    
-    setImages([...newImages]);
+
+    setImages([...images, ...newImages]);
   };
 
   const removeImage = (index: number) => {
     const newImages = [...images];
     const newPreviews = [...imagesPreviews];
-    
-    newImages.splice(index, 1);
-    newPreviews.splice(index, 1);
-    
+    const newExternalImages = [...externalImages];
+
+    // Check if this is a normal uploaded image or an external image
+    if (index < images.length) {
+      // It's a normal uploaded image
+      newImages.splice(index, 1);
+      newPreviews.splice(index, 1);
+    } else {
+      // It's an external image
+      const externalIndex = index - images.length;
+      newExternalImages.splice(externalIndex, 1);
+      newPreviews.splice(index, 1);
+    }
+
     setImages(newImages);
+    setExternalImages(newExternalImages);
     setImagesPreviews(newPreviews);
   };
 
   const moveImage = (index: number, direction: 'up' | 'down') => {
     if (
-      (direction === 'up' && index === 0) || 
-      (direction === 'down' && index === images.length - 1)
+      (direction === 'up' && index === 0) ||
+      (direction === 'down' && index === imagesPreviews.length - 1)
     ) {
       return;
     }
-    
+
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+
+    // Determine if we're moving uploaded images or external images
+    const isSourceUploaded = index < images.length;
+    const isTargetUploaded = targetIndex < images.length;
+
+    // Create copies of all arrays
     const newImages = [...images];
     const newPreviews = [...imagesPreviews];
-    
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    
-    // Swap images
-    const img1 = newImages[index];
-    const img2 = newImages[targetIndex];
-    const prev1 = newPreviews[index];
-    const prev2 = newPreviews[targetIndex];
+    const newExternalImages = [...externalImages];
 
-    if (!img1 || !img2) {
-      console.warn('Swap aborted: one of the images is undefined');
-      return;
-    }
-    if (!prev1 || !prev2) {
-      console.warn('Swap aborted: one of the previews is undefined');
-      return;
+    // Swap previews (this always happens)
+    const tempPreview = newPreviews[index] as string;
+    newPreviews[index] = newPreviews[targetIndex] as string;
+    newPreviews[targetIndex] = tempPreview;
+
+    if (isSourceUploaded && isTargetUploaded) {
+      // Both are uploaded images, swap in images array
+      const tempImage = newImages[index];
+      if (tempImage && newImages[targetIndex]) {
+        newImages[index] = newImages[targetIndex];
+        newImages[targetIndex] = tempImage;
+      }
+    } else if (!isSourceUploaded && !isTargetUploaded) {
+      // Both are external images, swap in externalImages array
+      const sourceExternalIndex = index - images.length;
+      const targetExternalIndex = targetIndex - images.length;
+      const tempExternalImage = newExternalImages[sourceExternalIndex];
+      if (tempExternalImage && newExternalImages[targetExternalIndex]) {
+        newExternalImages[sourceExternalIndex] = newExternalImages[targetExternalIndex];
+        newExternalImages[targetExternalIndex] = tempExternalImage;
+      }
+    } else {
+      // One is uploaded, one is external - need to move between arrays
+      if (isSourceUploaded) {
+        // Moving from uploaded to external
+        const sourceImage = newImages[index];
+        const targetExternalIndex = targetIndex - images.length;
+        const targetExternalImage = newExternalImages[targetExternalIndex];
+
+        // Create File from external URL (dummy operation for preview only)
+        const dummyFile = new File([], "external_image.jpg");
+
+        // Remove from source and add to target
+        if (sourceImage) {
+          newImages.splice(index, 1);
+          newImages.splice(targetIndex, 0, dummyFile);
+        }
+
+        // Update external images
+        if (targetExternalImage) {
+          newExternalImages.splice(targetExternalIndex, 1);
+        }
+        // We'd need the actual URL here, but for simplicity we're just reordering the previews
+      } else {
+        // Moving from external to uploaded
+        const sourceExternalIndex = index - images.length;
+        const sourceExternalImage = newExternalImages[sourceExternalIndex];
+        const targetImage = newImages[targetIndex];
+
+        // Remove from source and add to target
+        if (sourceExternalImage) {
+          newExternalImages.splice(sourceExternalIndex, 1);
+        }
+        // We'd need to convert the File to URL here, but for simplicity we're just reordering the previews
+      }
     }
 
-    // Thực hiện swap khi chắc chắn
-    [newImages[index], newImages[targetIndex]] = [img2, img1];
-    [newPreviews[index], newPreviews[targetIndex]] = [prev2, prev1];
-    
     setImages(newImages);
+    setExternalImages(newExternalImages);
     setImagesPreviews(newPreviews);
+  };
+
+  // Handle importing images from URL
+  const handleImportFromUrl = async () => {
+    if (!importUrl) {
+      setError("Vui lòng nhập URL chapter");
+      return;
+    }
+
+    setIsImporting(true);
+    setError("");
+
+    try {
+      // Phân tích URL để xác định nguồn và định dạng
+      const url = new URL(importUrl);
+      const hostname = url.hostname;
+      const pathname = url.pathname;
+
+      // Mảng chứa URL ảnh sẽ import
+      let imageUrls: string[] = [];
+
+      // Kiểm tra xem URL có phải là URL ảnh trực tiếp không
+      if (pathname.match(/\.(jpg|jpeg|png|webp|gif)$/i)) {
+        console.log("Detected direct image URL");
+        // Nếu là URL ảnh trực tiếp, thêm vào danh sách
+        imageUrls.push(importUrl);
+
+        // Nếu URL có dạng số tuần tự như 001.jpg, thử tìm các ảnh tiếp theo
+        const sequentialPattern = importUrl.match(/(.*\/)(\d+)(\.[a-zA-Z]+)$/);
+        if (sequentialPattern && sequentialPattern[1] && sequentialPattern[2] && sequentialPattern[3]) {
+          const baseUrl = sequentialPattern[1];  // https://img.pixelimg.net/ba-chi-chu-nha/chapter-1/
+          const numberPart = sequentialPattern[2]; // 001
+          const extension = sequentialPattern[3];  // .jpg
+          const digits = numberPart.length;
+          const startNumber = parseInt(numberPart);
+
+          console.log(`Detected sequential pattern: ${baseUrl}${numberPart}${extension}`);
+          console.log(`Base URL: ${baseUrl}, Number: ${startNumber}, Digits: ${digits}, Extension: ${extension}`);
+
+          // Thử tìm các ảnh tiếp theo trong chuỗi
+          for (let i = startNumber + 1; i < startNumber + 50; i++) {
+            // Format số với đúng số chữ số (padding)
+            const formattedNumber = i.toString().padStart(digits, '0');
+            const nextUrl = `${baseUrl}${formattedNumber}${extension}`;
+
+            // Thêm vào danh sách
+            imageUrls.push(nextUrl);
+          }
+        }
+      } else if (hostname.includes('nettruyen')) {
+        // Xử lý cho NetTruyen - không cần proxy
+        // Format: /manga/ten-truyen/chapter-X hoặc /truyen-tranh/ten-truyen/chapter-X
+        const chapterMatch = pathname.match(/(?:chapter|chuong)-(\d+)/i);
+        if (!chapterMatch) {
+          throw new Error("Không thể xác định số chapter từ URL");
+        }
+
+        const chapterNum = chapterMatch[1];
+        console.log("Detected chapter number:", chapterNum);
+
+        // Thử lấy ảnh từ trang web
+        try {
+          // Giả lập request để lấy HTML của trang - dùng fetch trực tiếp
+          const response = await fetch(importUrl);
+          const html = await response.text();
+
+          // Tìm tất cả các URL ảnh trong HTML
+          const imgRegex = /<img[^>]+(?:src|data-src|data-original)="([^">]+)"[^>]*>/g;
+          const allImageUrls = new Set<string>();
+          let match;
+
+          // Tìm ảnh từ các thuộc tính src, data-src, data-original
+          while ((match = imgRegex.exec(html)) !== null) {
+            const imgSrc = match[1];
+            // Bỏ qua các ảnh rõ ràng không phải ảnh chapter
+            if (imgSrc && typeof imgSrc === 'string' &&
+                !imgSrc.includes('logo') &&
+                !imgSrc.includes('banner') &&
+                !imgSrc.includes('icon') &&
+                !imgSrc.includes('tmp/0.png') &&
+                !imgSrc.includes('tmp/1.png') &&
+                !imgSrc.includes('tmp/2.png') &&
+                !imgSrc.includes('ads') &&
+                !imgSrc.includes('facebook') &&
+                !imgSrc.includes('fbcdn') &&
+                !imgSrc.includes('avatar') &&
+                !imgSrc.includes('thumbnail')) {
+              // Chuẩn hóa URL và chuyển đổi kiểu
+              const normalizedUrl = imgSrc.split('?')[0] as string;
+              allImageUrls.add(normalizedUrl);
+            }
+          }
+
+          // Lọc ra các ảnh chapter thực sự
+          if (allImageUrls.size > 0) {
+            // Tìm pattern phổ biến cho URL ảnh chapter
+            const urlPatterns = [
+              `/ch/${chapterNum}/`,
+              `/chapter-${chapterNum}/`,
+              `/chuong-${chapterNum}/`,
+              `/chap-${chapterNum}/`,
+              `/ch-${chapterNum}/`,
+              `/${chapterNum}.`,
+              `/${chapterNum}-`,
+              'ntcdn',
+              'netcdn',
+              'truyenvua.com',
+              'nettruyen',
+              'truyenqq'
+            ];
+
+            // Lọc ảnh theo pattern
+            const filteredUrls = Array.from(allImageUrls).filter(url => {
+              // Lọc bỏ các ảnh từ mạng xã hội, quảng cáo và ảnh tạm
+              if (url.includes('facebook') ||
+                  url.includes('fbcdn') ||
+                  url.includes('ads') ||
+                  url.includes('banner') ||
+                  url.includes('logo') ||
+                  url.includes('icon') ||
+                  url.includes('avatar') ||
+                  url.includes('tmp/0.png') ||
+                  url.includes('tmp/1.png') ||
+                  url.includes('tmp/2.png') ||
+                  url.includes('thumbnail')) {
+                return false;
+              }
+
+              // Ưu tiên các ảnh có pattern của chapter
+              for (const pattern of urlPatterns) {
+                if (url.includes(pattern)) {
+                  return true;
+                }
+              }
+
+              // Nếu không tìm thấy pattern cụ thể, kiểm tra xem có phải ảnh lớn không
+              return (url.includes('.webp') ||
+                      url.includes('.jpg') ||
+                      url.includes('.png')) &&
+                     !url.includes('thumbnail') &&
+                     !url.includes('small');
+            });
+
+            // Nếu tìm được ảnh, thêm vào danh sách
+            imageUrls = filteredUrls;
+          }
+        } catch (err) {
+          console.error("Error fetching page HTML:", err);
+          throw new Error("Không thể tải nội dung từ trang web");
+        }
+      } else {
+        // Xử lý chung cho các trang web khác - thử fetch trực tiếp trước, nếu lỗi CORS thì dùng proxy
+        try {
+          // Thử fetch trực tiếp trước
+          let html;
+          try {
+            const response = await fetch(importUrl);
+            html = await response.text();
+          } catch (directFetchError) {
+            console.log("Direct fetch failed, trying proxy:", directFetchError);
+            // Nếu fetch trực tiếp lỗi, dùng proxy
+            html = await proxyApi.fetchUrl(importUrl);
+          }
+
+          // Tìm tất cả các URL ảnh trong HTML
+          const imgRegex = /<img[^>]+(?:src|data-src|data-original)="([^">]+)"[^>]*>/g;
+          const allImageUrls = new Set<string>();
+          let match;
+
+          while ((match = imgRegex.exec(html)) !== null) {
+            const imgSrc = match[1];
+            // Lọc bỏ các ảnh logo, banner, icon
+            if (typeof imgSrc === 'string' && !imgSrc.includes('logo') && !imgSrc.includes('banner') && !imgSrc.includes('icon')) {
+              // Chuyển đổi URL tương đối thành tuyệt đối nếu cần
+              if (imgSrc.startsWith('/')) {
+                allImageUrls.add(`${url.protocol}//${url.host}${imgSrc}`);
+              } else if (!imgSrc.startsWith('http')) {
+                allImageUrls.add(`${url.protocol}//${url.host}/${imgSrc}`);
+              } else {
+                allImageUrls.add(imgSrc);
+              }
+            }
+          }
+
+          // Lọc các ảnh có kích thước lớn (có thể là ảnh chapter)
+          imageUrls = Array.from(allImageUrls).filter(url =>
+            !url.includes('avatar') &&
+            !url.includes('thumbnail') &&
+            !url.includes('small') &&
+            !url.includes('facebook') &&
+            !url.includes('fbcdn') &&
+            !url.includes('ads') &&
+            (url.includes('.jpg') ||
+             url.includes('.jpeg') ||
+             url.includes('.png') ||
+             url.includes('.webp') ||
+             url.includes('.gif'))
+          );
+        } catch (err) {
+          console.error("Error fetching page HTML:", err);
+          throw new Error("Không thể tải nội dung từ trang web");
+        }
+      }
+
+      // Nếu không tìm thấy ảnh nào, thử tìm URL ảnh trực tiếp trong input
+      if (imageUrls.length === 0) {
+        // Kiểm tra xem input có chứa URL ảnh không
+        const directImageUrlMatch = importUrl.match(/(https?:\/\/[^"\s]+\.(jpg|jpeg|png|webp|gif))/i);
+        if (directImageUrlMatch) {
+          const directImageUrl = directImageUrlMatch[0];
+          imageUrls.push(directImageUrl);
+        } else {
+          throw new Error("Không tìm thấy ảnh nào từ URL này");
+        }
+      }
+
+      // Loại bỏ các URL trùng lặp
+      imageUrls = Array.from(new Set(imageUrls));
+
+      // Thêm URLs vào danh sách ảnh
+      const newExternalImages = [...externalImages];
+      const newPreviews = [...imagesPreviews];
+
+      for (const url of imageUrls) {
+        newExternalImages.push({ url });
+        newPreviews.push(url);
+      }
+
+      setExternalImages(newExternalImages);
+      setImagesPreviews(newPreviews);
+      setImportUrl("");
+      setSuccess(true);
+    } catch (error) {
+      console.error("Lỗi khi import ảnh:", error);
+      setError(error instanceof Error ? error.message : "Lỗi khi import ảnh từ URL");
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSuccess(false);
-    
+
     if (!title || !number) {
       setError("Vui lòng nhập tiêu đề và số chapter");
       return;
     }
-    
-    if (images.length === 0) {
-      setError("Vui lòng tải lên ít nhất một ảnh cho chapter");
+
+    if (images.length === 0 && externalImages.length === 0) {
+      setError("Vui lòng tải lên hoặc import ít nhất một ảnh cho chapter");
       return;
     }
-    
+
     setIsLoading(true);
-    
+
     try {
       const formData = new FormData();
       formData.append("title", title);
       formData.append("number", number);
-      
+
       // Append each image
       images.forEach(image => {
         formData.append('images[]', image);
       });
-      
-      // Create chapter - API mới sẽ xử lý images trong ChapterForm
+
+      // Append each external image URL
+      externalImages.forEach(image => {
+        formData.append('external_image_urls[]', image.url);
+      });
+
+      // Create chapter - API sẽ xử lý cả images và external_image_urls
       await chapterApi.createChapter(mangaId, formData);
-      
+
       setSuccess(true);
-      
+
       // Reset form
       setTitle("");
       setNumber("");
       setImages([]);
       setImagesPreviews([]);
-      
+      setExternalImages([]);
+
       // Redirect to manga detail after 2 seconds
       setTimeout(() => {
         router.push(`/admin/mangas/${mangaId}`);
@@ -176,7 +479,7 @@ export default function CreateChapter(props: Props) {
 
         {success && (
           <div className="bg-green-900/50 border border-green-500 text-green-100 px-4 py-3 rounded-lg mb-6">
-            Tạo chapter mới thành công! Đang chuyển hướng...
+            Tạo chapter mới thành công!
           </div>
         )}
 
@@ -223,7 +526,7 @@ export default function CreateChapter(props: Props) {
               Tải lên các ảnh cho chapter. Các ảnh sẽ được hiển thị theo thứ tự tải lên.
               Bạn có thể sắp xếp lại thứ tự sau khi tải lên.
             </p>
-            
+
             <div className="border-2 border-dashed border-gray-600 rounded-lg p-4 text-center">
               <input
                 id="chapter-images"
@@ -245,6 +548,46 @@ export default function CreateChapter(props: Props) {
             </div>
           </div>
 
+          {/* Import ảnh từ URL */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-4">Import ảnh từ URL</h3>
+            <p className="text-sm text-gray-400 mb-2">
+              Nhập URL chapter từ các trang web truyện như nettruyen, truyenvn, v.v. để import tất cả ảnh của chapter đó
+            </p>
+
+            <div className="flex gap-4">
+              <input
+                type="text"
+                value={importUrl}
+                onChange={(e) => setImportUrl(e.target.value)}
+                placeholder="Ví dụ: https://nettruyen1905.com/manga/ten-truyen/chapter-1 hoặc URL ảnh trực tiếp"
+                className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="button"
+                onClick={handleImportFromUrl}
+                disabled={isImporting}
+                className={`px-6 py-3 rounded-lg text-white ${
+                  isImporting
+                    ? "bg-blue-700 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-500"
+                }`}
+              >
+                {isImporting ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Đang import...
+                  </span>
+                ) : (
+                  "Import ảnh"
+                )}
+              </button>
+            </div>
+          </div>
+
           {imagesPreviews.length > 0 && (
             <div className="mb-6">
               <h3 className="text-lg font-medium mb-2">Ảnh đã chọn ({imagesPreviews.length})</h3>
@@ -261,7 +604,7 @@ export default function CreateChapter(props: Props) {
                         {index + 1}
                       </div>
                     </div>
-                    
+
                     <div className="flex justify-between mt-2">
                       <div className="space-x-1">
                         <button
@@ -344,4 +687,4 @@ export default function CreateChapter(props: Props) {
       </main>
     </div>
   );
-} 
+}

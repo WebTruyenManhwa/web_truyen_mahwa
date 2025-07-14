@@ -53,6 +53,9 @@ Rails.application.routes.draw do
       # Add route for updating chapters with manga_id
       put 'mangas/:manga_id/chapters/:id', to: 'chapters#update'
 
+      # Add route for deleting chapters with manga_id
+      delete 'mangas/:manga_id/chapters/:id', to: 'chapters#destroy'
+
       # Add routes for chapter comments with manga_id
       get 'mangas/:manga_id/chapters/:chapter_id/comments', to: 'chapters/comments#index'
       post 'mangas/:manga_id/chapters/:chapter_id/comments', to: 'chapters/comments#create'
