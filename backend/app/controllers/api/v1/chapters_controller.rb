@@ -29,7 +29,11 @@ module Api
       end
 
       def update
-        form = ChapterForm.new(chapter_form_params.merge(manga_id: @chapter.manga_id, id: @chapter.id))
+        # Loại bỏ manga_id từ params để tránh lỗi Unpermitted parameter
+        update_params = chapter_form_params
+        update_params = update_params.except(:manga_id) if update_params[:manga_id].present?
+
+        form = ChapterForm.new(update_params.merge(manga_id: @chapter.manga_id, id: @chapter.id))
         chapter = form.save
 
         if chapter

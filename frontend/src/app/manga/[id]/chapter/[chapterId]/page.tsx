@@ -511,7 +511,7 @@ export default function ChapterReader() {
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 >
                   <span className="truncate">
-                    Chapter {chapter.number} - {chapter.title}
+                    Chapter {chapter.number}
                   </span>
                   <svg
                     className={`w-4 h-4 ml-2 transition-transform ${isDropdownOpen ? 'transform rotate-180' : ''}`}
@@ -535,7 +535,7 @@ export default function ChapterReader() {
                           }`}
                           onClick={() => setIsDropdownOpen(false)}
                         >
-                          <span className="truncate block">Chapter {chap.number} - {chap.title}</span>
+                          <span className="truncate block">Chapter {chap.number}</span>
                         </Link>
                       ))}
                     </div>

@@ -4,7 +4,6 @@ class ChapterForm
   attr_accessor :id, :title, :number, :manga_id, :images, :image_positions_to_delete,
                 :image_positions, :new_images, :new_image_positions, :external_image_urls
 
-  validates :title, presence: true
   validates :number, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :manga_id, presence: true
 
@@ -34,8 +33,15 @@ class ChapterForm
         raise ActiveRecord::Rollback
       end
 
-      chapter.title = title
-      chapter.number = number
+      # Nếu đang cập nhật và title trống, giữ nguyên title cũ
+      if !chapter.new_record? && title.blank?
+        chapter.number = number
+        chapter.title = ""
+      else
+        chapter.title = title
+        chapter.number = number
+      end
+
       chapter.save!
 
       # Xử lý ảnh

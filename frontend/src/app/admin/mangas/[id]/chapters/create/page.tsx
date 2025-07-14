@@ -402,8 +402,8 @@ export default function CreateChapter(props: Props) {
     setError("");
     setSuccess(false);
 
-    if (!title || !number) {
-      setError("Vui lòng nhập tiêu đề và số chapter");
+    if (!number) {
+      setError("Vui lòng nhập số chapter");
       return;
     }
 
@@ -445,9 +445,29 @@ export default function CreateChapter(props: Props) {
       setTimeout(() => {
         router.push(`/admin/mangas/${mangaId}`);
       }, 2000);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to create chapter:", err);
-      setError("Tạo chapter thất bại. Vui lòng thử lại sau.");
+
+      // Hiển thị chi tiết lỗi từ API nếu có
+      if (err.response?.data?.errors) {
+        // Nếu lỗi là một object với nhiều trường
+        if (typeof err.response.data.errors === 'object' && !Array.isArray(err.response.data.errors)) {
+          const errorMessages = Object.entries(err.response.data.errors)
+            .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
+            .join('; ');
+          setError(`Lỗi: ${errorMessages}`);
+        }
+        // Nếu lỗi là một mảng
+        else if (Array.isArray(err.response.data.errors)) {
+          setError(`Lỗi: ${err.response.data.errors.join(', ')}`);
+        }
+        // Nếu lỗi là một string
+        else {
+          setError(`Lỗi: ${err.response.data.errors}`);
+        }
+      } else {
+        setError("Tạo chapter thất bại. Vui lòng thử lại sau.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -487,7 +507,7 @@ export default function CreateChapter(props: Props) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <label htmlFor="title" className="block text-sm font-medium mb-2">
-                Tiêu đề <span className="text-red-500">*</span>
+                Tiêu đề
               </label>
               <input
                 id="title"
@@ -496,7 +516,6 @@ export default function CreateChapter(props: Props) {
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Nhập tiêu đề chapter"
-                required
               />
             </div>
 
