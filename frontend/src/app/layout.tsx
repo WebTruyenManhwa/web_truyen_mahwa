@@ -21,7 +21,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="vi" suppressHydrationWarning>
+    <html lang="vi">
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <link rel="icon" href="/favicon.ico" />
@@ -39,6 +39,7 @@ export default function RootLayout({
                   (e.ctrlKey && e.shiftKey && e.key === 'J') ||
                   (e.ctrlKey && e.key === 'U')) {
                 e.preventDefault();
+                alert('Tính năng này đã bị vô hiệu hóa');
                 return false;
               }
             });
@@ -116,11 +117,10 @@ export default function RootLayout({
             // Kiểm tra định kỳ
             setInterval(detectDevToolsBySize, 1000);
             setInterval(detectDevToolsByDebug, 2000);
-          ` }}
-        />
+          ` }}></script>
         )}
       </head>
-      <body className={`${inter.variable} ${nunito.variable} font-sans min-h-screen flex flex-col`}>
+      <body className={`${inter.className} bg-gray-900 text-white min-h-screen flex flex-col`}>
         <AuthProvider>
           <ThemeProvider>
             <Header />
