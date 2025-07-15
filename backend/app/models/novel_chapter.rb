@@ -8,10 +8,44 @@ class NovelChapter < ApplicationRecord
 
   before_validation :generate_slug, if: -> { slug.blank? && title.present? }
   before_validation :set_chapter_number, if: -> { chapter_number.nil? }
+  before_save :render_markdown_to_html
 
   default_scope { order(chapter_number: :asc) }
 
   private
+
+  def render_markdown_to_html
+    return unless content_changed? || rendered_html.blank?
+
+    begin
+      renderer = Redcarpet::Render::HTML.new(
+        hard_wrap: true,
+        filter_html: false,
+        no_images: false,
+        no_links: false,
+        no_styles: false,
+        safe_links_only: true
+      )
+
+      markdown = Redcarpet::Markdown.new(renderer,
+        autolink: true,
+        tables: true,
+        fenced_code_blocks: true,
+        strikethrough: true,
+        superscript: true,
+        underline: true,
+        highlight: true,
+        quote: true,
+        footnotes: true
+      )
+
+      self.rendered_html = markdown.render(content.to_s)
+    rescue => e
+      Rails.logger.error("Markdown rendering error: #{e.message}")
+      # Fallback to plain text if rendering fails
+      self.rendered_html = content.to_s
+    end
+  end
 
   def generate_slug
     base_slug = title.parameterize

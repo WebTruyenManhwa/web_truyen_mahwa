@@ -31,7 +31,9 @@ module Api
         @next_chapter = @novel_series.novel_chapters.where('chapter_number > ?', @novel_chapter.chapter_number).order(chapter_number: :asc).first
 
         render json: {
-          novel_chapter: @novel_chapter.as_json(only: [:id, :title, :content, :chapter_number, :slug, :created_at, :updated_at]),
+          novel_chapter: @novel_chapter.as_json(only: [:id, :title, :content, :chapter_number, :slug, :created_at, :updated_at]).merge(
+            rendered_html: @novel_chapter.rendered_html
+          ),
           novel_series: @novel_series.as_json(only: [:id, :title, :slug]),
           navigation: {
             prev_chapter: @prev_chapter&.as_json(only: [:id, :title, :chapter_number, :slug]),
