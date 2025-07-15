@@ -406,6 +406,7 @@ GEM
     rdoc (6.14.1)
       erb
       psych (>= 4.0.0)
+    redcarpet (3.6.1)
     redis (5.4.0)
       redis-client (>= 0.22.0)
     redis-client (0.25.0)
@@ -586,6 +587,7 @@ DEPENDENCIES
   rack-cors
   rails (~> 8.0.2)
   ransack
+  redcarpet (~> 3.6.0)
   redis (>= 4.0.1)
   rspec-rails
   rubocop
