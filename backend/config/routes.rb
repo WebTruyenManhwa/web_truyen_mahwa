@@ -23,6 +23,11 @@ Rails.application.routes.draw do
       # Admin routes
       namespace :admin do
         get 'dashboard/stats', to: 'dashboard#stats'
+
+        # Admin routes for novel series
+        resources :novel_series do
+          resources :novel_chapters, shallow: true
+        end
       end
 
       # Proxy route for fetching external content
@@ -45,6 +50,11 @@ Rails.application.routes.draw do
 
         # Add route for getting user's rating for a manga
         get 'ratings/user', to: 'mangas/ratings#show_user_rating'
+      end
+
+      # Novel series routes
+      resources :novel_series, only: [:index, :show] do
+        resources :novel_chapters, only: [:index, :show]
       end
 
       # Add a specific route for getting chapters with manga_id

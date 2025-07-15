@@ -508,6 +508,9 @@ export default function Header() {
           <Link href="/completed" className={`${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-700 hover:text-red-500'} font-medium`}>
             Hoàn thành
           </Link>
+          <Link href="/novel-series" className="text-gray-300 hover:text-red-500 font-medium">
+                  Truyện chữ
+          </Link>
           {renderCategoryDropdown()}
         </nav>
       </div>
