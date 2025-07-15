@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import AdminLayout from "../../../../../../components/admin/AdminLayout";
 import { useAuth } from "../../../../../../hooks/useAuth";
 import Link from "next/link";
@@ -11,6 +11,12 @@ interface NovelSeries {
   id: number;
   title: string;
   slug: string;
+}
+
+interface ApiErrorResponse {
+  errors?: string[];
+  error?: string;
+  message?: string;
 }
 
 export default function CreateNovelChapterPage() {
@@ -76,7 +82,7 @@ export default function CreateNovelChapterPage() {
     setError("");
 
     try {
-      const response = await axios.post(
+      await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/v1/admin/novel_series/${seriesSlug}/novel_chapters`,
         { novel_chapter: formData },
         {
@@ -87,10 +93,13 @@ export default function CreateNovelChapterPage() {
       );
 
       router.push(`/admin/novel-series/${seriesSlug}/chapters`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error creating novel chapter:", err);
+      const axiosError = err as AxiosError<ApiErrorResponse>;
       setError(
-        err.response?.data?.errors?.join(", ") ||
+        axiosError.response?.data?.errors?.join(", ") ||
+        axiosError.response?.data?.error ||
+        axiosError.response?.data?.message ||
         "Có lỗi xảy ra khi tạo chương truyện mới."
       );
     } finally {

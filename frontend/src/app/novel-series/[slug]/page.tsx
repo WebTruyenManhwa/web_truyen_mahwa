@@ -195,13 +195,13 @@ export default function NovelSeriesDetailPage() {
               {chapters.length > 0 && (
                 <div className="mt-6 flex flex-col sm:flex-row gap-3">
                   <Link
-                    href={`/novel-series/${novel.slug}/${chapters[0].slug || chapters[0].id}`}
+                    href={`/novel-series/${novel.slug}/${chapters[0]?.slug ?? chapters[0]?.id}`}
                     className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white text-center rounded-lg hover:bg-blue-700 transition-colors"
                   >
                     Đọc từ đầu
                   </Link>
                   <Link
-                    href={`/novel-series/${novel.slug}/${chapters[chapters.length - 1].slug || chapters[chapters.length - 1].id}`}
+                    href={`/novel-series/${novel.slug}/${chapters[chapters.length - 1]?.slug ?? chapters[chapters.length - 1]?.id}`}
                     className="w-full sm:w-auto px-6 py-3 bg-gray-700 text-white text-center rounded-lg hover:bg-gray-600 transition-colors"
                   >
                     Đọc chương mới nhất
@@ -225,7 +225,7 @@ export default function NovelSeriesDetailPage() {
               {chapters.map((chapter) => (
                 <Link
                   key={chapter.id}
-                  href={`/novel-series/${novel.slug}/${chapter.slug || chapter.id}`}
+                  href={`/novel-series/${novel.slug}/${chapter?.slug ?? chapter.id}`}
                   className={`p-3 ${
                     theme === 'dark'
                       ? 'bg-gray-700 hover:bg-gray-600'

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import AdminLayout from "../../../../../components/admin/AdminLayout";
 import { useAuth } from "../../../../../hooks/useAuth";
 import Link from "next/link";
@@ -15,6 +15,12 @@ interface NovelSeries {
   cover_image: string;
   status: string;
   slug: string;
+}
+
+interface ApiErrorResponse {
+  errors?: string[];
+  error?: string;
+  message?: string;
 }
 
 export default function EditNovelSeriesPage() {
@@ -82,7 +88,7 @@ export default function EditNovelSeriesPage() {
     setError("");
 
     try {
-      const response = await axios.put(
+      await axios.put(
         `${process.env.NEXT_PUBLIC_API_URL}/v1/admin/novel_series/${slug}`,
         { novel_series: formData },
         {
@@ -93,10 +99,13 @@ export default function EditNovelSeriesPage() {
       );
 
       router.push(`/admin/novel-series`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error updating novel series:", err);
+      const axiosError = err as AxiosError<ApiErrorResponse>;
       setError(
-        err.response?.data?.errors?.join(", ") ||
+        axiosError.response?.data?.errors?.join(", ") ||
+        axiosError.response?.data?.error ||
+        axiosError.response?.data?.message ||
         "Có lỗi xảy ra khi cập nhật truyện chữ."
       );
     } finally {

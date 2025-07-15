@@ -2,10 +2,16 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import AdminLayout from "../../../../components/admin/AdminLayout";
 import { useAuth } from "../../../../hooks/useAuth";
 import Link from "next/link";
+
+interface ApiErrorResponse {
+  errors?: string[];
+  error?: string;
+  message?: string;
+}
 
 export default function CreateNovelSeriesPage() {
   const router = useRouter();
@@ -54,10 +60,13 @@ export default function CreateNovelSeriesPage() {
       );
 
       router.push(`/admin/novel-series/${response.data.novel_series.slug}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error creating novel series:", err);
+      const axiosError = err as AxiosError<ApiErrorResponse>;
       setError(
-        err.response?.data?.errors?.join(", ") ||
+        axiosError.response?.data?.errors?.join(", ") ||
+        axiosError.response?.data?.error ||
+        axiosError.response?.data?.message ||
         "Có lỗi xảy ra khi tạo truyện chữ mới."
       );
     } finally {

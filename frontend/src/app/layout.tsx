@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Nunito_Sans } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -8,7 +8,7 @@ import { ThemeProvider } from "../hooks/useTheme";
 import React from "react";
 
 const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
-const nunito = Nunito_Sans({ subsets: ["latin"], variable: '--font-nunito' });
+// const nunito = Nunito_Sans({ subsets: ["latin"], variable: '--font-nunito' });
 
 export const metadata: Metadata = {
   title: "MangaVerse - Đọc truyện manga online",
@@ -39,7 +39,6 @@ export default function RootLayout({
                   (e.ctrlKey && e.shiftKey && e.key === 'J') ||
                   (e.ctrlKey && e.key === 'U')) {
                 e.preventDefault();
-                alert('Tính năng này đã bị vô hiệu hóa');
                 return false;
               }
             });

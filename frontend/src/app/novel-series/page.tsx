@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import axios from "axios";
@@ -32,7 +32,7 @@ interface ApiResponse {
   };
 }
 
-export default function NovelSeriesPage() {
+function NovelSeriesContent() {
   const { theme } = useTheme();
   const searchParams = useSearchParams();
   const [novels, setNovels] = useState<NovelSeries[]>([]);
@@ -380,5 +380,24 @@ export default function NovelSeriesPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Loading fallback for Suspense
+function LoadingFallback() {
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    </div>
+  );
+}
+
+export default function NovelSeriesPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <NovelSeriesContent />
+    </Suspense>
   );
 }
