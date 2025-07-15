@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import axios from "axios";
 import { useParams } from "next/navigation";
+import React from "react";
 
 interface NovelSeries {
   id: number;
@@ -89,11 +90,11 @@ export default function NovelChapterPage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Phím mũi tên trái: chương trước
       if (e.key === "ArrowLeft" && prevChapter) {
-        window.location.href = `/novel-series/${seriesSlug}/${prevChapter.slug}`;
+        window.location.href = `/novel-series/${seriesSlug}/${prevChapter.slug || prevChapter.id}`;
       }
       // Phím mũi tên phải: chương tiếp theo
       else if (e.key === "ArrowRight" && nextChapter) {
-        window.location.href = `/novel-series/${seriesSlug}/${nextChapter.slug}`;
+        window.location.href = `/novel-series/${seriesSlug}/${nextChapter.slug || nextChapter.id}`;
       }
       // Phím Escape: quay lại trang chi tiết truyện
       else if (e.key === "Escape") {
@@ -171,15 +172,15 @@ export default function NovelChapterPage() {
                 </svg>
                 <span className="hidden md:inline">Quay lại</span>
               </Link>
-              <h1 className="text-lg font-medium truncate">
+              <h1 className="text-lg font-medium truncate max-w-[200px] md:max-w-none">
                 <span className="hidden md:inline">{series.title} - </span>
-                Chương {chapter.chapter_number}: {chapter.title}
+                <span>Chương {chapter.chapter_number}</span>
               </h1>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="hidden md:flex items-center space-x-2">
               {prevChapter && (
                 <Link
-                  href={`/novel-series/${seriesSlug}/${prevChapter.slug}`}
+                  href={`/novel-series/${seriesSlug}/${prevChapter.slug || prevChapter.id}`}
                   className="px-3 py-1 bg-gray-700 text-white rounded-lg hover:bg-gray-600 flex items-center"
                 >
                   <svg
@@ -194,15 +195,15 @@ export default function NovelChapterPage() {
                       clipRule="evenodd"
                     />
                   </svg>
-                  <span className="hidden md:inline ml-1">Chương trước</span>
+                  <span className="ml-1">Chương trước</span>
                 </Link>
               )}
               {nextChapter && (
                 <Link
-                  href={`/novel-series/${seriesSlug}/${nextChapter.slug}`}
+                  href={`/novel-series/${seriesSlug}/${nextChapter.slug || nextChapter.id}`}
                   className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
                 >
-                  <span className="hidden md:inline mr-1">Chương sau</span>
+                  <span className="mr-1">Chương sau</span>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-5 w-5"
@@ -223,7 +224,7 @@ export default function NovelChapterPage() {
       </div>
 
       {/* Chapter content */}
-      <div className="container mx-auto px-4 pt-24 pb-20">
+      <div className="container mx-auto px-4 pt-24 pb-32 md:pb-20">
         <div className="bg-gray-800 rounded-lg p-6 md:p-8">
           <h1 className="text-2xl md:text-3xl font-bold mb-2 text-center">
             Chương {chapter.chapter_number}: {chapter.title}
@@ -239,10 +240,10 @@ export default function NovelChapterPage() {
           ></div>
         </div>
 
-        <div className="mt-8 flex justify-between items-center">
+        <div className="mt-8 hidden md:flex justify-between items-center">
           {prevChapter ? (
             <Link
-              href={`/novel-series/${seriesSlug}/${prevChapter.slug}`}
+              href={`/novel-series/${seriesSlug}/${prevChapter.slug || prevChapter.id}`}
               className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 flex items-center"
             >
               <svg
@@ -272,7 +273,7 @@ export default function NovelChapterPage() {
 
           {nextChapter ? (
             <Link
-              href={`/novel-series/${seriesSlug}/${nextChapter.slug}`}
+              href={`/novel-series/${seriesSlug}/${nextChapter.slug || nextChapter.id}`}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
             >
               Chương sau
@@ -298,6 +299,34 @@ export default function NovelChapterPage() {
       {/* Reading tips */}
       <div className="fixed bottom-0 left-0 right-0 bg-gray-800 py-2 px-4 text-center text-xs text-gray-400">
         <p>Phím mũi tên trái/phải để chuyển chương. Phím ESC để quay lại trang truyện.</p>
+      </div>
+
+      {/* Mobile navigation buttons */}
+      <div className="md:hidden fixed bottom-12 left-0 right-0 flex justify-center items-center gap-4 py-3 px-4 bg-gray-800">
+        {prevChapter && (
+          <Link
+            href={`/novel-series/${seriesSlug}/${prevChapter.slug || prevChapter.id}`}
+            className="flex-1 px-3 py-2 bg-gray-700 text-white text-center rounded-lg hover:bg-gray-600"
+          >
+            Chương trước
+          </Link>
+        )}
+
+        <Link
+          href={`/novel-series/${seriesSlug}`}
+          className="flex-1 px-3 py-2 bg-gray-700 text-white text-center rounded-lg hover:bg-gray-600"
+        >
+          Danh sách
+        </Link>
+
+        {nextChapter && (
+          <Link
+            href={`/novel-series/${seriesSlug}/${nextChapter.slug || nextChapter.id}`}
+            className="flex-1 px-3 py-2 bg-blue-600 text-white text-center rounded-lg hover:bg-blue-700"
+          >
+            Chương sau
+          </Link>
+        )}
       </div>
     </div>
   );

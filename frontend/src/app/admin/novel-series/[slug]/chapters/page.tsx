@@ -215,7 +215,7 @@ export default function NovelChaptersPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
                         <Link
-                          href={`/admin/novel-series/${slug}/chapters/${chapter.slug}/edit`}
+                          href={`/admin/novel-series/${slug}/chapters/${chapter.slug || chapter.id}/edit`}
                           className="text-blue-500 hover:text-blue-400"
                         >
                           Sửa

@@ -88,7 +88,7 @@ export default function EditNovelChapterPage() {
 
     try {
       await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/v1/admin/novel_chapters/${chapterSlug}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/v1/admin/novel_chapters/${formData.id}`,
         { novel_chapter: formData },
         {
           headers: {

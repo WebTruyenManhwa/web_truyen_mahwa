@@ -49,7 +49,14 @@ module Api
       end
 
       def set_novel_chapter
-        @novel_chapter = @novel_series.novel_chapters.find_by!(slug: params[:id])
+        # Xử lý trường hợp id có thể là slug hoặc id số
+        @novel_chapter = if params[:id].to_i.to_s == params[:id]
+          # Nếu id là số, tìm theo id
+          @novel_series.novel_chapters.find(params[:id])
+        else
+          # Nếu id là chuỗi, tìm theo slug
+          @novel_series.novel_chapters.find_by!(slug: params[:id])
+        end
       rescue ActiveRecord::RecordNotFound
         render json: { error: 'Novel chapter not found' }, status: :not_found
       end
