@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import axios from "axios";
 import React from "react";
 import { useTheme } from "../../hooks/useTheme";
 import ThemeToggle from "../../components/ThemeToggle";
+import { useNovelSeries } from "../../services/novelSwr";
 
 interface NovelSeries {
   id: number;
@@ -21,78 +21,47 @@ interface NovelSeries {
   updated_at: string;
 }
 
-interface ApiResponse {
-  novel_series: NovelSeries[];
-  meta: {
-    total_count: number;
-    total_pages: number;
-    current_page: number;
-    next_page: number | null;
-    prev_page: number | null;
-  };
-}
+// interface ApiResponse {
+//   novel_series: NovelSeries[];
+//   meta: {
+//     total_count: number;
+//     total_pages: number;
+//     current_page: number;
+//     next_page: number | null;
+//     prev_page: number | null;
+//   };
+// }
 
 function NovelSeriesContent() {
   const { theme } = useTheme();
   const searchParams = useSearchParams();
-  const [novels, setNovels] = useState<NovelSeries[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [status, setStatus] = useState("");
-  const [sortBy, setSortBy] = useState("created_at");
-  const [sortDirection, setSortDirection] = useState("desc");
 
-  useEffect(() => {
-    const currentPage = searchParams.get("page") ? parseInt(searchParams.get("page") || "1") : 1;
-    const currentSearch = searchParams.get("search") || "";
-    const currentStatus = searchParams.get("status") || "";
-    const currentSortBy = searchParams.get("sort_by") || "created_at";
-    const currentSortDirection = searchParams.get("sort_direction") || "desc";
+  // Extract search parameters
+  const currentPage = searchParams.get("page") ? parseInt(searchParams.get("page") || "1") : 1;
+  const currentSearch = searchParams.get("search") || "";
+  const currentStatus = searchParams.get("status") || "";
+  const currentSortBy = searchParams.get("sort_by") || "created_at";
+  const currentSortDirection = searchParams.get("sort_direction") || "desc";
 
-    setPage(currentPage);
-    setSearchQuery(currentSearch);
-    setStatus(currentStatus);
-    setSortBy(currentSortBy);
-    setSortDirection(currentSortDirection);
+  // State for form controls
+  const [searchQuery, setSearchQuery] = useState(currentSearch);
+  const [status, setStatus] = useState(currentStatus);
+  const [sortBy, setSortBy] = useState(currentSortBy);
+  const [sortDirection, setSortDirection] = useState(currentSortDirection);
 
-    fetchNovels(currentPage, currentSearch, currentStatus, currentSortBy, currentSortDirection);
-  }, [searchParams]);
+  // Use SWR hook for data fetching with 12-hour cache
+  const { data, error, isLoading } = useNovelSeries({
+    page: currentPage,
+    per_page: 12,
+    search: currentSearch,
+    status: currentStatus,
+    sort_by: currentSortBy,
+    sort_direction: currentSortDirection
+  });
 
-  const fetchNovels = async (
-    page: number,
-    search: string,
-    status: string,
-    sortBy: string,
-    sortDirection: string
-  ) => {
-    setLoading(true);
-    try {
-      const response = await axios.get<ApiResponse>(
-        `${process.env.NEXT_PUBLIC_API_URL}/v1/novel_series`,
-        {
-          params: {
-            page,
-            per_page: 12,
-            search,
-            status,
-            sort_by: sortBy,
-            sort_direction: sortDirection,
-          },
-        }
-      );
-
-      setNovels(response.data.novel_series);
-      setTotalPages(response.data.meta.total_pages);
-    } catch (err) {
-      setError("Có lỗi xảy ra khi tải dữ liệu truyện chữ.");
-      console.error("Error fetching novels:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Extract data from the response
+  const novels = data?.novel_series || [];
+  const totalPages = data?.meta?.total_pages || 1;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -256,19 +225,19 @@ function NovelSeriesContent() {
         </form>
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
         </div>
       ) : error ? (
-        <div className="bg-red-500 text-white p-4 rounded-lg mb-8">{error}</div>
+        <div className="bg-red-500 text-white p-4 rounded-lg mb-8">Có lỗi xảy ra khi tải dữ liệu truyện chữ.</div>
       ) : novels.length === 0 ? (
         <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white border border-gray-200'} p-8 rounded-lg text-center`}>
           <p className="text-xl">Không tìm thấy truyện chữ nào.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {novels.map((novel) => (
+          {novels.map((novel: NovelSeries) => (
             <Link
               key={novel.id}
               href={`/novel-series/${novel.slug}`}
@@ -315,11 +284,11 @@ function NovelSeriesContent() {
       {totalPages > 1 && (
         <div className="mt-8 flex justify-center">
           <div className="flex flex-wrap gap-2">
-            {page > 1 && (
+            {currentPage > 1 && (
               <Link
                 href={`/novel-series?${new URLSearchParams({
                   ...Object.fromEntries(searchParams.entries()),
-                  page: (page - 1).toString(),
+                  page: (currentPage - 1).toString(),
                 })}`}
                 className={`px-4 py-2 ${
                   theme === 'dark'
@@ -335,12 +304,12 @@ function NovelSeriesContent() {
               let pageNum;
               if (totalPages <= 5) {
                 pageNum = i + 1;
-              } else if (page <= 3) {
+              } else if (currentPage <= 3) {
                 pageNum = i + 1;
-              } else if (page >= totalPages - 2) {
+              } else if (currentPage >= totalPages - 2) {
                 pageNum = totalPages - 4 + i;
               } else {
-                pageNum = page - 2 + i;
+                pageNum = currentPage - 2 + i;
               }
 
               return (
@@ -351,7 +320,7 @@ function NovelSeriesContent() {
                     page: pageNum.toString(),
                   })}`}
                   className={`px-4 py-2 rounded-lg ${
-                    page === pageNum
+                    currentPage === pageNum
                       ? "bg-blue-600 text-white"
                       : "bg-gray-700 text-white hover:bg-gray-600"
                   }`}
@@ -361,11 +330,11 @@ function NovelSeriesContent() {
               );
             })}
 
-            {page < totalPages && (
+            {currentPage < totalPages && (
               <Link
                 href={`/novel-series?${new URLSearchParams({
                   ...Object.fromEntries(searchParams.entries()),
-                  page: (page + 1).toString(),
+                  page: (currentPage + 1).toString(),
                 })}`}
                 className={`px-4 py-2 ${
                   theme === 'dark'

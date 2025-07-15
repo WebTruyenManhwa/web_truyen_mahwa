@@ -1,25 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
-import axios from "axios";
 import { useParams } from "next/navigation";
 import React from "react";
 import { useTheme } from "../../../hooks/useTheme";
 import ThemeToggle from "../../../components/ThemeToggle";
+import { useNovelSeriesDetail } from "../../../services/novelSwr";
 
-interface NovelSeries {
-  id: number;
-  title: string;
-  author: string;
-  description: string;
-  cover_image: string;
-  status: string;
-  slug: string;
-  chapters_count: number;
-  created_at: string;
-  updated_at: string;
-}
+// interface NovelSeries {
+//   id: number;
+//   title: string;
+//   author: string;
+//   description: string;
+//   cover_image: string;
+//   status: string;
+//   slug: string;
+//   chapters_count: number;
+//   created_at: string;
+//   updated_at: string;
+// }
 
 interface NovelChapter {
   id: number;
@@ -29,39 +29,31 @@ interface NovelChapter {
   created_at: string;
 }
 
-interface ApiResponse {
-  novel_series: NovelSeries;
-  chapters: NovelChapter[];
-}
+// interface ApiResponse {
+//   novel_series: NovelSeries;
+//   chapters: NovelChapter[];
+// }
 
-export default function NovelSeriesDetailPage() {
+function NovelSeriesDetailContent() {
   const { theme } = useTheme();
   const params = useParams();
   const slug = params.slug as string;
-  const [novel, setNovel] = useState<NovelSeries | null>(null);
-  const [chapters, setChapters] = useState<NovelChapter[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
-  useEffect(() => {
-    const fetchNovelDetails = async () => {
-      setLoading(true);
-      try {
-        const response = await axios.get<ApiResponse>(
-          `${process.env.NEXT_PUBLIC_API_URL}/v1/novel_series/${slug}`
-        );
-        setNovel(response.data.novel_series);
-        setChapters(response.data.chapters);
-      } catch (err) {
-        setError("Có lỗi xảy ra khi tải dữ liệu truyện chữ.");
-        console.error("Error fetching novel details:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Use SWR hook for data fetching with 12-hour cache
+  const { data, error, isLoading } = useNovelSeriesDetail(slug);
 
-    fetchNovelDetails();
-  }, [slug]);
+  // Add debugging
+  // console.log('Novel detail data:', data);
+  // console.log('Novel detail error:', error);
+  // console.log('Novel detail loading:', isLoading);
+
+  // Extract data from the response
+  const novel = data?.novel_series || null;
+  const chapters = data?.chapters || [];
+
+  // Additional debugging
+  // console.log('Extracted novel:', novel);
+  // console.log('Extracted chapters:', chapters);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -98,7 +90,7 @@ export default function NovelSeriesDetailPage() {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-center items-center h-64">
@@ -112,7 +104,7 @@ export default function NovelSeriesDetailPage() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="bg-red-500 text-white p-4 rounded-lg mb-8">
-          {error || "Không tìm thấy truyện chữ."}
+          {error ? `Có lỗi xảy ra khi tải dữ liệu truyện chữ: ${error.message || 'Unknown error'}` : "Không tìm thấy truyện chữ."}
         </div>
         <Link
           href="/novel-series"
@@ -222,7 +214,7 @@ export default function NovelSeriesDetailPage() {
         ) : (
           <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white border border-gray-200'} rounded-lg overflow-hidden`}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 p-4">
-              {chapters.map((chapter) => (
+              {chapters.map((chapter: NovelChapter) => (
                 <Link
                   key={chapter.id}
                   href={`/novel-series/${novel.slug}/${chapter?.slug ?? chapter.id}`}
@@ -247,5 +239,24 @@ export default function NovelSeriesDetailPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// Loading fallback for Suspense
+function LoadingFallback() {
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    </div>
+  );
+}
+
+export default function NovelSeriesDetailPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <NovelSeriesDetailContent />
+    </Suspense>
   );
 }
