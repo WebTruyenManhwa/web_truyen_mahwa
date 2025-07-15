@@ -9,6 +9,8 @@ import Link from "next/link";
 import { chapterApi, userApi, mangaApi, commentApi } from "../../../../../services/api";
 import { useAuth } from "../../../../../hooks/useAuth";
 import { useParams } from "next/navigation";
+import { useTheme } from "../../../../../hooks/useTheme";
+import ThemeToggle from "../../../../../components/ThemeToggle";
 
 interface ChapterImage {
   position: number;
@@ -65,6 +67,7 @@ interface Comment {
 }
 
 export default function ChapterReader() {
+  const { theme } = useTheme();
   const params = useParams();
   const mangaId = params.id as string;
   const chapterId = params.chapterId as string;
@@ -497,22 +500,25 @@ export default function ChapterReader() {
   return (
     <div className="max-w-[53rem] mx-auto px-2">
       {/* Top Navigation Bar */}
-      <div className={`bg-gray-800 p-4 rounded mb-4 sticky top-0 z-10 transition-transform duration-300 ${showTopNav ? 'translate-y-0' : '-translate-y-full'}`}>
+      <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white border border-gray-200'} p-4 rounded mb-4 sticky top-0 z-10 transition-transform duration-300 ${showTopNav ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="flex flex-col space-y-3">
-          <div className="flex items-center">
-            <Link href={`/manga/${mangaId}`} className="text-gray-300 hover:text-red-500 mr-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-              </svg>
-            </Link>
-            <div className="overflow-hidden">
-              <h1 className="text-lg font-bold truncate">
-                <Link href={`/manga/${chapter.manga?.slug || mangaId}`} className="hover:text-red-500">
-                  {chapter.manga?.title || "Đang tải..."}
-                </Link>
-              </h1>
-              <p className="text-sm text-gray-400 truncate">Chapter {chapter.number || ""} {chapter.title ? `- ${chapter.title}` : ""}</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Link href={`/manga/${mangaId}`} className={`${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-700 hover:text-red-500'} mr-2`}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                </svg>
+              </Link>
+              <div className="overflow-hidden">
+                <h1 className="text-lg font-bold truncate">
+                  <Link href={`/manga/${chapter.manga?.slug || mangaId}`} className="hover:text-red-500">
+                    {chapter.manga?.title || "Đang tải..."}
+                  </Link>
+                </h1>
+                <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} truncate`}>Chapter {chapter.number || ""} {chapter.title ? `- ${chapter.title}` : ""}</p>
+              </div>
             </div>
+            <ThemeToggle className="w-8 h-8" />
           </div>
 
           <div className="flex flex-wrap gap-2 items-center">
@@ -540,14 +546,14 @@ export default function ChapterReader() {
             <div className="flex flex-1 min-w-0 gap-2 flex-wrap sm:flex-nowrap">
               <Link
                 href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.prev_chapter?.slug || chapter.prev_chapter?.id}`}
-                className="bg-red-700 hover:bg-red-600 px-3 py-1 rounded text-sm whitespace-nowrap"
+                className="bg-red-700 hover:bg-red-600 px-3 py-1 rounded text-sm whitespace-nowrap text-white"
               >
                 Chương trước
               </Link>
 
               <div className="relative flex-1 min-w-0 w-full" ref={dropdownRef}>
                 <button
-                  className="w-full bg-gray-700 text-white px-3 py-1 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-500 flex items-center justify-between"
+                  className={`w-full ${theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-200 text-gray-800'} px-3 py-1 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-500 flex items-center justify-between`}
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 >
                   <span className="truncate">
@@ -564,14 +570,16 @@ export default function ChapterReader() {
                 </button>
 
                 {isDropdownOpen && (
-                  <div className="absolute z-50 w-full mt-1 bg-gray-700 rounded shadow-lg max-w-full left-0 right-0">
+                  <div className={`absolute z-50 w-full mt-1 ${theme === 'dark' ? 'bg-gray-700' : 'bg-white border border-gray-200'} rounded shadow-lg max-w-full left-0 right-0`}>
                     <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
                       {allChapters.map((chap) => (
                         <Link
                           key={chap.id}
                           href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chap.slug || chap.id}`}
-                          className={`block px-3 py-2 text-sm hover:bg-gray-600 ${
-                            chap.id.toString() === chapterId ? 'bg-gray-600' : ''
+                          className={`block px-3 py-2 text-sm ${
+                            theme === 'dark'
+                              ? `hover:bg-gray-600 ${chap.id.toString() === chapterId ? 'bg-gray-600' : ''}`
+                              : `hover:bg-gray-100 ${chap.id.toString() === chapterId ? 'bg-gray-100' : ''}`
                           }`}
                           onClick={() => setIsDropdownOpen(false)}
                         >
@@ -585,7 +593,7 @@ export default function ChapterReader() {
 
               <Link
                 href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.next_chapter?.slug || chapter.next_chapter?.id}`}
-                className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm whitespace-nowrap"
+                className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm whitespace-nowrap text-white"
               >
                 Chương sau
               </Link>
@@ -620,12 +628,12 @@ export default function ChapterReader() {
           {currentPage > 0 && chapter.prev_chapter && (
             <Link
               href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.prev_chapter?.slug || chapter.prev_chapter?.id}`}
-              className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-full shadow-lg flex items-center"
+              className={`${theme === 'dark' ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-100 border border-gray-200'} text-white px-4 py-2 rounded-full shadow-lg flex items-center`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
               </svg>
-              Chapter trước
+              <span className={theme === 'dark' ? 'text-white' : 'text-gray-800'}>Chapter trước</span>
             </Link>
           )}
 
@@ -645,18 +653,18 @@ export default function ChapterReader() {
 
       {/* Comments Section */}
       <div className="mt-8">
-        <h2 className="text-xl font-bold mb-4 pb-2 border-b border-gray-700">Bình luận</h2>
-        <div className="bg-gray-800 rounded p-4">
+        <h2 className={`text-xl font-bold mb-4 pb-2 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-300'}`}>Bình luận</h2>
+        <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white border border-gray-200'} rounded p-4`}>
           {/* Form bình luận tổng luôn ở đầu */}
           {isAuthenticated ? (
             <div className="mb-4">
               <form id="comment-form" onSubmit={handleSubmitComment}>
                 {selectedStickers.length > 0 && !replyingTo && (
-                  <div className="mb-2 p-2 bg-gray-700 rounded flex flex-wrap gap-2 items-center">
+                  <div className={`mb-2 p-2 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} rounded flex flex-wrap gap-2 items-center`}>
                     {selectedStickers.map((sticker) => (
                       <div key={sticker} className="flex items-center mr-2 mb-1">
                         <img src={sticker} alt="Selected sticker" className="h-10 w-10 mr-1" />
-                        <button type="button" onClick={() => setSelectedStickers(selectedStickers.filter((s) => s !== sticker))} className="text-gray-400 hover:text-white">
+                        <button type="button" onClick={() => setSelectedStickers(selectedStickers.filter((s) => s !== sticker))} className={`${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}>
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                       </svg>
@@ -668,7 +676,7 @@ export default function ChapterReader() {
                 )}
                 <div
                   ref={commentInputRef}
-                  className="w-full bg-gray-700 text-white rounded p-3 focus:outline-none focus:ring-1 focus:ring-red-500 min-h-[60px] relative"
+                  className={`w-full ${theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-800'} rounded p-3 focus:outline-none focus:ring-1 focus:ring-red-500 min-h-[60px] relative`}
                   contentEditable
                   onInput={handleInput}
                   suppressContentEditableWarning={true}
@@ -684,23 +692,23 @@ export default function ChapterReader() {
                     }
                   }}
                 >
-                  {commentHtml === "" && !isMainCommentFocused && <span className="text-gray-400 absolute left-3 top-3 opacity-70">Viết bình luận của bạn...</span>}
+                  {commentHtml === "" && !isMainCommentFocused && <span className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} absolute left-3 top-3 opacity-70`}>Viết bình luận của bạn...</span>}
                 </div>
                 <div className="mt-2 flex justify-between items-center">
                   <div className="relative" ref={stickerPickerRef}>
                     <button
                       type="button"
                       onClick={() => setShowStickerPicker(!showStickerPicker)}
-                      className="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded"
+                      className={`${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'} p-2 rounded`}
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-7.536 5.879a1 1 0 001.414 0 3 3 0 014.242 0 1 1 0 001.414-1.414 5 5 0 00-7.07 0 1 1 0 000 1.414z" clipRule="evenodd" />
                       </svg>
                     </button>
                     {showStickerPicker && !replyingTo && (
-                      <div className="block p-2 bg-gray-700 rounded shadow-lg grid grid-cols-4 gap-2">
+                      <div className={`block p-2 ${theme === 'dark' ? 'bg-gray-700' : 'bg-white border border-gray-200'} rounded shadow-lg grid grid-cols-4 gap-2`}>
                         {/* Stickers */}
-                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742760.png')} className="p-1 hover:bg-gray-600 rounded">
+                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742760.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
                           <Image
                             src="https://cdn-icons-png.flaticon.com/128/742/742760.png"
                             alt="Sticker 1"
@@ -709,25 +717,25 @@ export default function ChapterReader() {
                             className="w-8 h-8"
                           />
                         </button>
-                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742751.png')} className="p-1 hover:bg-gray-600 rounded">
+                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742751.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
                           <img src="https://cdn-icons-png.flaticon.com/128/742/742751.png" alt="Sticker 2" className="w-8 h-8" />
                         </button>
-                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742784.png')} className="p-1 hover:bg-gray-600 rounded">
+                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742784.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
                           <img src="https://cdn-icons-png.flaticon.com/128/742/742784.png" alt="Sticker 3" className="w-8 h-8" />
                         </button>
-                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742750.png')} className="p-1 hover:bg-gray-600 rounded">
+                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742750.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
                           <img src="https://cdn-icons-png.flaticon.com/128/742/742750.png" alt="Sticker 4" className="w-8 h-8" />
                         </button>
-                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742745.png')} className="p-1 hover:bg-gray-600 rounded">
+                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742745.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
                           <img src="https://cdn-icons-png.flaticon.com/128/742/742745.png" alt="Sticker 5" className="w-8 h-8" />
                         </button>
-                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742821.png')} className="p-1 hover:bg-gray-600 rounded">
+                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742821.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
                           <img src="https://cdn-icons-png.flaticon.com/128/742/742821.png" alt="Sticker 6" className="w-8 h-8" />
                         </button>
-                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742752.png')} className="p-1 hover:bg-gray-600 rounded">
+                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742752.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
                           <img src="https://cdn-icons-png.flaticon.com/128/742/742752.png" alt="Sticker 7" className="w-8 h-8" />
                         </button>
-                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742920.png')} className="p-1 hover:bg-gray-600 rounded">
+                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742920.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
                           <img src="https://cdn-icons-png.flaticon.com/128/742/742920.png" alt="Sticker 8" className="w-8 h-8" />
                         </button>
                       </div>
@@ -750,17 +758,17 @@ export default function ChapterReader() {
               </form>
             </div>
           ) : (
-            <div className="mb-4 p-3 bg-gray-700 rounded text-center">
+            <div className={`mb-4 p-3 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} rounded text-center`}>
               <p>Vui lòng <Link href="/auth/login" className="text-red-400 hover:underline">đăng nhập</Link> để bình luận</p>
             </div>
           )}
           {/* Danh sách bình luận và form trả lời dưới từng comment */}
             {comments.length > 0 ? (
               comments.map((comment) => (
-              <div key={comment.id} className="bg-gray-700 rounded p-3 mb-4">
+              <div key={comment.id} className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} rounded p-3 mb-4`}>
                   <div className="flex justify-between items-start">
                     <div className="flex items-center">
-                      <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center mr-2">
+                      <div className={`w-8 h-8 rounded-full ${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'} flex items-center justify-center mr-2`}>
                         {comment.user && comment.user.avatar ? (
                           <Image
                             src={comment.user.avatar}
@@ -775,7 +783,7 @@ export default function ChapterReader() {
                       </div>
                       <div>
                         <p className="font-medium text-sm">{comment.user ? comment.user.username : 'Unknown User'}</p>
-                        <p className="text-xs text-gray-400">
+                        <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                           {new Date(comment.createdAt).toLocaleDateString()}
                         </p>
                       </div>
@@ -783,7 +791,7 @@ export default function ChapterReader() {
                     {isAuthenticated && (
                       <button
                         onClick={() => handleReplyToComment(comment)}
-                        className="text-sm text-gray-400 hover:text-white"
+                        className={`text-sm ${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}
                       >
                         Trả lời
                       </button>
@@ -969,7 +977,7 @@ export default function ChapterReader() {
                 </div>
               ))
             ) : (
-              <p className="text-center text-gray-400 text-sm">Chưa có bình luận nào. Hãy là người đầu tiên bình luận!</p>
+              <p className={`text-center ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} text-sm`}>Chưa có bình luận nào. Hãy là người đầu tiên bình luận!</p>
             )}
         </div>
       </div>

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import React from "react";
+import { useTheme } from "../../hooks/useTheme";
+import ThemeToggle from "../../components/ThemeToggle";
 
 interface NovelSeries {
   id: number;
@@ -31,6 +33,7 @@ interface ApiResponse {
 }
 
 export default function NovelSeriesPage() {
+  const { theme } = useTheme();
   const searchParams = useSearchParams();
   const [novels, setNovels] = useState<NovelSeries[]>([]);
   const [loading, setLoading] = useState(true);
@@ -181,10 +184,13 @@ export default function NovelSeriesPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8 text-center">Truyện Chữ</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Truyện Chữ</h1>
+        <ThemeToggle className="px-3 py-2" showLabel />
+      </div>
 
       {/* Filters */}
-      <div className="bg-gray-800 rounded-lg p-4 mb-8">
+      <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white border border-gray-200'} rounded-lg p-4 mb-8`}>
         <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="md:col-span-2">
             <input
@@ -192,14 +198,22 @@ export default function NovelSeriesPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm kiếm truyện..."
-              className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full px-4 py-2 ${
+                theme === 'dark'
+                  ? 'bg-gray-700 text-white focus:ring-blue-500'
+                  : 'bg-gray-100 text-gray-900 focus:ring-blue-400'
+              } rounded-lg focus:outline-none focus:ring-2`}
             />
           </div>
           <div>
             <select
               value={status}
               onChange={handleStatusChange}
-              className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full px-4 py-2 ${
+                theme === 'dark'
+                  ? 'bg-gray-700 text-white focus:ring-blue-500'
+                  : 'bg-gray-100 text-gray-900 focus:ring-blue-400'
+              } rounded-lg focus:outline-none focus:ring-2`}
             >
               <option value="">Tất cả trạng thái</option>
               <option value="ongoing">Đang tiến hành</option>
@@ -219,7 +233,11 @@ export default function NovelSeriesPage() {
                   : "title_desc"
               }
               onChange={handleSortChange}
-              className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full px-4 py-2 ${
+                theme === 'dark'
+                  ? 'bg-gray-700 text-white focus:ring-blue-500'
+                  : 'bg-gray-100 text-gray-900 focus:ring-blue-400'
+              } rounded-lg focus:outline-none focus:ring-2`}
             >
               <option value="newest">Mới nhất</option>
               <option value="oldest">Cũ nhất</option>
@@ -245,108 +263,121 @@ export default function NovelSeriesPage() {
       ) : error ? (
         <div className="bg-red-500 text-white p-4 rounded-lg mb-8">{error}</div>
       ) : novels.length === 0 ? (
-        <div className="bg-gray-800 text-white p-8 rounded-lg text-center">
+        <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white border border-gray-200'} p-8 rounded-lg text-center`}>
           <p className="text-xl">Không tìm thấy truyện chữ nào.</p>
         </div>
       ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {novels.map((novel) => (
-              <Link
-                href={`/novel-series/${novel.slug}`}
-                key={novel.id}
-                className="bg-gray-800 rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-300"
-              >
-                <div className="relative h-64">
-                  <img
-                    src={novel.cover_image || "/placeholder-novel.jpg"}
-                    alt={novel.title}
-                    className="w-full h-full object-cover"
-                  />
-                  <div
-                    className={`absolute top-2 right-2 ${getStatusColor(
-                      novel.status
-                    )} text-white text-xs px-2 py-1 rounded-full`}
-                  >
-                    {getStatusLabel(novel.status)}
-                  </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {novels.map((novel) => (
+            <Link
+              key={novel.id}
+              href={`/novel-series/${novel.slug}`}
+              className={`block ${
+                theme === 'dark'
+                  ? 'bg-gray-800 hover:bg-gray-700'
+                  : 'bg-white hover:bg-gray-50 border border-gray-200'
+              } rounded-lg overflow-hidden transition-colors`}
+            >
+              <div className="relative h-60">
+                <img
+                  src={novel.cover_image || "/placeholder-novel.jpg"}
+                  alt={novel.title}
+                  className="w-full h-full object-cover"
+                />
+                <div
+                  className={`absolute top-2 right-2 ${getStatusColor(
+                    novel.status
+                  )} text-white text-xs px-2 py-1 rounded-full`}
+                >
+                  {getStatusLabel(novel.status)}
                 </div>
-                <div className="p-4">
-                  <h2 className="text-xl font-semibold mb-2 line-clamp-2">{novel.title}</h2>
-                  <p className="text-gray-400 text-sm mb-2">Tác giả: {novel.author}</p>
-                  <div className="flex justify-between items-center text-sm text-gray-400">
-                    <span>{novel.chapters_count} chương</span>
-                    <span>Cập nhật: {formatDate(novel.updated_at)}</span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex justify-center mt-8">
-              <div className="flex space-x-1">
-                {page > 1 && (
-                  <Link
-                    href={`/novel-series?page=${page - 1}${
-                      searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ""
-                    }${status ? `&status=${status}` : ""}${
-                      sortBy ? `&sort_by=${sortBy}` : ""
-                    }${sortDirection ? `&sort_direction=${sortDirection}` : ""}`}
-                    className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
-                  >
-                    Trước
-                  </Link>
-                )}
-
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (page <= 3) {
-                    pageNum = i + 1;
-                  } else if (page >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = page - 2 + i;
-                  }
-
-                  return (
-                    <Link
-                      key={i}
-                      href={`/novel-series?page=${pageNum}${
-                        searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ""
-                      }${status ? `&status=${status}` : ""}${
-                        sortBy ? `&sort_by=${sortBy}` : ""
-                      }${sortDirection ? `&sort_direction=${sortDirection}` : ""}`}
-                      className={`px-4 py-2 rounded-lg ${
-                        page === pageNum
-                          ? "bg-blue-600 text-white"
-                          : "bg-gray-700 text-white hover:bg-gray-600"
-                      }`}
-                    >
-                      {pageNum}
-                    </Link>
-                  );
-                })}
-
-                {page < totalPages && (
-                  <Link
-                    href={`/novel-series?page=${page + 1}${
-                      searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ""
-                    }${status ? `&status=${status}` : ""}${
-                      sortBy ? `&sort_by=${sortBy}` : ""
-                    }${sortDirection ? `&sort_direction=${sortDirection}` : ""}`}
-                    className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
-                  >
-                    Tiếp
-                  </Link>
-                )}
               </div>
-            </div>
-          )}
-        </>
+              <div className="p-4">
+                <h2 className="text-lg font-semibold mb-2 line-clamp-2">{novel.title}</h2>
+                <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} mb-2`}>
+                  Tác giả: {novel.author}
+                </p>
+                <div className="flex justify-between items-center text-xs">
+                  <span className={theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}>
+                    {novel.chapters_count} chương
+                  </span>
+                  <span className={theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}>
+                    {formatDate(novel.updated_at)}
+                  </span>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-8 flex justify-center">
+          <div className="flex flex-wrap gap-2">
+            {page > 1 && (
+              <Link
+                href={`/novel-series?${new URLSearchParams({
+                  ...Object.fromEntries(searchParams.entries()),
+                  page: (page - 1).toString(),
+                })}`}
+                className={`px-4 py-2 ${
+                  theme === 'dark'
+                    ? 'bg-gray-700 hover:bg-gray-600'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                } rounded-lg`}
+              >
+                Trước
+              </Link>
+            )}
+
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pageNum;
+              if (totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (page <= 3) {
+                pageNum = i + 1;
+              } else if (page >= totalPages - 2) {
+                pageNum = totalPages - 4 + i;
+              } else {
+                pageNum = page - 2 + i;
+              }
+
+              return (
+                <Link
+                  key={i}
+                  href={`/novel-series?${new URLSearchParams({
+                    ...Object.fromEntries(searchParams.entries()),
+                    page: pageNum.toString(),
+                  })}`}
+                  className={`px-4 py-2 rounded-lg ${
+                    page === pageNum
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-700 text-white hover:bg-gray-600"
+                  }`}
+                >
+                  {pageNum}
+                </Link>
+              );
+            })}
+
+            {page < totalPages && (
+              <Link
+                href={`/novel-series?${new URLSearchParams({
+                  ...Object.fromEntries(searchParams.entries()),
+                  page: (page + 1).toString(),
+                })}`}
+                className={`px-4 py-2 ${
+                  theme === 'dark'
+                    ? 'bg-gray-700 hover:bg-gray-600'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                } rounded-lg`}
+              >
+                Tiếp
+              </Link>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

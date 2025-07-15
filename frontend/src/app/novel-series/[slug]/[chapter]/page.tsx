@@ -5,6 +5,8 @@ import Link from "next/link";
 import axios from "axios";
 import { useParams } from "next/navigation";
 import React from "react";
+import { useTheme } from "../../../../hooks/useTheme";
+import ThemeToggle from "../../../../components/ThemeToggle";
 
 interface NovelSeries {
   id: number;
@@ -32,6 +34,7 @@ interface ApiResponse {
 }
 
 export default function NovelChapterPage() {
+  const { theme } = useTheme();
   const params = useParams();
   const seriesSlug = params.slug as string;
   const chapterSlug = params.chapter as string;
@@ -144,10 +147,12 @@ export default function NovelChapterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className={`min-h-screen ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
       {/* Navigation bar */}
       <div
-        className={`fixed top-0 left-0 right-0 bg-gray-800 shadow-md z-10 transition-transform duration-300 ${
+        className={`fixed top-0 left-0 right-0 ${
+          theme === 'dark' ? 'bg-gray-800 shadow-md' : 'bg-white shadow-md border-b border-gray-200'
+        } z-10 transition-transform duration-300 ${
           showNavbar ? "transform translate-y-0" : "transform -translate-y-full"
         }`}
       >
@@ -177,47 +182,52 @@ export default function NovelChapterPage() {
                 <span>Chương {chapter.chapter_number}</span>
               </h1>
             </div>
-            <div className="hidden md:flex items-center space-x-2">
-              {prevChapter && (
-                <Link
-                  href={`/novel-series/${seriesSlug}/${prevChapter.slug || prevChapter.id}`}
-                  className="px-3 py-1 bg-gray-700 text-white rounded-lg hover:bg-gray-600 flex items-center"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
+            <div className="flex items-center space-x-2">
+              <ThemeToggle className="w-8 h-8" />
+              <div className="hidden md:flex items-center space-x-2">
+                {prevChapter && (
+                  <Link
+                    href={`/novel-series/${seriesSlug}/${prevChapter.slug || prevChapter.id}`}
+                    className={`px-3 py-1 ${
+                      theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                    } rounded-lg flex items-center`}
                   >
-                    <path
-                      fillRule="evenodd"
-                      d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  <span className="ml-1">Chương trước</span>
-                </Link>
-              )}
-              {nextChapter && (
-                <Link
-                  href={`/novel-series/${seriesSlug}/${nextChapter.slug || nextChapter.id}`}
-                  className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
-                >
-                  <span className="mr-1">Chương sau</span>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    <span className="ml-1">Chương trước</span>
+                  </Link>
+                )}
+                {nextChapter && (
+                  <Link
+                    href={`/novel-series/${seriesSlug}/${nextChapter.slug || nextChapter.id}`}
+                    className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
                   >
-                    <path
-                      fillRule="evenodd"
-                      d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </Link>
-              )}
+                    <span className="mr-1">Chương sau</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -225,17 +235,17 @@ export default function NovelChapterPage() {
 
       {/* Chapter content */}
       <div className="container mx-auto px-4 pt-24 pb-32 md:pb-20">
-        <div className="bg-gray-800 rounded-lg p-6 md:p-8">
+        <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white border border-gray-200'} rounded-lg p-6 md:p-8`}>
           <h1 className="text-2xl md:text-3xl font-bold mb-2 text-center">
             Chương {chapter.chapter_number}: {chapter.title}
           </h1>
-          <p className="text-gray-400 text-center mb-8">
+          <p className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} text-center mb-8`}>
             Cập nhật: {formatDate(chapter.updated_at)}
           </p>
 
           <div
             ref={contentRef}
-            className="prose prose-invert max-w-none"
+            className={`prose max-w-none ${theme === 'dark' ? 'prose-invert' : ''}`}
             dangerouslySetInnerHTML={{ __html: chapter.content.replace(/\n/g, "<br />") }}
           ></div>
         </div>
@@ -244,7 +254,9 @@ export default function NovelChapterPage() {
           {prevChapter ? (
             <Link
               href={`/novel-series/${seriesSlug}/${prevChapter.slug || prevChapter.id}`}
-              className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 flex items-center"
+              className={`px-4 py-2 ${
+                theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+              } rounded-lg flex items-center`}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -266,7 +278,9 @@ export default function NovelChapterPage() {
 
           <Link
             href={`/novel-series/${seriesSlug}`}
-            className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
+            className={`px-4 py-2 ${
+              theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+            } rounded-lg`}
           >
             Danh sách chương
           </Link>
@@ -297,16 +311,26 @@ export default function NovelChapterPage() {
       </div>
 
       {/* Reading tips */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gray-800 py-2 px-4 text-center text-xs text-gray-400">
+      <div className={`fixed bottom-0 left-0 right-0 ${
+        theme === 'dark' ? 'bg-gray-800' : 'bg-white border-t border-gray-200'
+      } py-2 px-4 text-center text-xs ${
+        theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+      }`}>
         <p>Phím mũi tên trái/phải để chuyển chương. Phím ESC để quay lại trang truyện.</p>
       </div>
 
       {/* Mobile navigation buttons */}
-      <div className="md:hidden fixed bottom-12 left-0 right-0 flex justify-center items-center gap-4 py-3 px-4 bg-gray-800">
+      <div className={`md:hidden fixed bottom-12 left-0 right-0 flex justify-center items-center gap-4 py-3 px-4 ${
+        theme === 'dark' ? 'bg-gray-800' : 'bg-white border-t border-gray-200'
+      }`}>
         {prevChapter && (
           <Link
             href={`/novel-series/${seriesSlug}/${prevChapter.slug || prevChapter.id}`}
-            className="flex-1 px-3 py-2 bg-gray-700 text-white text-center rounded-lg hover:bg-gray-600"
+            className={`flex-1 px-3 py-2 ${
+              theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-200 text-gray-800'
+            } text-center rounded-lg ${
+              theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-300'
+            }`}
           >
             Chương trước
           </Link>
@@ -314,7 +338,11 @@ export default function NovelChapterPage() {
 
         <Link
           href={`/novel-series/${seriesSlug}`}
-          className="flex-1 px-3 py-2 bg-gray-700 text-white text-center rounded-lg hover:bg-gray-600"
+          className={`flex-1 px-3 py-2 ${
+            theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-200 text-gray-800'
+          } text-center rounded-lg ${
+            theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-300'
+          }`}
         >
           Danh sách
         </Link>

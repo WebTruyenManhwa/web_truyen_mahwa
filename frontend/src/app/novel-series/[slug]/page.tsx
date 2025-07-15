@@ -5,6 +5,8 @@ import Link from "next/link";
 import axios from "axios";
 import { useParams } from "next/navigation";
 import React from "react";
+import { useTheme } from "../../../hooks/useTheme";
+import ThemeToggle from "../../../components/ThemeToggle";
 
 interface NovelSeries {
   id: number;
@@ -33,6 +35,7 @@ interface ApiResponse {
 }
 
 export default function NovelSeriesDetailPage() {
+  const { theme } = useTheme();
   const params = useParams();
   const slug = params.slug as string;
   const [novel, setNovel] = useState<NovelSeries | null>(null);
@@ -123,7 +126,7 @@ export default function NovelSeriesDetailPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-4">
+      <div className="flex justify-between items-center mb-4">
         <Link
           href="/novel-series"
           className="text-blue-500 hover:underline flex items-center"
@@ -142,9 +145,10 @@ export default function NovelSeriesDetailPage() {
           </svg>
           Quay lại danh sách truyện chữ
         </Link>
+        <ThemeToggle className="px-3 py-2" />
       </div>
 
-      <div className="bg-gray-800 rounded-lg overflow-hidden">
+      <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white border border-gray-200'} rounded-lg overflow-hidden`}>
         <div className="p-6 md:p-8">
           <div className="flex flex-col md:flex-row">
             <div className="w-full md:w-1/4 mb-6 md:mb-0">
@@ -166,14 +170,14 @@ export default function NovelSeriesDetailPage() {
 
             <div className="w-full md:w-3/4 md:pl-8">
               <h1 className="text-3xl font-bold mb-2">{novel.title}</h1>
-              <p className="text-gray-400 mb-4">Tác giả: {novel.author}</p>
+              <p className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} mb-4`}>Tác giả: {novel.author}</p>
 
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-2">Giới thiệu</h2>
-                <p className="text-gray-300 whitespace-pre-line">{novel.description}</p>
+                <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} whitespace-pre-line`}>{novel.description}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 text-sm text-gray-400">
+              <div className={`grid grid-cols-2 gap-4 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                 <div>
                   <span className="font-semibold">Số chương:</span> {novel.chapters_count}
                 </div>
@@ -212,23 +216,29 @@ export default function NovelSeriesDetailPage() {
       <div className="mt-8">
         <h2 className="text-2xl font-bold mb-4">Danh sách chương</h2>
         {chapters.length === 0 ? (
-          <div className="bg-gray-800 p-6 rounded-lg text-center">
+          <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white border border-gray-200'} p-6 rounded-lg text-center`}>
             <p>Chưa có chương nào.</p>
           </div>
         ) : (
-          <div className="bg-gray-800 rounded-lg overflow-hidden">
+          <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white border border-gray-200'} rounded-lg overflow-hidden`}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 p-4">
               {chapters.map((chapter) => (
                 <Link
                   key={chapter.id}
                   href={`/novel-series/${novel.slug}/${chapter.slug || chapter.id}`}
-                  className="p-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                  className={`p-3 ${
+                    theme === 'dark'
+                      ? 'bg-gray-700 hover:bg-gray-600'
+                      : 'bg-gray-100 hover:bg-gray-200'
+                  } rounded-lg transition-colors`}
                 >
                   <div className="flex justify-between items-center">
-                    <span className="text-white">
+                    <span>
                       Chương {chapter.chapter_number}: {chapter.title}
                     </span>
-                    <span className="text-xs text-gray-400">{formatDate(chapter.created_at)}</span>
+                    <span className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {formatDate(chapter.created_at)}
+                    </span>
                   </div>
                 </Link>
               ))}
