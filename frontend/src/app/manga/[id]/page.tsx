@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 // import { mangaApi } from "../../../services/api";
 import { useAuth } from "../../../hooks/useAuth";
+import { useTheme } from "../../../hooks/useTheme";
 // import { userApi } from "../../../services/api";
 import React from "react";
 import { useManga, useFavoriteStatus, useUserRating, mangaAPI, userAPI } from "../../../services/swrApi";
@@ -46,6 +47,7 @@ export default function MangaDetail(props: Props) {
   // Trích xuất id từ params và lưu vào biến riêng để tránh cảnh báo
   const { id: mangaId } = React.use(props.params);
   const { isAuthenticated } = useAuth();
+  const { theme } = useTheme();
   const [isFavorite, setIsFavorite] = useState(false);
   const [userRating, setUserRating] = useState<number>(0);
   const [isRating, setIsRating] = useState(false);
@@ -237,9 +239,9 @@ export default function MangaDetail(props: Props) {
 
   // Phần còn lại của component giữ nguyên
   return (
-    <div>
+    <div className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
       {/* Manga Info Section */}
-      <div className="bg-gray-800 rounded-lg overflow-hidden mb-6">
+      <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'} rounded-lg overflow-hidden mb-6`}>
         <div className="md:flex gap-6 p-6">
           {/* Left Column */}
           <div className="md:w-1/4">
@@ -252,20 +254,20 @@ export default function MangaDetail(props: Props) {
             </div>
 
             {/* Rating Section */}
-            <div className="bg-gray-700/50 rounded-lg p-4 mb-4">
+            <div className={`${theme === 'dark' ? 'bg-gray-700/50' : 'bg-gray-200/70'} rounded-lg p-4 mb-4`}>
               {renderRatingStars()}
-              <div className="text-center text-gray-300">
+              <div className="text-center">
                 {/* Display the rating value */}
                 <span className="text-xl font-bold">
                   {/* Always show the manga's overall rating */}
                   {Number(manga.rating || 0).toFixed(1)}
                 </span>
                 <span className="text-sm"> / 5</span>
-                <span className="text-gray-400 text-sm block">
+                <span className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} text-sm block`}>
                   của {manga.totalVotes || manga.total_votes || 0} lượt đánh giá
                 </span>
                 {isAuthenticated && userRating > 0 && (
-                  <span className="text-sm text-yellow-400 mt-2 block">
+                  <span className="text-sm text-yellow-500 mt-2 block">
                     Bạn đã đánh giá: {userRating}/5
                   </span>
                 )}
@@ -286,7 +288,7 @@ export default function MangaDetail(props: Props) {
               </div>
               <button onClick={toggleFavorite}
                 className={`block w-full text-center py-2 rounded ${
-                  isFavorite ? "bg-yellow-600 hover:bg-yellow-700" : "bg-gray-700 hover:bg-gray-600"
+                  isFavorite ? "bg-yellow-600 hover:bg-yellow-700" : theme === 'dark' ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-300 hover:bg-gray-400"
                 } text-white`}>
                 {isFavorite ? "Đã yêu thích" : "Thêm vào yêu thích"}
               </button>
@@ -295,17 +297,17 @@ export default function MangaDetail(props: Props) {
 
           {/* Right Column */}
           <div className="md:w-3/4 mt-6 md:mt-0">
-            <h1 className="text-3xl font-bold text-white mb-4">{manga.title}</h1>
+            <h1 className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>{manga.title}</h1>
 
             {/* Stats Row */}
             <div className="flex flex-wrap gap-4 mb-6">
               <div className="flex items-center">
-                <span className="text-gray-400">Nhóm dịch:</span>
-                <span className="ml-2 text-white">{manga.translationTeam || "Chưa có"}</span>
+                <span className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Nhóm dịch:</span>
+                <span className="ml-2">{manga.translationTeam || "Chưa có"}</span>
               </div>
               <div className="flex items-center">
-                <span className="text-gray-400">Lượt xem:</span>
-                <span className="ml-2 text-white">{manga.view_count?.toLocaleString() || 0}</span>
+                <span className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Lượt xem:</span>
+                <span className="ml-2">{manga.view_count?.toLocaleString() || 0}</span>
               </div>
             </div>
 
@@ -320,7 +322,7 @@ export default function MangaDetail(props: Props) {
               )}
 
               {manga.view_count && (
-                <span className="bg-gray-700 text-gray-100 px-2 py-1 rounded text-xs flex items-center">
+                <span className={`${theme === 'dark' ? 'bg-gray-700 text-gray-100' : 'bg-gray-300 text-gray-800'} px-2 py-1 rounded text-xs flex items-center`}>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-3 w-3 mr-1"
@@ -352,7 +354,7 @@ export default function MangaDetail(props: Props) {
 
             {/* Genres */}
             <div className="mb-4">
-              <h2 className="text-sm text-gray-400 mb-2">Thể loại:</h2>
+              <h2 className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} mb-2`}>Thể loại:</h2>
               <div className="flex flex-wrap gap-2">
                 {manga.genres && manga.genres.map((genre: { name?: string; title?: string; id?: number | string; } | null | undefined, index: React.Key | null | undefined) => {
                   // Xử lý genre dựa trên kiểu dữ liệu
@@ -380,7 +382,7 @@ export default function MangaDetail(props: Props) {
                     <Link
                       key={index}
                       href={`/genres/${slug}`}
-                      className="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs"
+                      className={`${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} px-2 py-1 rounded text-xs`}
                     >
                       {genreName}
                     </Link>
@@ -392,53 +394,53 @@ export default function MangaDetail(props: Props) {
             {/* Info Table */}
             <div className="mb-4">
               <div className="grid grid-cols-3 gap-2 text-sm">
-                <div className="text-gray-400">Tác giả:</div>
+                <div className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Tác giả:</div>
                 <div className="col-span-2">{manga.author}</div>
 
                 {manga.artist && (
                   <>
-                    <div className="text-gray-400">Họa sĩ:</div>
+                    <div className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Họa sĩ:</div>
                     <div className="col-span-2">{manga.artist}</div>
                   </>
                 )}
 
                 {manga.releaseYear && (
                   <>
-                    <div className="text-gray-400">Năm phát hành:</div>
+                    <div className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Năm phát hành:</div>
                     <div className="col-span-2">{manga.releaseYear}</div>
                   </>
                 )}
 
-                <div className="text-gray-400">Số chương:</div>
+                <div className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Số chương:</div>
                 <div className="col-span-2">{manga.chapters.length}</div>
               </div>
             </div>
 
             {/* Description */}
             <div className="mb-4">
-              <h2 className="text-sm text-gray-400 mb-2">Mô tả:</h2>
-              <p className="text-sm text-gray-300 leading-relaxed">{manga.description}</p>
+              <h2 className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} mb-2`}>Mô tả:</h2>
+              <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} leading-relaxed`}>{manga.description}</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Chapter List Section */}
-      <div className="bg-gray-800 rounded-lg p-4">
-        <h2 className="text-xl font-bold mb-4 pb-2 border-b border-gray-700">Danh sách chương</h2>
+      <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'} rounded-lg p-4`}>
+        <h2 className={`text-xl font-bold mb-4 pb-2 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-300'}`}>Danh sách chương</h2>
 
         <div className="space-y-2">
           {manga.chapters.map((chapter: { id: React.Key | null | undefined; slug: any; number: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; title: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; view_count: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; created_at: string | number | Date; }) => (
             <Link
               key={chapter.id}
               href={`/manga/${manga.slug || manga.id}/chapter/${chapter.slug || chapter.id}`}
-              className="flex justify-between items-center p-3 hover:bg-gray-700 rounded transition-colors"
+              className={`flex justify-between items-center p-3 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'} rounded transition-colors`}
             >
               <div>
                 <span className="font-medium">Chapter {chapter.number}</span>
-                {chapter.title && <span className="ml-2 text-gray-400">- {chapter.title}</span>}
+                {chapter.title && <span className={`ml-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>- {chapter.title}</span>}
               </div>
-              <div className="flex items-center space-x-4 text-sm text-gray-400">
+              <div className={`flex items-center space-x-4 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                 {/* Hiển thị view_count nếu có */}
                 {typeof chapter.view_count === 'number' && (
                   <span className="flex items-center">

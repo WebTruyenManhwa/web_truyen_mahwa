@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Nunito_Sans } from "next/font/google";
 import "./globals.css";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { AuthProvider } from "../hooks/useAuth";
+import { ThemeProvider } from "../hooks/useTheme";
 import React from "react";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
+const nunito = Nunito_Sans({ subsets: ["latin"], variable: '--font-nunito' });
 
 export const metadata: Metadata = {
   title: "MangaVerse - Đọc truyện manga online",
@@ -19,7 +21,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="vi">
+    <html lang="vi" suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <link rel="icon" href="/favicon.ico" />
@@ -114,16 +116,19 @@ export default function RootLayout({
             // Kiểm tra định kỳ
             setInterval(detectDevToolsBySize, 1000);
             setInterval(detectDevToolsByDebug, 2000);
-          ` }}></script>
+          ` }}
+        />
         )}
       </head>
-      <body className={`${inter.className} bg-gray-900 text-white min-h-screen flex flex-col`}>
+      <body className={`${inter.variable} ${nunito.variable} font-sans min-h-screen flex flex-col`}>
         <AuthProvider>
-          <Header />
-          <main className="flex-grow container mx-auto px-4 py-6">
-            {children}
-          </main>
-          <Footer />
+          <ThemeProvider>
+            <Header />
+            <main className="flex-grow container mx-auto px-4 py-6">
+              {children}
+            </main>
+            <Footer />
+          </ThemeProvider>
         </AuthProvider>
       </body>
     </html>

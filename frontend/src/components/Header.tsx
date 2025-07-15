@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "../hooks/useAuth";
+import { useTheme } from "../hooks/useTheme";
 import { mangaApi } from "../services/api";
 import React from "react";
 
@@ -23,6 +24,7 @@ export default function Header() {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const { user, isAuthenticated, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const searchRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
@@ -183,7 +185,7 @@ export default function Header() {
 
   const renderUserDropdown = () => {
     if (!isAuthenticated) {
-  return (
+      return (
         <div className="flex space-x-2">
           <Link
             href="/auth/login"
@@ -205,61 +207,60 @@ export default function Header() {
       <div
         className="relative"
         ref={dropdownRef}
-
       >
-                  <button
+        <button
           className="flex items-center text-gray-300 hover:text-white bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded-full text-sm"
           onMouseEnter={() => setIsDropdownOpen(true)}
         >
-                    <span className="mr-1">{user?.username}</span>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </button>
+          <span className="mr-1">{user?.username}</span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fillRule="evenodd"
+              d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </button>
         {isDropdownOpen && (
           <div className="absolute right-0 mt-1 w-48 bg-gray-800 rounded-lg shadow-lg py-1 z-20 border border-gray-700">
-                    <Link
-                      href="/profile"
-                      className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
-                    >
-                      Trang cá nhân
-                    </Link>
-                    <Link
-                      href="/favorites"
-                      className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
-                    >
-                      Truyện yêu thích
-                    </Link>
-                    <Link
-                      href="/history"
-                      className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
-                    >
-                      Lịch sử đọc
-                    </Link>
-                    {user?.role === 'admin' && (
-                      <Link
-                        href="/admin/dashboard"
-                        className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
-                      >
-                        Quản trị
-                      </Link>
-                    )}
-                    <button
-                      onClick={handleLogout}
-                      className="block w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
-                    >
-                      Đăng xuất
-                    </button>
-                  </div>
+            <Link
+              href="/profile"
+              className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
+            >
+              Trang cá nhân
+            </Link>
+            <Link
+              href="/favorites"
+              className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
+            >
+              Truyện yêu thích
+            </Link>
+            <Link
+              href="/history"
+              className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
+            >
+              Lịch sử đọc
+            </Link>
+            {user?.role === 'admin' && (
+              <Link
+                href="/admin/dashboard"
+                className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
+              >
+                Quản trị
+              </Link>
+            )}
+            <button
+              onClick={handleLogout}
+              className="block w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
+            >
+              Đăng xuất
+            </button>
+          </div>
         )}
       </div>
     );
@@ -270,7 +271,7 @@ export default function Header() {
     return (
       <div className="relative" ref={categoryDropdownRef}>
         <button
-          className="text-gray-300 hover:text-red-500 font-medium flex items-center"
+          className={`${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-700 hover:text-red-500'} font-medium flex items-center`}
           onMouseEnter={() => setIsCategoryDropdownOpen(true)}
         >
           Thể loại
@@ -320,17 +321,45 @@ export default function Header() {
     );
   };
 
+  // Theme toggle button
+  const renderThemeToggle = () => {
+    return (
+      <button
+        onClick={toggleTheme}
+        className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 transition-colors"
+        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {theme === 'dark' ? (
+          // Sun icon for dark mode (switch to light)
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-300" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
+          </svg>
+        ) : (
+          // Moon icon for light mode (switch to dark)
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-300" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+          </svg>
+        )}
+      </button>
+    );
+  };
+
   return (
-    <header className="bg-gray-900 border-b border-gray-800">
+    <header className={`${theme === 'dark' ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
       {/* Top Header */}
-      <div className="bg-gray-800 py-2 border-b border-gray-700">
+      <div className={`${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'} py-2 border-b`}>
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center">
             <Link href="/" className="flex items-center">
-              <span className="text-2xl font-bold text-red-500">MangaVerse</span>
+              <span className="text-2xl font-bold text-red-500 font-nunito">MangaVerse</span>
             </Link>
 
             <div className="flex items-center space-x-4">
+              {/* Theme Toggle */}
+              <div className="mr-2">
+                {renderThemeToggle()}
+              </div>
+
               {/* Desktop Search */}
               <div ref={searchRef} className="hidden md:block relative">
                 <form onSubmit={handleSearch} className="flex">
@@ -344,7 +373,7 @@ export default function Header() {
                       }
                     }}
                     placeholder="Tìm kiếm truyện..."
-                    className="w-64 bg-gray-700 text-white px-4 py-1 rounded-l-full focus:outline-none focus:ring-1 focus:ring-red-500 text-sm"
+                    className={`w-64 ${theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-800'} px-4 py-1 rounded-l-full focus:outline-none focus:ring-1 focus:ring-red-500 text-sm`}
                   />
                   <button
                     type="submit"
@@ -369,9 +398,9 @@ export default function Header() {
 
                 {/* Search Results Dropdown */}
                 {showSearchResults && (
-                  <div className="absolute left-0 right-0 mt-1 bg-gray-800 rounded-lg shadow-lg overflow-hidden z-50 border border-gray-700">
+                  <div className={`absolute left-0 right-0 mt-1 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-lg shadow-lg overflow-hidden z-50 border`}>
                     {isSearching ? (
-                      <div className="p-3 text-center text-gray-400">
+                      <div className={`p-3 text-center ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                         <div className="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-red-500 mr-2"></div>
                         Đang tìm kiếm...
                       </div>
@@ -383,7 +412,7 @@ export default function Header() {
                               href={`/manga/${manga.slug || manga.id}`}
                               key={manga.id}
                               onClick={() => setShowSearchResults(false)}
-                              className="flex items-center p-2 hover:bg-gray-700 border-b border-gray-700 last:border-b-0"
+                              className={`flex items-center p-2 ${theme === 'dark' ? 'hover:bg-gray-700 border-gray-700' : 'hover:bg-gray-100 border-gray-200'} border-b last:border-b-0`}
                             >
                               <div className="w-10 h-14 flex-shrink-0 mr-3 overflow-hidden rounded">
                                 <img
@@ -393,10 +422,10 @@ export default function Header() {
                                 />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-white text-sm font-medium truncate">{manga.title}</p>
+                                <p className={`${theme === 'dark' ? 'text-white' : 'text-gray-900'} text-sm font-medium truncate`}>{manga.title}</p>
                                 {manga.latest_chapter ? (
                                   <div className="flex justify-between text-xs text-gray-400">
-                                    <span className="bg-gray-700 px-2 py-1 rounded">Chapter {manga.latest_chapter.number}</span>
+                                    <span className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'} px-2 py-1 rounded`}>Chapter {manga.latest_chapter.number}</span>
                                     <span>{formatTimeAgo(manga.latest_chapter.created_at)}</span>
                                   </div>
                                 ) : (
@@ -408,7 +437,7 @@ export default function Header() {
                   </Link>
                           ))}
                         </div>
-                        <div className="p-2 border-t border-gray-700">
+                        <div className={`p-2 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
                   <Link
                             href={`/search?q=${encodeURIComponent(searchQuery)}`}
                             onClick={() => setShowSearchResults(false)}
@@ -419,7 +448,7 @@ export default function Header() {
                         </div>
                       </div>
                     ) : (
-                      <div className="p-3 text-center text-gray-400 text-sm">
+                      <div className={`p-3 text-center ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} text-sm`}>
                         Không tìm thấy truyện nào
                       </div>
                     )}
@@ -467,16 +496,16 @@ export default function Header() {
       {/* Main Navigation */}
       <div className="container mx-auto px-4">
         <nav className="hidden md:flex py-3 space-x-6">
-          <Link href="/" className="text-gray-300 hover:text-red-500 font-medium">
+          <Link href="/" className={`${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-700 hover:text-red-500'} font-medium`}>
             Trang chủ
           </Link>
-          <Link href="/latest" className="text-gray-300 hover:text-red-500 font-medium">
+          <Link href="/latest" className={`${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-700 hover:text-red-500'} font-medium`}>
             Mới cập nhật
           </Link>
-          <Link href="/popular" className="text-gray-300 hover:text-red-500 font-medium">
+          <Link href="/popular" className={`${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-700 hover:text-red-500'} font-medium`}>
             Phổ biến
           </Link>
-          <Link href="/completed" className="text-gray-300 hover:text-red-500 font-medium">
+          <Link href="/completed" className={`${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-700 hover:text-red-500'} font-medium`}>
             Hoàn thành
           </Link>
           {renderCategoryDropdown()}
@@ -485,7 +514,7 @@ export default function Header() {
 
       {/* Mobile Menu */}
       {isMenuOpen && (
-        <div className="md:hidden py-4 border-t border-gray-800 bg-gray-900">
+        <div className={`md:hidden py-4 border-t ${theme === 'dark' ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-white'}`}>
           <div className="container mx-auto px-4">
             {/* Mobile Search */}
             <div ref={searchRef} className="relative mb-4">
@@ -500,11 +529,11 @@ export default function Header() {
                     }
                   }}
                 placeholder="Tìm kiếm truyện..."
-                className="w-full bg-gray-800 text-white px-4 py-2 rounded-l focus:outline-none focus:ring-1 focus:ring-red-500"
+                className={`flex-1 ${theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-800'} px-4 py-2 rounded-l-lg focus:outline-none focus:ring-1 focus:ring-red-500`}
               />
               <button
                 type="submit"
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-r"
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-r-lg"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -522,194 +551,29 @@ export default function Header() {
                 </svg>
               </button>
             </form>
+          </div>
 
-              {/* Mobile Search Results Dropdown */}
-              {showSearchResults && (
-                <div className="absolute left-0 right-0 mt-1 bg-gray-800 rounded-lg shadow-lg overflow-hidden z-50 border border-gray-700">
-                  {isSearching ? (
-                    <div className="p-3 text-center text-gray-400">
-                      <div className="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-red-500 mr-2"></div>
-                      Đang tìm kiếm...
-                    </div>
-                  ) : searchResults.length > 0 ? (
-                    <div>
-                      <div className={`${searchResults.length > 5 ? 'max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800' : ''}`}>
-                        {searchResults.map((manga) => (
-                          <Link
-                            href={`/manga/${manga.slug || manga.id}`}
-                            key={manga.id}
-                            onClick={() => {
-                              setShowSearchResults(false);
-                              setIsMenuOpen(false);
-                            }}
-                            className="flex items-center p-2 hover:bg-gray-700 border-b border-gray-700 last:border-b-0"
-                          >
-                            <div className="w-10 h-14 flex-shrink-0 mr-3 overflow-hidden rounded">
-                              <img
-                                src={manga.cover_image?.url || "/placeholder-manga.jpg"}
-                                alt={manga.title}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-white text-sm font-medium truncate">{manga.title}</p>
-                              {manga.latest_chapter ? (
-                                <div className="flex justify-between text-xs text-gray-400">
-                                  <span>Chapter {manga.latest_chapter.number}</span>
-                                  <span>{formatTimeAgo(manga.latest_chapter.created_at)}</span>
-                                </div>
-                              ) : (
-                                <div className="text-xs text-gray-400">
-                                  <span>Chưa có chapter</span>
-                                </div>
-                              )}
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                      <div className="p-2 border-t border-gray-700">
-                        <Link
-                          href={`/search?q=${encodeURIComponent(searchQuery)}`}
-                          onClick={() => {
-                            setShowSearchResults(false);
-                            setIsMenuOpen(false);
-                          }}
-                          className="text-red-500 text-xs hover:underline block text-center"
-                        >
-                          Xem tất cả kết quả
-                        </Link>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-3 text-center text-gray-400 text-sm">
-                      Không tìm thấy truyện nào
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <nav className="flex flex-col space-y-3">
-              <Link
-                href="/"
-                className="text-gray-300 hover:text-red-500"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Trang chủ
-              </Link>
-              <Link
-                href="/latest"
-                className="text-gray-300 hover:text-red-500"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Mới cập nhật
-              </Link>
-              <Link
-                href="/popular"
-                className="text-gray-300 hover:text-red-500"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Phổ biến
-              </Link>
-              <Link
-                href="/completed"
-                className="text-gray-300 hover:text-red-500"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Hoàn thành
-              </Link>
-              <Link
-                href="/genres"
-                className="text-gray-300 hover:text-red-500"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Thể loại
-              </Link>
-
-              <div className="border-t border-gray-800 pt-3 mt-3">
-              {isAuthenticated ? (
-                <div
-                  className="relative"
-                  onMouseEnter={() => setIsDropdownOpen(true)}
-                  onMouseLeave={() => {
-                    setTimeout(() => setIsDropdownOpen(false), 300);
-                  }}
-                >
-                  <button className="flex items-center text-gray-300 hover:text-white bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded-full text-sm">
-                    <span className="mr-1">{user?.username}</span>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </button>
-                  {isDropdownOpen && (
-                    <div className="absolute right-0 mt-1 w-48 bg-gray-800 rounded-lg shadow-lg py-1 z-20 border border-gray-700">
-                      <Link
-                        href="/profile"
-                        className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
-                      >
-                        Trang cá nhân
-                      </Link>
-                      <Link
-                        href="/favorites"
-                        className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
-                      >
-                        Truyện yêu thích
-                      </Link>
-                      <Link
-                        href="/history"
-                        className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
-                      >
-                        Lịch sử đọc
-                      </Link>
-                      {user?.role === 'admin' && (
-                        <Link
-                          href="/admin/dashboard"
-                          className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
-                        >
-                          Quản trị
-                        </Link>
-                      )}
-                      <button
-                        onClick={handleLogout}
-                        className="block w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"
-                      >
-                        Đăng xuất
-                      </button>
-                    </div>
-                  )}
-                </div>
-                ) : (
-                  <div className="flex flex-col space-y-2">
-                    <Link
-                      href="/auth/login"
-                      className="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded text-center"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Đăng nhập
-                    </Link>
-                    <Link
-                      href="/auth/register"
-                      className="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded text-center"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Đăng ký
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </nav>
+          {/* Mobile Navigation Links */}
+          <div className="flex flex-col space-y-3">
+            <Link href="/" className={`${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-700 hover:text-red-500'} font-medium`}>
+              Trang chủ
+            </Link>
+            <Link href="/latest" className={`${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-700 hover:text-red-500'} font-medium`}>
+              Mới cập nhật
+            </Link>
+            <Link href="/popular" className={`${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-700 hover:text-red-500'} font-medium`}>
+              Phổ biến
+            </Link>
+            <Link href="/completed" className={`${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-700 hover:text-red-500'} font-medium`}>
+              Hoàn thành
+            </Link>
+            <Link href="/genres" className={`${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-700 hover:text-red-500'} font-medium`}>
+              Thể loại
+            </Link>
           </div>
         </div>
-      )}
-    </header>
+      </div>
+    )}
+  </header>
   );
 }

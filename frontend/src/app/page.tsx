@@ -7,6 +7,7 @@ import Link from "next/link";
 // import { mangaApi, genreApi } from "../services/api";
 import React from "react";
 import { useMangas, useRankings, useGenres } from '../services/swrApi';
+import { useTheme } from '../hooks/useTheme';
 
 interface Manga {
   id: number;
@@ -34,6 +35,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState("latest");
   const [activeRanking, setActiveRanking] = useState<'day' | 'week' | 'month'>('day');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const { theme } = useTheme();
 
   // Sử dụng SWR hooks
   const { data: popularData, error: popularError, isLoading: popularLoading } = useMangas({
@@ -150,23 +152,23 @@ export default function Home() {
   }
 
   return (
-    <div className="space-y-8">
-      {/* Hero Banner - Improved with backdrop blur and better overlay */}
+    <div className={`space-y-8 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+      {/* Hero Banner - Enhanced with better overlay and styling */}
       {featuredManga && (
         <section className="relative rounded-lg overflow-hidden">
-          <div className="relative h-72 md:h-96">
+          <div className="relative h-80 md:h-[450px]">
             <img
               src={featuredManga.coverImage || "https://placehold.co/1200x800/333/white?text=No+Image"}
               alt={featuredManga.title}
               className="w-full h-full object-cover brightness-75"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent" />
-            <div className="absolute bottom-0 left-0 p-6 md:p-8 w-full md:max-w-2xl backdrop-blur-sm bg-black/30 rounded-tr-lg">
-              <h1 className="text-2xl md:text-3xl font-bold mb-2 text-white drop-shadow-md">{featuredManga.title}</h1>
-              <p className="text-gray-200 mb-4 line-clamp-2 text-sm md:text-base drop-shadow">{featuredManga.description}</p>
+            <div className="absolute bottom-0 left-0 p-6 md:p-8 w-full md:max-w-3xl backdrop-blur-sm bg-black/30 rounded-tr-lg">
+              <h1 className="text-3xl md:text-4xl font-bold mb-3 text-white drop-shadow-md font-nunito">{featuredManga.title}</h1>
+              <p className="text-gray-200 mb-5 line-clamp-3 text-sm md:text-base drop-shadow">{featuredManga.description}</p>
               <Link
                 href={`/manga/${featuredManga.slug || featuredManga.id}`}
-                className="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-md font-medium text-sm inline-block transition-all duration-200 hover:scale-105 hover:shadow-lg"
+                className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-600 text-white px-6 py-3 rounded-md font-medium text-sm inline-block transition-all duration-300 hover:scale-105 hover:shadow-lg animate-pulse-slow"
               >
                 Đọc ngay
               </Link>
@@ -176,14 +178,14 @@ export default function Home() {
       )}
 
       {/* Tab Navigation */}
-      <div className="border-b border-gray-700 mb-4">
+      <div className={`border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} mb-4`}>
         <div className="flex space-x-4">
           <button
             onClick={() => setActiveTab("latest")}
             className={`py-2 px-4 font-medium text-lg ${
               activeTab === "latest"
                 ? "text-red-500 border-b-2 border-red-500"
-                : "text-gray-400 hover:text-white"
+                : theme === 'dark' ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
             }`}
           >
             Mới cập nhật
@@ -193,7 +195,7 @@ export default function Home() {
             className={`py-2 px-4 font-medium text-lg ${
               activeTab === "popular"
                 ? "text-red-500 border-b-2 border-red-500"
-                : "text-gray-400 hover:text-white"
+                : theme === 'dark' ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
             }`}
           >
             Phổ biến
@@ -207,7 +209,7 @@ export default function Home() {
           {/* Left scroll button */}
           <button 
             onClick={scrollLeft}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-gray-900/80 hover:bg-gray-800 text-white rounded-full p-2 shadow-lg"
+            className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 ${theme === 'dark' ? 'bg-gray-900/80 hover:bg-gray-800' : 'bg-white/80 hover:bg-gray-100'} text-red-500 rounded-full p-2 shadow-lg`}
             aria-label="Scroll left"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -224,19 +226,19 @@ export default function Home() {
             {latestUpdates.map((manga: Manga) => (
               <div key={manga.id} className="flex-shrink-0 w-[180px] sm:w-[200px] md:w-[220px] mx-2 snap-start">
                 <Link href={`/manga/${manga.slug || manga.id}`} className="block group">
-                  <div className="relative aspect-[2/3] rounded overflow-hidden mb-2 bg-gray-800 transition-transform duration-300 group-hover:scale-105 group-hover:shadow-lg">
+                  <div className="relative aspect-[2/3] rounded-lg overflow-hidden mb-2 bg-gray-800 transition-all duration-300 group-hover:scale-105 group-hover:shadow-xl">
                     <img
                       src={manga.coverImage}
                       alt={manga.title}
-                      className="object-cover w-full h-full"
+                      className="w-full h-full object-cover"
                       loading="lazy"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/70 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
                     {/* Chapter Badge */}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-2">
                       <div className="flex justify-between items-center text-xs">
-                        <span className="bg-red-600 text-white px-1.5 py-0.5 rounded text-xs">
+                        <span className="bg-red-600 text-white px-2 py-1 rounded text-xs font-medium">
                           Chapter {manga.latest_chapter?.number || manga.latestChapter || manga.chapter || "?"}
                         </span>
 
@@ -270,12 +272,17 @@ export default function Home() {
                           </span>
                         )}
                       </div>
+                      
+                      {/* Hover description */}
+                      <div className="hidden group-hover:block mt-1">
+                        <p className="text-white text-xs line-clamp-2 opacity-90">{manga.description || "Không có mô tả"}</p>
+                      </div>
                     </div>
                   </div>
-                  <h3 className="font-medium text-sm line-clamp-2 group-hover:text-red-500 transition-colors">{manga.title}</h3>
+                  <h3 className="font-medium text-sm line-clamp-2 group-hover:text-red-500 transition-colors font-nunito">{manga.title}</h3>
                 </Link>
                 {manga.updatedAt && (
-                  <p className="text-gray-500 text-xs">
+                  <p className={`${theme === 'dark' ? 'text-gray-500' : 'text-gray-600'} text-xs`}>
                     {new Date(manga.updatedAt).toLocaleDateString()}
                   </p>
                 )}
@@ -286,7 +293,7 @@ export default function Home() {
           {/* Right scroll button */}
           <button 
             onClick={scrollRight}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-gray-900/80 hover:bg-gray-800 text-white rounded-full p-2 shadow-lg"
+            className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 ${theme === 'dark' ? 'bg-gray-900/80 hover:bg-gray-800' : 'bg-white/80 hover:bg-gray-100'} text-red-500 rounded-full p-2 shadow-lg`}
             aria-label="Scroll right"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -302,19 +309,19 @@ export default function Home() {
           {popularMangas.map((manga: Manga) => (
             <div key={manga.id} className="group">
               <Link href={`/manga/${manga.slug || manga.id}`} className="block">
-                <div className="relative aspect-[2/3] rounded overflow-hidden mb-2 bg-gray-800 transition-transform duration-300 group-hover:scale-105 group-hover:shadow-lg">
+                <div className="relative aspect-[2/3] rounded-lg overflow-hidden mb-2 bg-gray-800 transition-all duration-300 group-hover:scale-105 group-hover:shadow-xl">
                   <img
                     src={manga.coverImage}
                     alt={manga.title}
-                    className="object-cover w-full h-full"
+                    className="w-full h-full object-cover"
                     loading="lazy"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/70 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
                   {/* Chapter Badge */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-2">
                     <div className="flex justify-between items-center text-xs">
-                      <span className="bg-red-600 text-white px-1.5 py-0.5 rounded text-xs">
+                      <span className="bg-red-600 text-white px-2 py-1 rounded text-xs font-medium">
                         Chapter {manga.latest_chapter?.number || manga.latestChapter || manga.chapter || "?"}
                       </span>
 
@@ -348,12 +355,17 @@ export default function Home() {
                         </span>
                       )}
                     </div>
+                    
+                    {/* Hover description */}
+                    <div className="hidden group-hover:block mt-1">
+                      <p className="text-white text-xs line-clamp-2 opacity-90">{manga.description || "Không có mô tả"}</p>
+                    </div>
                   </div>
                 </div>
-                <h3 className="font-medium text-sm line-clamp-2 group-hover:text-red-500 transition-colors">{manga.title}</h3>
+                <h3 className="font-medium text-sm line-clamp-2 group-hover:text-red-500 transition-colors font-nunito">{manga.title}</h3>
               </Link>
               {manga.updatedAt && (
-                <p className="text-gray-500 text-xs">
+                <p className={`${theme === 'dark' ? 'text-gray-500' : 'text-gray-600'} text-xs`}>
                   {new Date(manga.updatedAt).toLocaleDateString()}
                 </p>
               )}
@@ -366,7 +378,7 @@ export default function Home() {
       <div className="text-center mt-8">
         <Link
           href={activeTab === "latest" ? "/latest" : "/popular"}
-          className="inline-block bg-gray-800 hover:bg-gray-700 text-white px-6 py-2 rounded-full transition-all duration-200 hover:scale-105 hover:shadow-md"
+          className="inline-block bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-600 text-white px-8 py-3 rounded-full transition-all duration-300 hover:scale-105 hover:shadow-md"
         >
           Xem thêm
         </Link>
@@ -374,23 +386,23 @@ export default function Home() {
 
       {/* Top Rankings Section - Improved with special styling for top 3 */}
       <section className="mt-12">
-        <h2 className="text-xl font-bold mb-4 pb-2 border-b border-gray-700">Bảng xếp hạng</h2>
+        <h2 className={`text-2xl font-bold mb-4 pb-2 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} font-nunito`}>Bảng xếp hạng</h2>
 
-        <div className="flex mb-4 border-b border-gray-800">
+        <div className={`flex mb-4 border-b ${theme === 'dark' ? 'border-gray-800' : 'border-gray-200'}`}>
           <button
-            className={`px-4 py-2 font-medium ${activeRanking === 'day' ? 'text-red-500 border-b-2 border-red-500' : 'text-gray-400'}`}
+            className={`px-4 py-2 font-medium ${activeRanking === 'day' ? 'text-red-500 border-b-2 border-red-500' : theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}
             onClick={() => setActiveRanking('day')}
           >
             Top ngày
           </button>
           <button
-            className={`px-4 py-2 font-medium ${activeRanking === 'week' ? 'text-red-500 border-b-2 border-red-500' : 'text-gray-400'}`}
+            className={`px-4 py-2 font-medium ${activeRanking === 'week' ? 'text-red-500 border-b-2 border-red-500' : theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}
             onClick={() => setActiveRanking('week')}
           >
             Top tuần
           </button>
           <button
-            className={`px-4 py-2 font-medium ${activeRanking === 'month' ? 'text-red-500 border-b-2 border-red-500' : 'text-gray-400'}`}
+            className={`px-4 py-2 font-medium ${activeRanking === 'month' ? 'text-red-500 border-b-2 border-red-500' : theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}
             onClick={() => setActiveRanking('month')}
           >
             Top tháng
@@ -398,10 +410,10 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
-          {processedRankings[activeRanking].map((manga: { id: React.Key | null | undefined; slug: any; coverImage: any; title: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; latestChapter: any; latest_chapter?: {number: number}; chapter: any; period_views: any; view_count: any; }, index: number) => (
+          {processedRankings[activeRanking].map((manga: { id: React.Key | null | undefined; slug: any; coverImage: any; title: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; latestChapter: any; latest_chapter?: {number: number}; chapter: any; period_views: any; view_count: any; description?: string; }, index: number) => (
             <div key={manga.id} className="group">
               <Link href={`/manga/${manga.slug || manga.id}`} className="block">
-                <div className={`relative aspect-[2/3] rounded overflow-hidden mb-2 bg-gray-800 transition-transform duration-300 group-hover:scale-105 group-hover:shadow-lg ${
+                <div className={`relative aspect-[2/3] rounded-lg overflow-hidden mb-2 bg-gray-800 transition-all duration-300 group-hover:scale-105 group-hover:shadow-xl ${
                   index < 3 ? `ring-2 ${index === 0 ? 'ring-yellow-500' : index === 1 ? 'ring-gray-400' : 'ring-amber-700'}` : ''
                 }`}>
                   {/* Ranking number badge with special styling for top 3 */}
@@ -409,22 +421,22 @@ export default function Home() {
                     index === 0 ? 'bg-yellow-500 text-black' : 
                     index === 1 ? 'bg-gray-300 text-black' : 
                     index === 2 ? 'bg-amber-700 text-white' : 
-                    'bg-gray-900/80 text-red-500'
+                    theme === 'dark' ? 'bg-gray-900/80 text-red-500' : 'bg-white/80 text-red-500'
                   }`}>
                     #{index + 1}
                   </div>
                   <img
                     src={manga.coverImage || "/placeholder-manga.jpg"}
                     alt={manga.title as string}
-                    className="object-cover w-full h-full"
+                    className="w-full h-full object-cover"
                     loading="lazy"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/70 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
                   {/* Chapter Badge */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-2">
                     <div className="flex justify-between items-center text-xs">
-                      <span className="bg-red-600 text-white px-1.5 py-0.5 rounded text-xs">
+                      <span className="bg-red-600 text-white px-2 py-1 rounded text-xs font-medium">
                         Chapter {manga.latest_chapter?.number || manga.latestChapter || manga.chapter || 1}
                       </span>
 
@@ -456,9 +468,14 @@ export default function Home() {
                           : manga.period_views || manga.view_count || 0}
                       </span>
                     </div>
+                    
+                    {/* Hover description */}
+                    <div className="hidden group-hover:block mt-1">
+                      <p className="text-white text-xs line-clamp-2 opacity-90">{manga.description || "Không có mô tả"}</p>
+                    </div>
                   </div>
                 </div>
-                <h3 className="font-medium text-sm line-clamp-2 group-hover:text-red-500 transition-colors">{manga.title}</h3>
+                <h3 className="font-medium text-sm line-clamp-2 group-hover:text-red-500 transition-colors font-nunito">{manga.title}</h3>
               </Link>
             </div>
           ))}
@@ -467,13 +484,13 @@ export default function Home() {
 
       {/* Genres Section - Added hover effects */}
       <section className="mt-12">
-        <h2 className="text-xl font-bold mb-4 pb-2 border-b border-gray-700">Thể loại</h2>
+        <h2 className={`text-2xl font-bold mb-4 pb-2 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} font-nunito`}>Thể loại</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {(genres.length > 0 ? genres : defaultGenres).map((genre: { id: React.Key | null | undefined; name: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; }) => (
             <Link
               key={genre.id}
               href={`/genres/${String(genre.name).toLowerCase()}`}
-              className="bg-gray-800 hover:bg-gray-700 text-center py-3 rounded-lg transition-all duration-200 hover:text-red-500 hover:scale-105 hover:shadow-md"
+              className={`${theme === 'dark' ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'} text-center py-3 rounded-lg transition-all duration-200 hover:text-red-500 hover:scale-105 hover:shadow-md`}
             >
               {genre.name}
             </Link>

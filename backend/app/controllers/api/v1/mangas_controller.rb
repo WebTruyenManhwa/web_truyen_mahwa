@@ -11,7 +11,7 @@ module Api
 
         @mangas = Rails.cache.fetch(cache_key, expires_in: 10.minutes) do
           # Chỉ select các trường cần thiết thay vì tất cả
-          mangas = Manga.select(:id, :title, :slug, :status, :view_count, :rating, :total_votes, :cover_image, :created_at, :updated_at)
+          mangas = Manga.select(:id, :title, :description, :slug, :status, :view_count, :rating, :total_votes, :cover_image, :created_at, :updated_at)
                        .includes(:genres)
 
 
@@ -73,7 +73,7 @@ module Api
         # Build the response
         manga_with_latest_chapters = @mangas.map do |manga|
           # Create the basic manga JSON
-          manga_json = manga.as_json(only: [:id, :title, :slug, :status, :view_count, :rating, :total_votes, :cover_image, :created_at, :updated_at])
+          manga_json = manga.as_json(only: [:id, :title, :description, :slug, :status, :view_count, :rating, :total_votes, :cover_image, :created_at, :updated_at])
 
           # Add the latest chapter if available
           if latest_chapters[manga.id]
@@ -246,7 +246,7 @@ module Api
       # Lấy danh sách manga với lượt xem theo thời gian
       def get_mangas_with_views(period, limit = 20)
         # Lấy tất cả manga với thông tin cần thiết, giới hạn số lượng
-        mangas = Manga.select(:id, :title, :slug, :view_count, :rating, :total_votes, :cover_image)
+        mangas = Manga.select(:id, :title, :description, :slug, :view_count, :rating, :total_votes, :cover_image)
                      .includes(:genres)
                      .limit(limit)
 
@@ -308,7 +308,7 @@ module Api
 
           # Tạo hash với thông tin manga và lượt xem
           manga_data = manga.as_json(
-            only: [:id, :title, :slug, :view_count, :rating, :total_votes, :cover_image],
+            only: [:id, :title, :description, :slug, :view_count, :rating, :total_votes, :cover_image],
             include: { genres: { only: [:id, :name] } }
           )
           manga_data['period_views'] = period_views
