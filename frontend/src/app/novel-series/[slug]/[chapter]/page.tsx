@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import axios from "axios";
 import { useParams } from "next/navigation";
@@ -33,6 +33,17 @@ interface ApiResponse {
   };
 }
 
+// Ngưỡng để quyết định có chia nội dung thành các phần hay không
+const CONTENT_THRESHOLDS = {
+  CHARACTERS: 3000, // Số ký tự
+  PARAGRAPHS: 15,   // Số đoạn văn
+  HEIGHT: 3000,     // Chiều cao (px)
+  WORDS: 500        // Số từ
+};
+
+// Số phần hiển thị ban đầu
+const INITIAL_SECTIONS_TO_SHOW = 2;
+
 export default function NovelChapterPage() {
   const { theme } = useTheme();
   const params = useParams();
@@ -47,6 +58,15 @@ export default function NovelChapterPage() {
   const [showNavbar, setShowNavbar] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
+  
+  // State cho infinite scroll và sectioned reveal
+  const [contentSections, setContentSections] = useState<string[]>([]);
+  const [visibleSections, setVisibleSections] = useState(INITIAL_SECTIONS_TO_SHOW);
+  const [shouldSectionContent, setShouldSectionContent] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [reachedEnd, setReachedEnd] = useState(false);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchChapterDetails = async () => {
@@ -69,6 +89,114 @@ export default function NovelChapterPage() {
 
     fetchChapterDetails();
   }, [seriesSlug, chapterSlug]);
+
+  // Xử lý nội dung chương khi đã tải xong
+  useEffect(() => {
+    if (!chapter) return;
+    
+    // Phân tích nội dung để quyết định có nên chia thành các phần hay không
+    const content = chapter.content;
+    
+    // Đếm số ký tự
+    const charCount = content.length;
+    
+    // Đếm số đoạn văn (giả sử đoạn văn được ngăn cách bằng \n)
+    const paragraphCount = (content.match(/\n/g) || []).length + 1;
+    
+    // Đếm số từ (đơn giản là đếm khoảng trắng + 1)
+    const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
+    
+    // Kiểm tra ngưỡng để quyết định có nên chia thành các phần hay không
+    const shouldSection = 
+      charCount > CONTENT_THRESHOLDS.CHARACTERS ||
+      paragraphCount > CONTENT_THRESHOLDS.PARAGRAPHS ||
+      wordCount > CONTENT_THRESHOLDS.WORDS;
+    
+    setShouldSectionContent(shouldSection);
+    
+    if (shouldSection) {
+      // Chia nội dung thành các phần
+      const sections = splitContentIntoSections(content);
+      setContentSections(sections);
+    } else {
+      // Không cần chia, đặt toàn bộ nội dung vào một phần
+      setContentSections([content]);
+      setVisibleSections(1);
+      setReachedEnd(true);
+    }
+  }, [chapter]);
+
+  // Hàm chia nội dung thành các phần
+  const splitContentIntoSections = (content: string): string[] => {
+    // Chia theo đoạn văn
+    const paragraphs = content.split('\n');
+    const sections: string[] = [];
+    const paragraphsPerSection = Math.max(5, Math.ceil(paragraphs.length / 5)); // Khoảng 5 đoạn văn mỗi phần
+    
+    for (let i = 0; i < paragraphs.length; i += paragraphsPerSection) {
+      const sectionParagraphs = paragraphs.slice(i, i + paragraphsPerSection);
+      sections.push(sectionParagraphs.join('\n'));
+    }
+    
+    return sections;
+  };
+
+  // Thiết lập Intersection Observer để tự động tải thêm nội dung khi cuộn đến cuối
+  useEffect(() => {
+    if (!shouldSectionContent || reachedEnd || contentSections.length === 0) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0] && entries[0].isIntersecting && !isLoadingMore) {
+          loadMoreContent();
+        }
+      },
+      { threshold: 0.5 }
+    );
+    
+    const loadMoreElement = loadMoreRef.current;
+    if (loadMoreElement) {
+      observer.observe(loadMoreElement);
+    }
+    
+    observerRef.current = observer;
+    
+    return () => {
+      if (observerRef.current && loadMoreElement) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [shouldSectionContent, contentSections, visibleSections, isLoadingMore, reachedEnd]);
+
+  // Hàm tải thêm nội dung
+  const loadMoreContent = () => {
+    if (isLoadingMore || reachedEnd) return;
+    
+    setIsLoadingMore(true);
+    
+    // Giả lập độ trễ để người dùng thấy được hiệu ứng tải
+    setTimeout(() => {
+      const nextVisibleSections = Math.min(visibleSections + 2, contentSections.length);
+      setVisibleSections(nextVisibleSections);
+      
+      if (nextVisibleSections >= contentSections.length) {
+        setReachedEnd(true);
+      }
+      
+      setIsLoadingMore(false);
+    }, 500);
+  };
+
+  // Hiển thị nội dung dựa trên số phần hiện tại
+  const visibleContent = useMemo(() => {
+    return contentSections.slice(0, visibleSections).join('\n');
+  }, [contentSections, visibleSections]);
+
+  // Tính phần trăm đã đọc
+  const readingProgress = useMemo(() => {
+    if (contentSections.length === 0) return 0;
+    return Math.min(100, Math.round((visibleSections / contentSections.length) * 100));
+  }, [contentSections, visibleSections]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -183,6 +311,11 @@ export default function NovelChapterPage() {
               </h1>
             </div>
             <div className="flex items-center space-x-2">
+              {shouldSectionContent && (
+                <div className={`hidden md:block px-2 py-1 rounded-full ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                  <span className="text-xs font-medium">Đã đọc: {readingProgress}%</span>
+                </div>
+              )}
               <ThemeToggle className="w-8 h-8" />
               <div className="hidden md:flex items-center space-x-2">
                 {prevChapter && (
@@ -246,8 +379,32 @@ export default function NovelChapterPage() {
           <div
             ref={contentRef}
             className={`prose max-w-none ${theme === 'dark' ? 'prose-invert' : ''}`}
-            dangerouslySetInnerHTML={{ __html: chapter.content.replace(/\n/g, "<br />") }}
+            dangerouslySetInnerHTML={{ __html: visibleContent.replace(/\n/g, "<br />") }}
           ></div>
+          
+          {shouldSectionContent && !reachedEnd && (
+            <div 
+              ref={loadMoreRef} 
+              className="flex flex-col items-center justify-center py-8"
+            >
+              {isLoadingMore ? (
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+              ) : (
+                <button 
+                  onClick={loadMoreContent}
+                  className={`px-4 py-2 rounded-lg ${theme === 'dark' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white flex items-center`}
+                >
+                  Tải thêm nội dung
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              )}
+              <div className="mt-2 text-sm text-gray-500">
+                Đã đọc {readingProgress}% nội dung
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-8 hidden md:flex justify-between items-center">
@@ -356,6 +513,16 @@ export default function NovelChapterPage() {
           </Link>
         )}
       </div>
+      
+      {/* Reading progress indicator for mobile */}
+      {shouldSectionContent && (
+        <div className={`md:hidden fixed bottom-0 left-0 right-0 h-1 bg-gray-300`}>
+          <div 
+            className="h-full bg-blue-500"
+            style={{ width: `${readingProgress}%` }}
+          ></div>
+        </div>
+      )}
     </div>
   );
 }
