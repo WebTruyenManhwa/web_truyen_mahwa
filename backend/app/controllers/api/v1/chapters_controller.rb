@@ -7,12 +7,43 @@ module Api
 
       def index
         @chapters = @manga.chapters.ordered
-        render json: @chapters.map { |chapter| ChapterPresenter.new(chapter).as_json }
+
+        # Preload all chapters for this manga to optimize next/prev chapter lookups
+        ChapterPresenterService.preload_chapters_for_manga(@manga.id)
+
+        # Preload all chapter image collections in one query
+        chapter_ids = @chapters.map(&:id)
+        image_collections = ChapterPresenterService.preload_image_collections(chapter_ids)
+
+        # Eager load the chapter_image_collection to avoid N+1 queries
+        @chapters.each do |chapter|
+          # Set the preloaded image collection to avoid the query in the presenter
+          if !chapter.association(:chapter_image_collection).loaded?
+            chapter.association(:chapter_image_collection).target = image_collections[chapter.id]
+          end
+        end
+
+        # Convert chapters to JSON using the presenter with list_view option
+        chapter_data = @chapters.map { |chapter| ChapterPresenter.new(chapter).as_json(list_view: true) }
+
+        # Return the data directly as JSON array
+        render json: { chapters: chapter_data }
       end
 
       def show
         # Increment view counts with rate limiting
         increment_view_counts
+
+        # Preload chapters for this manga to optimize next/prev lookups
+        ChapterPresenterService.preload_chapters_for_manga(@chapter.manga_id)
+
+        # Preload chapter image collection
+        image_collections = ChapterPresenterService.preload_image_collections([@chapter.id])
+
+        # Set the preloaded image collection to avoid the query in the presenter
+        if !@chapter.association(:chapter_image_collection).loaded?
+          @chapter.association(:chapter_image_collection).target = image_collections[@chapter.id]
+        end
 
         render json: ChapterPresenter.new(@chapter).as_json
       end
@@ -141,7 +172,7 @@ module Api
                   # If ID is part of the parameter, find by ID
             @chapter = manga.chapters.find_by(id: chapter_id)
             Rails.logger.debug "Found chapter by ID: #{@chapter&.id} - #{@chapter&.title}"
-                else
+          else
                   # Try to find by slug or ID
             @chapter = manga.chapters.find_by(slug: params[:id])
             Rails.logger.debug "Found chapter by slug: #{@chapter&.id} - #{@chapter&.title}" if @chapter
@@ -170,7 +201,7 @@ module Api
             # If ID is part of the parameter, find by ID
             @chapter = Chapter.find_by(id: chapter_id)
             Rails.logger.debug "Found chapter by ID (no manga): #{@chapter&.id} - #{@chapter&.title}"
-                else
+          else
                   # Try to find by slug or ID
             @chapter = Chapter.find_by(slug: params[:id])
             Rails.logger.debug "Found chapter by slug (no manga): #{@chapter&.id} - #{@chapter&.title}" if @chapter

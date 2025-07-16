@@ -1,10 +1,10 @@
 class ChapterPresenter
   attr_reader :chapter
-  
+
   def initialize(chapter)
     @chapter = chapter
   end
-  
+
   def as_json(options = {})
     {
       id: chapter.id,
@@ -14,15 +14,15 @@ class ChapterPresenter
       created_at: chapter.created_at,
       updated_at: chapter.updated_at,
       manga: manga_data,
-      images: formatted_images,
+      images: formatted_images(options),
       next_chapter: next_chapter_data,
       prev_chapter: prev_chapter_data,
       slug: chapter.slug
     }
   end
-  
+
   private
-  
+
   def manga_data
     {
       id: chapter.manga.id,
@@ -30,10 +30,27 @@ class ChapterPresenter
       slug: chapter.manga.slug
     }
   end
-  
-  def formatted_images
-    return [] unless chapter.chapter_image_collection
-    
+
+  def formatted_images(options = {})
+    # Get the chapter's image collection from the preloaded cache if available
+    image_collection = chapter.chapter_image_collection
+
+    # Return empty array if no image collection exists
+    return [] unless image_collection
+
+    # For list views, we may only need the first image
+    if options[:list_view]
+      first_img = chapter.images.first
+      return [] unless first_img
+
+      return [{
+        position: first_img['position'],
+        url: image_url(first_img),
+        is_external: first_img['is_external']
+      }]
+    end
+
+    # For full chapter view, return all images
     chapter.images.map do |img|
       {
         position: img['position'],
@@ -42,7 +59,7 @@ class ChapterPresenter
       }
     end
   end
-  
+
   def image_url(img)
     if img['is_external']
       img['external_url']
@@ -57,14 +74,14 @@ class ChapterPresenter
     # Fallback URL nếu có lỗi
     "/images/fallback/chapter_image.jpg"
   end
-  
+
   def next_chapter_data
-    next_chap = chapter.manga.chapters.where("number > ?", chapter.number).order(number: :asc).first
-    next_chap ? { id: next_chap.id, number: next_chap.number, slug: next_chap.slug } : nil
+    # Use the optimized service instead of direct queries
+    ChapterPresenterService.next_chapter_data(chapter)
   end
-  
+
   def prev_chapter_data
-    prev_chap = chapter.manga.chapters.where("number < ?", chapter.number).order(number: :desc).first
-    prev_chap ? { id: prev_chap.id, number: prev_chap.number, slug: prev_chap.slug } : nil
+    # Use the optimized service instead of direct queries
+    ChapterPresenterService.prev_chapter_data(chapter)
   end
-end 
+end

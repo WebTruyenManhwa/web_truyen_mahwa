@@ -6,6 +6,7 @@ class RequestCacheMiddleware
   def call(env)
     # Reset request-specific caches before each request
     ChapterService.reset_request_cache
+    ChapterPresenterService.reset_request_cache
 
     # Process the request
     @app.call(env)
