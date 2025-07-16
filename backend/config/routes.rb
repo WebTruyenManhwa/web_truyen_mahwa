@@ -5,6 +5,10 @@ Rails.application.routes.draw do
     omniauth_callbacks: 'api/v1/omniauth_callbacks'
   }
 
+  # Health check routes
+  get '/healthcheck', to: 'health#check'
+  get '/', to: 'health#check', constraints: ->(req) { req.format.json? }
+  
   # Thêm route debug để kiểm tra
   get '/auth-test', to: 'home#auth_test'
 
