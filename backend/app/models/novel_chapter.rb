@@ -12,6 +12,16 @@ class NovelChapter < ApplicationRecord
 
   default_scope { order(chapter_number: :asc) }
 
+  # Batch chapter methods
+  def batch_chapter?
+    is_batch_chapter == true
+  end
+
+  def batch_range
+    return nil unless batch_chapter?
+    (batch_start..batch_end)
+  end
+
   private
 
   def render_markdown_to_html

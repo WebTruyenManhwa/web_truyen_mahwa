@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_07_15_165058) do
+ActiveRecord::Schema[8.0].define(version: 2025_07_16_041232) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -118,6 +118,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_15_165058) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.text "rendered_html"
+    t.boolean "is_batch_chapter"
+    t.integer "batch_start"
+    t.integer "batch_end"
     t.index ["novel_series_id"], name: "index_novel_chapters_on_novel_series_id"
   end
 

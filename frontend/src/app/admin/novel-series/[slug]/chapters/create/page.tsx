@@ -33,6 +33,8 @@ export default function CreateNovelChapterPage() {
     content: "",
     chapter_number: "",
     slug: "",
+    is_batch: false,
+    end_chapter_number: "",
   });
 
   useEffect(() => {
@@ -73,6 +75,24 @@ export default function CreateNovelChapterPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    
+    // Xử lý trường hợp nhập số chương dạng "1-15"
+    if (name === "chapter_number" && value.includes("-")) {
+      const [startChapter, endChapter] = value.split("-");
+      
+      if (startChapter && endChapter) {
+        setFormData((prev) => ({
+          ...prev,
+          chapter_number: startChapter.trim(),
+          end_chapter_number: endChapter.trim(),
+          is_batch: true,
+          // Tự động tạo tiêu đề nếu chưa có
+          title: prev.title || `Chương ${startChapter.trim()}-${endChapter.trim()}`,
+        }));
+        return;
+      }
+    }
+    
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -81,10 +101,26 @@ export default function CreateNovelChapterPage() {
     setSaving(true);
     setError("");
 
+    // Xử lý dữ liệu trước khi gửi
+    const dataToSubmit = { ...formData };
+    
+    // Nếu là chương gộp, tự động cập nhật tiêu đề nếu chưa có
+    if (formData.is_batch && formData.end_chapter_number) {
+      if (!dataToSubmit.title) {
+        dataToSubmit.title = `Chương ${formData.chapter_number}-${formData.end_chapter_number}`;
+      }
+    }
+
     try {
       await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/v1/admin/novel_series/${seriesSlug}/novel_chapters`,
-        { novel_chapter: formData },
+        { 
+          novel_chapter: dataToSubmit,
+          batch_info: formData.is_batch ? {
+            start_chapter: parseInt(formData.chapter_number),
+            end_chapter: parseInt(formData.end_chapter_number)
+          } : null
+        },
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -155,16 +191,24 @@ export default function CreateNovelChapterPage() {
             </div>
 
             <div>
-              <label className="block text-gray-300 mb-2">Số chương (để trống sẽ tự động tạo)</label>
+              <label className="block text-gray-300 mb-2">
+                Số chương (để trống sẽ tự động tạo, nhập dạng "1-15" để tạo chương gộp)
+              </label>
               <input
-                type="number"
+                type="text"
                 name="chapter_number"
-                value={formData.chapter_number}
+                value={formData.is_batch 
+                  ? `${formData.chapter_number}-${formData.end_chapter_number}`
+                  : formData.chapter_number}
                 onChange={handleChange}
-                min="1"
                 className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Ví dụ: 1"
+                placeholder="Ví dụ: 1 hoặc 1-15 cho chương gộp"
               />
+              {formData.is_batch && (
+                <p className="mt-2 text-sm text-yellow-400">
+                  Chương gộp: {formData.chapter_number} đến {formData.end_chapter_number}
+                </p>
+              )}
             </div>
 
             <div>
@@ -199,7 +243,7 @@ export default function CreateNovelChapterPage() {
               disabled={saving}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
-              {saving ? "Đang lưu..." : "Tạo chương mới"}
+              {saving ? "Đang lưu..." : formData.is_batch ? "Tạo chương gộp" : "Tạo chương mới"}
             </button>
           </div>
         </form>
