@@ -509,7 +509,7 @@ export default function Header() {
             Hoàn thành
           </Link>
           <Link href="/novel-series" className={`${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-700 hover:text-red-500'} font-medium`}>
-                  Truyện chữ
+            Truyện chữ
           </Link>
           {renderCategoryDropdown()}
         </nav>
@@ -569,6 +569,9 @@ export default function Header() {
             </Link>
             <Link href="/completed" className={`${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-700 hover:text-red-500'} font-medium`}>
               Hoàn thành
+            </Link>
+            <Link href="/novel-series" className={`${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-700 hover:text-red-500'} font-medium`}>
+              Truyện chữ
             </Link>
             <Link href="/genres" className={`${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-700 hover:text-red-500'} font-medium`}>
               Thể loại
