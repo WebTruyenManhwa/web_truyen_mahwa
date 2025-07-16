@@ -554,6 +554,65 @@ export default function Header() {
                 </svg>
               </button>
             </form>
+
+            {/* Mobile Search Results Dropdown */}
+            {showSearchResults && (
+              <div className={`absolute left-0 right-0 mt-1 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-lg shadow-lg overflow-hidden z-50 border`}>
+                {isSearching ? (
+                  <div className={`p-3 text-center ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <div className="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-red-500 mr-2"></div>
+                    Đang tìm kiếm...
+                  </div>
+                ) : searchResults.length > 0 ? (
+                  <div>
+                    <div className={`${searchResults.length > 5 ? 'max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800' : ''}`}>
+                      {searchResults.map((manga) => (
+                        <Link
+                          href={`/manga/${manga.slug || manga.id}`}
+                          key={manga.id}
+                          onClick={() => setShowSearchResults(false)}
+                          className={`flex items-center p-2 ${theme === 'dark' ? 'hover:bg-gray-700 border-gray-700' : 'hover:bg-gray-100 border-gray-200'} border-b last:border-b-0`}
+                        >
+                          <div className="w-10 h-14 flex-shrink-0 mr-3 overflow-hidden rounded">
+                            <img
+                              src={manga.cover_image?.url || "/placeholder-manga.jpg"}
+                              alt={manga.title}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`${theme === 'dark' ? 'text-white' : 'text-gray-900'} text-sm font-medium truncate`}>{manga.title}</p>
+                            {manga.latest_chapter ? (
+                              <div className="flex justify-between text-xs text-gray-400">
+                                <span className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'} px-2 py-1 rounded`}>Chapter {manga.latest_chapter.number}</span>
+                                <span>{formatTimeAgo(manga.latest_chapter.created_at)}</span>
+                              </div>
+                            ) : (
+                              <div className="text-xs text-gray-400">
+                                <span>Chưa có chapter</span>
+                              </div>
+                            )}
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                    <div className={`p-2 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+                      <Link
+                        href={`/search?q=${encodeURIComponent(searchQuery)}`}
+                        onClick={() => setShowSearchResults(false)}
+                        className="text-red-500 text-xs hover:underline block text-center"
+                      >
+                        Xem tất cả kết quả
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={`p-3 text-center ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} text-sm`}>
+                    Không tìm thấy truyện nào
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Mobile Navigation Links */}
