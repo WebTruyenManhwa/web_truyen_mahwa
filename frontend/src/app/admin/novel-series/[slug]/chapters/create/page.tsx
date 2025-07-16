@@ -37,22 +37,6 @@ export default function CreateNovelChapterPage() {
     end_chapter_number: "",
   });
 
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push("/auth/login");
-      return;
-    }
-
-    if (!authLoading && isAuthenticated && user?.role !== "admin") {
-      router.push("/");
-      return;
-    }
-
-    if (!authLoading && isAuthenticated && user?.role === "admin") {
-      fetchNovelSeries();
-    }
-  }, [authLoading, isAuthenticated, user, seriesSlug]);
-
   const fetchNovelSeries = async () => {
     setLoading(true);
     try {
@@ -72,6 +56,23 @@ export default function CreateNovelChapterPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push("/auth/login");
+      return;
+    }
+
+    if (!authLoading && isAuthenticated && user?.role !== "admin") {
+      router.push("/");
+      return;
+    }
+
+    if (!authLoading && isAuthenticated && user?.role === "admin") {
+      fetchNovelSeries();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated, user, seriesSlug, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -192,7 +193,7 @@ export default function CreateNovelChapterPage() {
 
             <div>
               <label className="block text-gray-300 mb-2">
-                Số chương (để trống sẽ tự động tạo, nhập dạng "1-15" để tạo chương gộp)
+                Số chương (để trống sẽ tự động tạo, nhập dạng &ldquo;1-15&rdquo; để tạo chương gộp)
               </label>
               <input
                 type="text"
