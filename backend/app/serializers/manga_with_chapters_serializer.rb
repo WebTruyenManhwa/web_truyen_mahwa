@@ -26,6 +26,13 @@ class MangaWithChaptersSerializer < MangaSerializer
     @instance_options[:period_views] = views
   end
 
+  # Override chapters to use preloaded data
+  def chapters
+    # Return empty array to avoid N+1 queries in index action
+    # The actual chapters are loaded in the controller and passed via preload
+    []
+  end
+
   # Ghi đè phương thức as_json để thêm thông tin bổ sung
   def as_json(options = {})
     # Merge options với instance_options hiện tại

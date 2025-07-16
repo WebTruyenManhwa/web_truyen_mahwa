@@ -45,5 +45,12 @@ class CacheService
       Rails.cache.delete(rankings_month_cache_key(6))
       Rails.cache.delete(rankings_month_cache_key(20))
     end
+
+    # Create a clear cache script that can be run when needed
+    def clear_all_caches
+      Rails.logger.info "=== Clearing all caches ==="
+      Rails.cache.clear
+      Rails.logger.info "=== All caches cleared successfully ==="
+    end
   end
 end

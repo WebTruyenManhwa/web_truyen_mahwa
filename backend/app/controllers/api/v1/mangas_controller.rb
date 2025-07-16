@@ -16,11 +16,21 @@ module Api
 
         # Giảm số lượng items mặc định xuống 20
         @pagy, @mangas = pagy(@mangas, items: params[:per_page] || 20)
+
+        # Preload genres để tránh N+1 queries
+        # Đảm bảo rằng genres đã được preload
+        if !@mangas.first&.association(:genres)&.loaded?
+          @mangas = @mangas.includes(:genres)
+        end
+
         # Lấy manga IDs cho trang hiện tại
         manga_ids = @mangas.map(&:id)
 
         # Lấy chapter mới nhất cho các manga này trong một truy vấn
         latest_chapters = MangaService.get_latest_chapters(manga_ids)
+
+        # Lấy số lượng chapter cho mỗi manga
+        chapters_count = MangaService.get_chapters_count(manga_ids)
 
         # Preload tất cả chapters cho các manga này để tránh N+1 query
         chapters_by_manga = ChapterService.preload_chapters_for_mangas(manga_ids)
@@ -42,6 +52,11 @@ module Api
           # Thêm chapter mới nhất nếu có
           if latest_chapters[manga.id]
             serializer.add_latest_chapter(latest_chapters[manga.id])
+          end
+
+          # Thêm số lượng chapter nếu có
+          if chapters_count[manga.id]
+            serializer.add_chapters_count(chapters_count[manga.id])
           end
 
           # Chuyển đổi thành JSON

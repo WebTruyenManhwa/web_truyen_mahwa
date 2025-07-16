@@ -28,6 +28,16 @@ module Backend
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w(assets tasks))
 
+    # Add middleware directory to autoload paths
+    config.autoload_paths << Rails.root.join('app', 'middleware')
+    config.eager_load_paths << Rails.root.join('app', 'middleware')
+
+    # Explicitly require the middleware file
+    require Rails.root.join('app', 'middleware', 'request_cache_middleware')
+
+    # Register middleware for request-specific caching
+    config.middleware.use RequestCacheMiddleware
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files

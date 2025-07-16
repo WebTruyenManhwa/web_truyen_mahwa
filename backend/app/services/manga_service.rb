@@ -6,9 +6,17 @@ class MangaService
       mangas = Manga.select(:id, :title, :description, :slug, :status, :author, :artist, :release_year, :view_count, :rating, :total_votes, :cover_image, :created_at, :updated_at)
                    .includes(:genres)
 
-      mangas = mangas.where('title ILIKE ?', "%#{params[:search]}%") if params[:search].present?
-      mangas = mangas.joins(:manga_genres).where(manga_genres: { genre_id: params[:genre_id] }) if params[:genre_id].present?
+      # Thêm điều kiện tìm kiếm nếu có
+      if params[:search].present?
+        mangas = mangas.where('title ILIKE ?', "%#{params[:search]}%")
+      end
 
+      # Thêm điều kiện lọc theo genre nếu có
+      if params[:genre_id].present?
+        mangas = mangas.joins(:manga_genres).where(manga_genres: { genre_id: params[:genre_id] })
+      end
+
+      # Sắp xếp theo tiêu chí
       case params[:sort]
       when 'popular'
         mangas = mangas.popular
@@ -73,25 +81,26 @@ class MangaService
 
     # Lấy bảng xếp hạng manga theo thời gian - tối ưu để tránh N+1 query
     def get_rankings(period, limit = 20)
-      # Lấy nhiều manga hơn để đảm bảo không bỏ sót manga có lượt xem cao
-      # Lấy tối thiểu 100 manga hoặc gấp 5 lần limit yêu cầu
-      fetch_limit = [100, limit * 5].max
+      # Lấy lượt xem theo thời gian cho tất cả manga trong một truy vấn duy nhất
+      period_views_data = get_period_views_for_all_manga(period)
 
-      # Lấy tất cả manga với thông tin cần thiết
+      # Sắp xếp manga_ids theo lượt xem giảm dần
+      sorted_manga_ids = period_views_data.sort_by { |_, views| -views }.map { |manga_id, _| manga_id }.take(limit)
+
+      return [] if sorted_manga_ids.empty?
+
+      # Lấy tất cả manga với thông tin cần thiết, chỉ lấy những manga đã được sắp xếp
       mangas = Manga.select(:id, :title, :description, :status, :author, :artist, :release_year, :slug, :view_count, :rating, :total_votes, :cover_image, :created_at, :updated_at)
                    .includes(:genres)
-                   .limit(fetch_limit)
-
-      # Lấy danh sách manga IDs
-      manga_ids = mangas.map(&:id)
-      return [] if manga_ids.empty?
+                   .where(id: sorted_manga_ids)
+                   .index_by(&:id)
 
       # Lấy chapter mới nhất và số lượng chapter trong một truy vấn duy nhất cho mỗi loại
-      latest_chapters = get_latest_chapters(manga_ids)
-      chapters_count = get_chapters_count(manga_ids)
+      latest_chapters = get_latest_chapters(sorted_manga_ids)
+      chapters_count = get_chapters_count(sorted_manga_ids)
 
       # Preload chapters và images để tránh N+1 query
-      chapters_by_manga = ChapterService.preload_chapters_for_mangas(manga_ids)
+      chapters_by_manga = ChapterService.preload_chapters_for_mangas(sorted_manga_ids)
 
       # Lấy tất cả chapter IDs
       all_chapter_ids = chapters_by_manga.values.flatten.map(&:id)
@@ -99,19 +108,19 @@ class MangaService
       # Preload images cho tất cả chapter trong một truy vấn
       images_by_chapter = ChapterService.preload_images_for_chapters(all_chapter_ids)
 
-      # Lấy lượt xem theo thời gian cho tất cả manga trong một truy vấn duy nhất
-      period_views_data = get_period_views(manga_ids, period)
-
       # Tính lượt xem cho từng manga theo thời gian
-      mangas_with_views = mangas.map do |manga|
+      mangas_with_views = sorted_manga_ids.map do |manga_id|
+        manga = mangas[manga_id]
+        next unless manga
+
         # Lấy lượt xem từ dữ liệu đã tính toán trước đó
-        period_views = period_views_data[manga.id] || manga.view_count || 0
+        period_views = period_views_data[manga_id] || manga.view_count || 0
 
         # Sử dụng serializer để định dạng dữ liệu
         serializer = MangaRankingSerializer.new(manga, {
           period_views: period_views,
-          latest_chapter: latest_chapters[manga.id],
-          chapters_count: chapters_count[manga.id] || 0,
+          latest_chapter: latest_chapters[manga_id],
+          chapters_count: chapters_count[manga_id] || 0,
           chapters_by_manga: chapters_by_manga,
           images_by_chapter: images_by_chapter
         })
@@ -124,19 +133,13 @@ class MangaService
         manga_data.delete('chapters')
 
         manga_data
-      end
+      end.compact
 
-      # Sắp xếp theo lượt xem giảm dần, đảm bảo period_views không nil
-      sorted_mangas = mangas_with_views.sort_by { |m| -(m[:period_views] || 0) }
-
-      # Giới hạn lại số lượng manga trả về theo limit ban đầu
-      sorted_mangas.take(limit)
+      mangas_with_views
     end
 
-    # Lấy lượt xem theo thời gian cho nhiều manga cùng lúc
-    def get_period_views(manga_ids, period)
-      return {} if manga_ids.empty?
-
+    # Lấy lượt xem theo thời gian cho tất cả manga
+    def get_period_views_for_all_manga(period)
       # Xác định khoảng thời gian dựa trên period
       case period
       when :day
@@ -150,27 +153,31 @@ class MangaService
       end
 
       # Cache key cho kết quả
-      cache_key = "manga_views/#{period}/#{start_date.to_i}/#{manga_ids.sort.join('-')}"
+      cache_key = "manga_views_all/#{period}/#{start_date.to_i}"
 
       # Sử dụng cache để giảm tải database
       Rails.cache.fetch(cache_key, expires_in: 1.hour) do
-        # Lấy tổng lượt xem cho tất cả manga trong khoảng thời gian
-        views_data = {}
-
         # Truy vấn SQL để lấy tổng lượt xem cho mỗi manga trong khoảng thời gian
         # Sử dụng format chuỗi ISO 8601 cho thời gian để tránh lỗi
         formatted_date = start_date.strftime('%Y-%m-%d %H:%M:%S')
         sql = <<-SQL
           SELECT manga_id, SUM(view_count) as total_views
           FROM manga_views
-          WHERE manga_id IN (#{manga_ids.join(',')})
-            AND created_at >= '#{formatted_date}'
+          WHERE created_at >= '#{formatted_date}'
           GROUP BY manga_id
         SQL
 
         # Thực thi truy vấn và lưu kết quả
+        views_data = {}
         ActiveRecord::Base.connection.execute(sql).each do |row|
-          views_data[row['manga_id']] = row['total_views'].to_i
+          views_data[row['manga_id'].to_i] = row['total_views'].to_i
+        end
+
+        # Nếu không có dữ liệu views, lấy từ manga.view_count
+        if views_data.empty?
+          Manga.pluck(:id, :view_count).each do |id, view_count|
+            views_data[id] = view_count.to_i
+          end
         end
 
         views_data
