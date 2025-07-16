@@ -23,26 +23,17 @@ class MangaService
       mangas
     end
 
-    # Lấy thông tin chapter mới nhất cho danh sách manga
+    # Lấy thông tin chapter mới nhất cho danh sách manga - tối ưu để tránh N+1 query
     def get_latest_chapters(manga_ids)
       return {} if manga_ids.empty?
 
       latest_chapters = {}
-      # Sử dụng subquery để lấy chapter mới nhất cho mỗi manga
+      # Sử dụng DISTINCT ON để lấy chapter mới nhất cho mỗi manga trong một truy vấn duy nhất
       latest_chapters_sql = <<-SQL
-        WITH ranked_chapters AS (
-          SELECT
-            id,
-            manga_id,
-            number,
-            created_at,
-            ROW_NUMBER() OVER (PARTITION BY manga_id ORDER BY number::decimal DESC) as rn
-          FROM chapters
-          WHERE manga_id IN (#{manga_ids.join(',')})
-        )
-        SELECT id, manga_id, number, created_at
-        FROM ranked_chapters
-        WHERE rn = 1
+        SELECT DISTINCT ON (manga_id) id, manga_id, number, title, created_at
+        FROM chapters
+        WHERE manga_id IN (#{manga_ids.join(',')})
+        ORDER BY manga_id, number::decimal DESC
       SQL
 
       # Thực thi truy vấn trực tiếp
@@ -53,6 +44,7 @@ class MangaService
         latest_chapters[row['manga_id']] = {
           id: row['id'],
           number: row['number'],
+          title: row['title'],
           created_at: row['created_at']
         }
       end
@@ -60,12 +52,13 @@ class MangaService
       latest_chapters
     end
 
-    # Lấy số lượng chapter cho danh sách manga
+    # Lấy số lượng chapter cho danh sách manga - đã tối ưu để tránh N+1 query
     def get_chapters_count(manga_ids)
       return {} if manga_ids.empty?
 
-      chapters_count = {}
+      # Sử dụng GROUP BY để đếm số lượng chapter cho tất cả manga trong một truy vấn
       count_sql = "SELECT manga_id, COUNT(*) as count FROM chapters WHERE manga_id IN (#{manga_ids.join(',')}) GROUP BY manga_id"
+      chapters_count = {}
       ActiveRecord::Base.connection.execute(count_sql).each do |row|
         chapters_count[row['manga_id']] = row['count']
       end
@@ -73,34 +66,32 @@ class MangaService
       chapters_count
     end
 
-    # Lấy bảng xếp hạng manga theo thời gian
+    # Lấy bảng xếp hạng manga theo thời gian - tối ưu để tránh N+1 query
     def get_rankings(period, limit = 20)
-      # Lấy tất cả manga với thông tin cần thiết, giới hạn số lượng
+      # Lấy nhiều manga hơn để đảm bảo không bỏ sót manga có lượt xem cao
+      # Lấy tối thiểu 100 manga hoặc gấp 5 lần limit yêu cầu
+      fetch_limit = [100, limit * 5].max
+
+      # Lấy tất cả manga với thông tin cần thiết
       mangas = Manga.select(:id, :title, :description, :status, :author, :artist, :release_year, :slug, :view_count, :rating, :total_votes, :cover_image, :created_at, :updated_at)
                    .includes(:genres)
-                   .limit(limit)
+                   .limit(fetch_limit)
 
       # Lấy danh sách manga IDs
       manga_ids = mangas.map(&:id)
+      return [] if manga_ids.empty?
 
-      # Lấy chapter mới nhất và số lượng chapter
+      # Lấy chapter mới nhất và số lượng chapter trong một truy vấn duy nhất cho mỗi loại
       latest_chapters = get_latest_chapters(manga_ids)
       chapters_count = get_chapters_count(manga_ids)
 
+      # Lấy lượt xem theo thời gian cho tất cả manga trong một truy vấn duy nhất
+      period_views_data = get_period_views(manga_ids, period)
+
       # Tính lượt xem cho từng manga theo thời gian
       mangas_with_views = mangas.map do |manga|
-        # Lấy lượt xem theo thời gian từ database
-        period_views = case period
-                      when :day
-                        manga.views_for_day
-                      when :week
-                        manga.views_for_week
-                      when :month
-                        manga.views_for_month
-                      end
-
-        # Nếu không có lượt xem hoặc nil, sử dụng view_count từ manga hoặc 0
-        period_views = manga.view_count || 0 if period_views.nil? || period_views == 0
+        # Lấy lượt xem từ dữ liệu đã tính toán trước đó
+        period_views = period_views_data[manga.id] || manga.view_count || 0
 
         # Sử dụng serializer để định dạng dữ liệu
         serializer = MangaRankingSerializer.new(manga, {
@@ -116,7 +107,54 @@ class MangaService
       end
 
       # Sắp xếp theo lượt xem giảm dần, đảm bảo period_views không nil
-      mangas_with_views.sort_by { |m| -(m['period_views'] || 0) }
+      sorted_mangas = mangas_with_views.sort_by { |m| -(m[:period_views] || 0) }
+
+      # Giới hạn lại số lượng manga trả về theo limit ban đầu
+      sorted_mangas.take(limit)
+    end
+
+    # Lấy lượt xem theo thời gian cho nhiều manga cùng lúc
+    def get_period_views(manga_ids, period)
+      return {} if manga_ids.empty?
+
+      # Xác định khoảng thời gian dựa trên period
+      case period
+      when :day
+        start_date = Date.today.beginning_of_day
+      when :week
+        start_date = 6.days.ago.beginning_of_day
+      when :month
+        start_date = 29.days.ago.beginning_of_day
+      else
+        start_date = Date.today.beginning_of_day
+      end
+
+      # Cache key cho kết quả
+      cache_key = "manga_views/#{period}/#{start_date.to_i}/#{manga_ids.sort.join('-')}"
+
+      # Sử dụng cache để giảm tải database
+      Rails.cache.fetch(cache_key, expires_in: 1.hour) do
+        # Lấy tổng lượt xem cho tất cả manga trong khoảng thời gian
+        views_data = {}
+
+        # Truy vấn SQL để lấy tổng lượt xem cho mỗi manga trong khoảng thời gian
+        # Sử dụng format chuỗi ISO 8601 cho thời gian để tránh lỗi
+        formatted_date = start_date.strftime('%Y-%m-%d %H:%M:%S')
+        sql = <<-SQL
+          SELECT manga_id, SUM(view_count) as total_views
+          FROM manga_views
+          WHERE manga_id IN (#{manga_ids.join(',')})
+            AND created_at >= '#{formatted_date}'
+          GROUP BY manga_id
+        SQL
+
+        # Thực thi truy vấn và lưu kết quả
+        ActiveRecord::Base.connection.execute(sql).each do |row|
+          views_data[row['manga_id']] = row['total_views'].to_i
+        end
+
+        views_data
+      end
     end
 
     # Tăng lượt xem cho manga
