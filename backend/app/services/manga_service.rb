@@ -27,10 +27,13 @@ class MangaService
     def get_latest_chapters(manga_ids)
       return {} if manga_ids.empty?
 
+      # Đảm bảo manga_ids là mảng các số nguyên
+      manga_ids = manga_ids.map(&:to_i).uniq
+
       latest_chapters = {}
       # Sử dụng DISTINCT ON để lấy chapter mới nhất cho mỗi manga trong một truy vấn duy nhất
       latest_chapters_sql = <<-SQL
-        SELECT DISTINCT ON (manga_id) id, manga_id, number, title, created_at
+        SELECT DISTINCT ON (manga_id) id, manga_id, number, title, slug, created_at
         FROM chapters
         WHERE manga_id IN (#{manga_ids.join(',')})
         ORDER BY manga_id, number::decimal DESC
@@ -41,10 +44,12 @@ class MangaService
 
       # Xử lý kết quả
       result.each do |row|
-        latest_chapters[row['manga_id']] = {
+        manga_id = row['manga_id'].to_i
+        latest_chapters[manga_id] = {
           id: row['id'],
           number: row['number'],
           title: row['title'],
+          slug: row['slug'],
           created_at: row['created_at']
         }
       end
@@ -85,6 +90,15 @@ class MangaService
       latest_chapters = get_latest_chapters(manga_ids)
       chapters_count = get_chapters_count(manga_ids)
 
+      # Preload chapters và images để tránh N+1 query
+      chapters_by_manga = ChapterService.preload_chapters_for_mangas(manga_ids)
+
+      # Lấy tất cả chapter IDs
+      all_chapter_ids = chapters_by_manga.values.flatten.map(&:id)
+
+      # Preload images cho tất cả chapter trong một truy vấn
+      images_by_chapter = ChapterService.preload_images_for_chapters(all_chapter_ids)
+
       # Lấy lượt xem theo thời gian cho tất cả manga trong một truy vấn duy nhất
       period_views_data = get_period_views(manga_ids, period)
 
@@ -97,12 +111,18 @@ class MangaService
         serializer = MangaRankingSerializer.new(manga, {
           period_views: period_views,
           latest_chapter: latest_chapters[manga.id],
-          chapters_count: chapters_count[manga.id] || 0
+          chapters_count: chapters_count[manga.id] || 0,
+          chapters_by_manga: chapters_by_manga,
+          images_by_chapter: images_by_chapter
         })
 
         # Chuyển đổi thành JSON
         manga_data = serializer.as_json
         manga_data['cover_image'] = { url: manga.cover_image_url } if manga.cover_image.present?
+
+        # Không bao gồm chapters trong kết quả rankings để tránh lỗi serializer
+        manga_data.delete('chapters')
+
         manga_data
       end
 

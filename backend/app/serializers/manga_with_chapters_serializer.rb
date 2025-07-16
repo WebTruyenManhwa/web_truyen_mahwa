@@ -28,7 +28,10 @@ class MangaWithChaptersSerializer < MangaSerializer
 
   # Ghi đè phương thức as_json để thêm thông tin bổ sung
   def as_json(options = {})
-    json = super(options)
+    # Merge options với instance_options hiện tại
+    @instance_options = @instance_options.merge(options) if options.present?
+
+    json = super(@instance_options)
 
     # Thêm latest_chapter nếu có
     if @instance_options[:latest_chapter]

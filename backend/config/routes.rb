@@ -8,7 +8,7 @@ Rails.application.routes.draw do
   # Health check routes
   get '/healthcheck', to: 'health#check'
   get '/', to: 'health#check', constraints: ->(req) { req.format.json? }
-  
+
   # Thêm route debug để kiểm tra
   get '/auth-test', to: 'home#auth_test'
 
@@ -50,6 +50,8 @@ Rails.application.routes.draw do
           get 'rankings/day', to: 'mangas#rankings_day'
           get 'rankings/week', to: 'mangas#rankings_week'
           get 'rankings/month', to: 'mangas#rankings_month'
+          # Add route to clear rankings cache (admin only)
+          post 'rankings/clear_cache', to: 'mangas#clear_rankings_cache'
         end
 
         # Add route for getting user's rating for a manga
