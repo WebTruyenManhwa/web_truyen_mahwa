@@ -17,46 +17,34 @@ module Api
         # Giảm số lượng items mặc định xuống 20
         @pagy, @mangas = pagy(@mangas, items: params[:per_page] || 20)
 
-        # Preload genres để tránh N+1 queries
-        # Đảm bảo rằng genres đã được preload
-        if !@mangas.first&.association(:genres)&.loaded?
-          @mangas = @mangas.includes(:genres)
-        end
-
         # Lấy manga IDs cho trang hiện tại
         manga_ids = @mangas.map(&:id)
 
-        # Lấy chapter mới nhất cho các manga này trong một truy vấn
-        latest_chapters = MangaService.get_latest_chapters(manga_ids)
+        # Đảm bảo preload genres và manga_genres để tránh N+1 queries
+        # Sử dụng eager_load thay vì includes để đảm bảo associations được load hoàn toàn
+        @mangas = Manga.eager_load(:genres, :manga_genres)
+                      .where(id: manga_ids)
+                      .order(created_at: :desc)
 
-        # Lấy số lượng chapter cho mỗi manga
-        chapters_count = MangaService.get_chapters_count(manga_ids)
-
-        # Preload tất cả chapters cho các manga này để tránh N+1 query
-        chapters_by_manga = ChapterService.preload_chapters_for_mangas(manga_ids)
-
-        # Lấy tất cả chapter IDs
-        all_chapter_ids = chapters_by_manga.values.flatten.map(&:id)
-
-        # Preload images cho tất cả chapter trong một truy vấn
-        images_by_chapter = ChapterService.preload_images_for_chapters(all_chapter_ids)
+        # Preload tất cả dữ liệu cần thiết trong một lần
+        preloaded_data = preload_manga_data(manga_ids)
 
         # Sử dụng serializer để định dạng dữ liệu
         manga_with_latest_chapters = @mangas.map do |manga|
           # Tạo serializer với dữ liệu preload
           serializer = MangaWithChaptersSerializer.new(manga, {
-            chapters_by_manga: chapters_by_manga,
-            images_by_chapter: images_by_chapter
+            chapters_by_manga: preloaded_data[:chapters_by_manga],
+            images_by_chapter: preloaded_data[:images_by_chapter]
           })
 
           # Thêm chapter mới nhất nếu có
-          if latest_chapters[manga.id]
-            serializer.add_latest_chapter(latest_chapters[manga.id])
+          if preloaded_data[:latest_chapters][manga.id]
+            serializer.add_latest_chapter(preloaded_data[:latest_chapters][manga.id])
           end
 
           # Thêm số lượng chapter nếu có
-          if chapters_count[manga.id]
-            serializer.add_chapters_count(chapters_count[manga.id])
+          if preloaded_data[:chapters_count][manga.id]
+            serializer.add_chapters_count(preloaded_data[:chapters_count][manga.id])
           end
 
           # Chuyển đổi thành JSON
@@ -191,9 +179,34 @@ module Api
 
       private
 
+      # Preload tất cả dữ liệu cần thiết cho danh sách manga trong một lần
+      def preload_manga_data(manga_ids)
+        # Lấy chapter mới nhất cho các manga này trong một truy vấn
+        latest_chapters = MangaService.get_latest_chapters(manga_ids)
+
+        # Lấy số lượng chapter cho mỗi manga
+        chapters_count = MangaService.get_chapters_count(manga_ids)
+
+        # Preload tất cả chapters cho các manga này để tránh N+1 query
+        chapters_by_manga = ChapterService.preload_chapters_for_mangas(manga_ids)
+
+        # Lấy tất cả chapter IDs
+        all_chapter_ids = chapters_by_manga.values.flatten.map(&:id)
+
+        # Chỉ preload ảnh đầu tiên cho mỗi chapter để tối ưu hóa hiệu suất
+        images_by_chapter = ChapterService.preload_first_images_for_chapters(all_chapter_ids)
+
+        {
+          latest_chapters: latest_chapters,
+          chapters_count: chapters_count,
+          chapters_by_manga: chapters_by_manga,
+          images_by_chapter: images_by_chapter
+        }
+      end
+
       # Preload dữ liệu và serialize manga để tránh N+1 query
       def preload_and_serialize_manga(manga)
-        # Preload tất cả chapters và chapter_image_collections cho manga này
+        # Preload tất cả chapters và chapter_image_collection cho manga này
         chapters = manga.chapters.includes(:chapter_image_collection, :manga).order(number: :asc).to_a
 
         # Sắp xếp chapters theo số chapter để tối ưu hóa việc tìm kiếm next/prev

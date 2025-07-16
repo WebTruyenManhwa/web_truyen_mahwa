@@ -4,6 +4,7 @@ class ChapterService
     def reset_request_cache
       @chapters_cache = {}
       @images_cache = {}
+      @first_images_cache = {}
     end
 
     # Preload chapters for multiple mangas in a single query
@@ -35,6 +36,49 @@ class ChapterService
       @chapters_cache[cache_key] = chapters_by_manga
 
       chapters_by_manga
+    end
+
+    # Preload only first image for each chapter - optimized for list views
+    def preload_first_images_for_chapters(chapter_ids)
+      return {} if chapter_ids.blank?
+
+      # Initialize cache if needed
+      @first_images_cache ||= {}
+
+      # Create a cache key for this specific set of chapter_ids
+      cache_key = chapter_ids.sort.join('-')
+
+      # Return cached result if available
+      return @first_images_cache[cache_key] if @first_images_cache[cache_key]
+
+      # Ensure chapter_ids are integers
+      chapter_ids = chapter_ids.map(&:to_i).uniq
+
+      # Use raw SQL to fetch only the first image for each chapter
+      # This is much more efficient than loading all images and then filtering
+      # Use proper JSON extraction for PostgreSQL with -> operator
+      sql = <<-SQL
+        SELECT DISTINCT ON (chapter_id) chapter_id, images->0 as first_image
+        FROM chapter_image_collections
+        WHERE chapter_id IN (#{chapter_ids.join(',')})
+        ORDER BY chapter_id
+      SQL
+
+      # Execute the query
+      results = ActiveRecord::Base.connection.execute(sql)
+
+      # Create a map of chapter_id to first image only
+      first_images_by_chapter = {}
+      results.each do |row|
+        chapter_id = row['chapter_id'].to_i
+        first_image = row['first_image']
+        first_images_by_chapter[chapter_id] = [first_image] if first_image.present?
+      end
+
+      # Cache the result
+      @first_images_cache[cache_key] = first_images_by_chapter
+
+      first_images_by_chapter
     end
 
     # Preload images for multiple chapters in a single query

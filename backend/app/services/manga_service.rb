@@ -4,7 +4,7 @@ class MangaService
     def fetch_mangas(params)
       # Chỉ select các trường cần thiết thay vì tất cả
       mangas = Manga.select(:id, :title, :description, :slug, :status, :author, :artist, :release_year, :view_count, :rating, :total_votes, :cover_image, :created_at, :updated_at)
-                   .includes(:genres)
+                   .eager_load(:genres, :manga_genres) # Sử dụng eager_load thay vì includes
 
       # Thêm điều kiện tìm kiếm nếu có
       if params[:search].present?
@@ -91,22 +91,12 @@ class MangaService
 
       # Lấy tất cả manga với thông tin cần thiết, chỉ lấy những manga đã được sắp xếp
       mangas = Manga.select(:id, :title, :description, :status, :author, :artist, :release_year, :slug, :view_count, :rating, :total_votes, :cover_image, :created_at, :updated_at)
-                   .includes(:genres)
+                   .eager_load(:genres, :manga_genres) # Sử dụng eager_load thay vì includes
                    .where(id: sorted_manga_ids)
                    .index_by(&:id)
 
-      # Lấy chapter mới nhất và số lượng chapter trong một truy vấn duy nhất cho mỗi loại
-      latest_chapters = get_latest_chapters(sorted_manga_ids)
-      chapters_count = get_chapters_count(sorted_manga_ids)
-
-      # Preload chapters và images để tránh N+1 query
-      chapters_by_manga = ChapterService.preload_chapters_for_mangas(sorted_manga_ids)
-
-      # Lấy tất cả chapter IDs
-      all_chapter_ids = chapters_by_manga.values.flatten.map(&:id)
-
-      # Preload images cho tất cả chapter trong một truy vấn
-      images_by_chapter = ChapterService.preload_images_for_chapters(all_chapter_ids)
+      # Preload tất cả dữ liệu cần thiết trong một lần
+      preloaded_data = preload_ranking_data(sorted_manga_ids)
 
       # Tính lượt xem cho từng manga theo thời gian
       mangas_with_views = sorted_manga_ids.map do |manga_id|
@@ -119,10 +109,10 @@ class MangaService
         # Sử dụng serializer để định dạng dữ liệu
         serializer = MangaRankingSerializer.new(manga, {
           period_views: period_views,
-          latest_chapter: latest_chapters[manga_id],
-          chapters_count: chapters_count[manga_id] || 0,
-          chapters_by_manga: chapters_by_manga,
-          images_by_chapter: images_by_chapter
+          latest_chapter: preloaded_data[:latest_chapters][manga_id],
+          chapters_count: preloaded_data[:chapters_count][manga_id] || 0,
+          chapters_by_manga: preloaded_data[:chapters_by_manga],
+          images_by_chapter: preloaded_data[:images_by_chapter]
         })
 
         # Chuyển đổi thành JSON
@@ -136,6 +126,29 @@ class MangaService
       end.compact
 
       mangas_with_views
+    end
+
+    # Preload tất cả dữ liệu cần thiết cho bảng xếp hạng trong một lần
+    def preload_ranking_data(manga_ids)
+      # Lấy chapter mới nhất và số lượng chapter trong một truy vấn duy nhất cho mỗi loại
+      latest_chapters = get_latest_chapters(manga_ids)
+      chapters_count = get_chapters_count(manga_ids)
+
+      # Preload chapters và images để tránh N+1 query
+      chapters_by_manga = ChapterService.preload_chapters_for_mangas(manga_ids)
+
+      # Lấy tất cả chapter IDs
+      all_chapter_ids = chapters_by_manga.values.flatten.map(&:id)
+
+      # Chỉ preload ảnh đầu tiên cho mỗi chapter để tối ưu hóa hiệu suất
+      images_by_chapter = ChapterService.preload_first_images_for_chapters(all_chapter_ids)
+
+      {
+        latest_chapters: latest_chapters,
+        chapters_count: chapters_count,
+        chapters_by_manga: chapters_by_manga,
+        images_by_chapter: images_by_chapter
+      }
     end
 
     # Lấy lượt xem theo thời gian cho tất cả manga
