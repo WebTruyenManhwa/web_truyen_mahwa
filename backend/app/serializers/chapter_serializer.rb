@@ -3,7 +3,11 @@ class ChapterSerializer < ActiveModel::Serializer
   has_one :chapter_image_collection
 
   def next_chapter
-    # Sử dụng chapter đã được preload nếu có
+    # Try using ChapterPresenterService first, which uses preloaded data
+    next_chapter_data = ChapterPresenterService.next_chapter_data(object)
+    return next_chapter_data if next_chapter_data
+
+    # Fallback to using preloaded chapters from instance_options
     if instance_options[:chapters_by_manga] && instance_options[:chapters_by_manga][object.manga_id]
       chapters = instance_options[:chapters_by_manga][object.manga_id]
       # Ensure chapters are sorted by number
@@ -26,7 +30,11 @@ class ChapterSerializer < ActiveModel::Serializer
   end
 
   def prev_chapter
-    # Sử dụng chapter đã được preload nếu có
+    # Try using ChapterPresenterService first, which uses preloaded data
+    prev_chapter_data = ChapterPresenterService.prev_chapter_data(object)
+    return prev_chapter_data if prev_chapter_data
+
+    # Fallback to using preloaded chapters from instance_options
     if instance_options[:chapters_by_manga] && instance_options[:chapters_by_manga][object.manga_id]
       chapters = instance_options[:chapters_by_manga][object.manga_id]
       # Ensure chapters are sorted by number
@@ -49,16 +57,31 @@ class ChapterSerializer < ActiveModel::Serializer
   end
 
   def manga
-    # Sử dụng manga đã được preload từ association
+    # Make sure we're using the preloaded manga association
+    return nil unless object.association(:manga).loaded? || object.manga_id
+
+    # Use the preloaded manga object if available
+    manga_obj = object.manga
+
+    # Return basic manga data
     {
-      id: object.manga.id,
-      title: object.manga.title,
-      slug: object.manga.slug
+      id: manga_obj.id,
+      title: manga_obj.title,
+      slug: manga_obj.slug
     }
   end
 
   def images
-    # Sử dụng images đã được preload nếu có
+    # First check if images are already memoized in the object
+    return object.instance_variable_get(:@images) if object.instance_variable_defined?(:@images)
+
+    # Check if the chapter_image_collection association is already loaded
+    if object.association(:chapter_image_collection).loaded?
+      # If the association is loaded, use it directly
+      return object.images
+    end
+
+    # Use images from preloaded data if available
     if instance_options[:images_by_chapter] && instance_options[:images_by_chapter][object.id]
       return instance_options[:images_by_chapter][object.id]
     end
