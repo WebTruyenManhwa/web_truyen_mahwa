@@ -14,8 +14,10 @@ import ThemeToggle from "../../../../../components/ThemeToggle";
 
 interface ChapterImage {
   position: number;
-  url: string;
+  url?: string;
+  external_url?: string;
   is_external: boolean;
+  image?: string | null;
 }
 
 interface ChapterSummary {
@@ -183,13 +185,29 @@ export default function ChapterReader() {
         setIsLoading(true);
         const data = await chapterApi.getChapter(mangaId, chapterId);
         console.log("Chapter data:", data);
+
+        // Debug image data
+        // if (data && data.images) {
+        //   console.log("Image data:", data.images);
+        //   data.images.forEach((img, index) => {
+        //     console.log(`Image ${index}:`, {
+        //       position: img.position,
+        //       url: img.url,
+        //       external_url: img.external_url,
+        //       is_external: img.is_external
+        //     });
+        //   });
+        // }
+
         setChapter(data);
 
         // Fetch tất cả chapters của manga
         try {
-          const chapters = await chapterApi.getMangaChapters(mangaId);
+          const chaptersData = await chapterApi.getMangaChapters(mangaId);
           // Sắp xếp chapters theo số thứ tự
-          const sortedChapters = [...chapters].sort((a, b) => a.number - b.number);
+          const sortedChapters = chaptersData && chaptersData.chapters && Array.isArray(chaptersData.chapters)
+            ? [...chaptersData.chapters].sort((a, b) => b.number - a.number)
+            : [];
           setAllChapters(sortedChapters);
         } catch (err) {
           console.error("Failed to fetch manga chapters:", err);
@@ -475,7 +493,32 @@ export default function ChapterReader() {
 
   // Helper function to get the image URL from different possible sources
   const getImageUrl = (image: ChapterImage): string => {
-    return image.url || '';
+    let finalUrl = '';
+
+    // For external images, use external_url
+    if (image.is_external && image.external_url) {
+      finalUrl = image.external_url;
+    } else {
+      // For non-external images, try url or image
+      finalUrl = image.url || image.image || '';
+    }
+
+    // Use a placeholder image when URL is empty or undefined
+    const result = finalUrl && finalUrl.trim() !== ''
+      ? finalUrl
+      : 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="1200" viewBox="0 0 800 1200" fill="none"%3E%3Crect width="800" height="1200" fill="%23f0f0f0"/%3E%3Ctext x="400" y="600" font-family="Arial" font-size="24" text-anchor="middle" fill="%23999999"%3EImage not available%3C/text%3E%3C/svg%3E';
+
+    // console.log('Image data:', {
+    //   original: image,
+    //   is_external: image.is_external,
+    //   external_url: image.external_url,
+    //   url: image.url,
+    //   image: image.image,
+    //   finalUrl: finalUrl,
+    //   result: result
+    // });
+
+    return result;
   };
 
   if (isLoading) {

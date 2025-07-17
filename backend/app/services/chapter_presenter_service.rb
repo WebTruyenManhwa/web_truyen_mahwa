@@ -7,6 +7,16 @@ class ChapterPresenterService
       @image_collections = {}
     end
 
+    # Check if chapters are preloaded for a manga
+    def has_chapters_for_manga?(manga_id)
+      @chapters_by_manga&.key?(manga_id)
+    end
+
+    # Get preloaded chapters for a manga
+    def chapters_by_manga(manga_id)
+      @chapters_by_manga&.dig(manga_id)
+    end
+
     # Preload all chapters for a manga and create a next/prev mapping
     def preload_chapters_for_manga(manga_id)
       @chapters_by_manga ||= {}
@@ -15,7 +25,7 @@ class ChapterPresenterService
       # Return cached result if available
       return @chapters_by_manga[manga_id] if @chapters_by_manga[manga_id]
 
-      # Load all chapters for this manga in one query
+      # Load all chapters for this manga in one query - no transaction needed for read-only operation
       chapters = Chapter.where(manga_id: manga_id).order(number: :asc).to_a
       @chapters_by_manga[manga_id] = chapters
 
@@ -57,6 +67,8 @@ class ChapterPresenterService
 
     # Preload image collections for multiple chapters
     def preload_image_collections(chapter_ids)
+      return {} if chapter_ids.empty?
+
       @image_collections ||= {}
 
       # Filter out chapter IDs that are already cached
