@@ -3,72 +3,72 @@ module Api
     module Chapters
       class CommentsController < BaseController
         before_action :set_chapter
-        before_action :set_parent_comment, only: [:create]
+        skip_before_action :authenticate_user!, only: [:index]
 
         def index
-          @comments = @chapter.comments.includes(:user, replies: [:user]).where(parent_id: nil).order(created_at: :desc)
-          @comment_json = ActiveModelSerializers::SerializableResource.new(@comments, each_serializer: CommentSerializer).as_json
+          @comments = @chapter.comments
+                      .includes(:user, replies: :user)
+                      .where(parent_id: nil)
+                      .order(created_at: :desc)
 
-          @comment_json.each do |comment|
-            comment[:replies].each do |reply|
-              reply[:user] = UserSerializer.new(User.find(reply[:user_id])).as_json
-            end
-          end
-
-          render json: @comment_json
+          render json: @comments
         end
 
         def create
-          @comment = current_user.comments.new(comment_params)
-          @comment.commentable = @chapter
-          @comment.parent = @parent_comment if @parent_comment
+          @comment = @chapter.comments.build(comment_params)
+          @comment.user = current_user
 
           if @comment.save
             render json: @comment, status: :created
           else
-            render json: { errors: @comment.errors }, status: :unprocessable_entity
+            render json: { errors: @comment.errors.full_messages }, status: :unprocessable_entity
+          end
+        end
+
+        def reply
+          parent_comment = @chapter.comments.find(params[:comment_id])
+          @reply = @chapter.comments.build(comment_params)
+          @reply.user = current_user
+          @reply.parent = parent_comment
+
+          if @reply.save
+            render json: @reply, status: :created
+          else
+            render json: { errors: @reply.errors.full_messages }, status: :unprocessable_entity
           end
         end
 
         private
 
         def set_chapter
-          if params[:manga_id].present?
-            # Tìm manga bằng slug hoặc ID
-            @manga = Manga.find_by(slug: params[:manga_id]) || Manga.find_by(id: params[:manga_id])
+          # Memoize manga to avoid redundant lookups
+          @manga ||= if params[:manga_id].present?
+            Manga.find_by(slug: params[:manga_id]) || Manga.find_by(id: params[:manga_id])
+          end
 
-            if @manga.nil?
-              render json: { error: "Không tìm thấy manga" }, status: :not_found
-              return
-            end
-
-            # Tìm chapter bằng slug hoặc ID
-            chapter_id = params[:chapter_id]
-
-            # Nếu chapter_id có dạng "chapter-X", trích xuất số chapter
-            if chapter_id.to_s.match(/^chapter-(\d+)$/)
-              chapter_number = $1.to_i
-              @chapter = @manga.chapters.find_by(number: chapter_number)
+          # Find chapter efficiently using memoized manga
+          @chapter ||= if @manga
+            # Try to find by number if chapter_id is in format "chapter-X"
+            if params[:chapter_id].to_s.start_with?('chapter-')
+              chapter_number = params[:chapter_id].sub('chapter-', '').to_f
+              @manga.chapters.find_by(number: chapter_number)
             else
-              # Thử tìm bằng slug hoặc ID
-              @chapter = @manga.chapters.find_by(slug: chapter_id) || @manga.chapters.find_by(id: chapter_id)
+              # Try to find by slug or ID
+              @manga.chapters.find_by(slug: params[:chapter_id]) ||
+              @manga.chapters.find_by(id: params[:chapter_id])
             end
+          end
 
-            if @chapter.nil?
-              render json: { error: "Không tìm thấy chapter" }, status: :not_found
-            end
-          else
-            # For backward compatibility
-            @chapter = Chapter.find(params[:chapter_id])
+          # If chapter not found, raise error
+          unless @chapter
+            error_message = "Couldn't find Chapter with id=#{params[:chapter_id]}"
+            error_message += " for Manga with id=#{params[:manga_id]}" if @manga
+            raise ActiveRecord::RecordNotFound, error_message
           end
         end
 
-        def set_parent_comment
-          @parent_comment = Comment.find(params[:parent_id]) if params[:parent_id].present?
-        end
-
         def comment_params
-          params.permit(:content, :sticker, :parent_id, stickers: [])
+          params.require(:comment).permit(:content, :sticker, stickers: [])
         end
       end
     end

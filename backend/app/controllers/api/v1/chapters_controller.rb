@@ -8,8 +8,8 @@ module Api
       def index
         @chapters = @manga.chapters.ordered
 
-        # Preload all chapters for this manga to optimize next/prev chapter lookups
-        ChapterPresenterService.preload_chapters_for_manga(@manga.id)
+        # Preload all chapters for this manga to optimize next/prev chapter lookups - only once
+        all_chapters = fetch_cached_chapters(@manga.id)
 
         # Preload all chapter image collections in one query
         chapter_ids = @chapters.map(&:id)
@@ -18,7 +18,7 @@ module Api
         # Eager load the chapter_image_collection to avoid N+1 queries
         @chapters.each do |chapter|
           # Set the preloaded image collection to avoid the query in the presenter
-          if !chapter.association(:chapter_image_collection).loaded?
+          if !chapter.association(:chapter_image_collection).loaded? && image_collections[chapter.id]
             chapter.association(:chapter_image_collection).target = image_collections[chapter.id]
           end
         end
@@ -26,26 +26,39 @@ module Api
         # Convert chapters to JSON using the presenter with list_view option
         chapter_data = @chapters.map { |chapter| ChapterPresenter.new(chapter).as_json(list_view: true) }
 
-        # Return the data directly as JSON array
-        render json: { chapters: chapter_data }
+        # Return the data directly as JSON array to ensure it's always an array
+        render json: { chapters: chapter_data || [] }
       end
 
       def show
         # Increment view counts with rate limiting
         increment_view_counts
 
-        # Preload chapters for this manga to optimize next/prev lookups
-        ChapterPresenterService.preload_chapters_for_manga(@chapter.manga_id)
+        # Preload chapters for this manga to optimize next/prev lookups - only once
+        all_chapters = fetch_cached_chapters(@chapter.manga_id)
 
         # Preload chapter image collection
         image_collections = ChapterPresenterService.preload_image_collections([@chapter.id])
 
         # Set the preloaded image collection to avoid the query in the presenter
-        if !@chapter.association(:chapter_image_collection).loaded?
+        if !@chapter.association(:chapter_image_collection).loaded? && image_collections[@chapter.id]
           @chapter.association(:chapter_image_collection).target = image_collections[@chapter.id]
         end
 
-        render json: ChapterPresenter.new(@chapter).as_json
+        # Ensure manga is loaded to avoid N+1 query
+        if !@chapter.association(:manga).loaded?
+          @chapter.association(:manga).reload
+        end
+
+        # Create serializer context with preloaded data
+        chapters_by_manga = { @chapter.manga_id => all_chapters }
+        images_by_chapter = { @chapter.id => @chapter.images }
+
+        # Use ChapterSerializer directly with preloaded data
+        render json: @chapter,
+               serializer: ChapterSerializer,
+               chapters_by_manga: chapters_by_manga,
+               images_by_chapter: images_by_chapter
       end
 
       def create
@@ -80,6 +93,12 @@ module Api
       end
 
       private
+
+      # Cache chapters by manga_id within the request
+      def fetch_cached_chapters(manga_id)
+        @cached_chapters ||= {}
+        @cached_chapters[manga_id] ||= ChapterPresenterService.preload_chapters_for_manga(manga_id)
+      end
 
       def increment_view_counts
         # Generate a unique key for this IP + chapter combination
@@ -150,106 +169,110 @@ module Api
       end
 
       def set_manga
-        @manga = Manga.find_by(slug: params[:manga_id]) || Manga.find(params[:manga_id])
+        @manga ||= Manga.find_by(slug: params[:manga_id]) || Manga.find(params[:manga_id])
       end
 
       def set_chapter
-        Rails.logger.debug "Setting chapter with params: manga_id=#{params[:manga_id]}, id=#{params[:id]}"
+        @chapter ||= begin
+          Rails.logger.debug "Setting chapter with params: manga_id=#{params[:manga_id]}, id=#{params[:id]}"
 
-        if params[:manga_id].present?
-                # If manga_id is provided, find the chapter within that manga's chapters
-          manga = Manga.find_by(slug: params[:manga_id]) || Manga.find_by(id: params[:manga_id])
-          Rails.logger.debug "Found manga: #{manga&.id} - #{manga&.title}"
+          if params[:manga_id].present?
+            # If manga_id is provided, find the chapter within that manga's chapters
+            manga = set_manga_from_param(params[:manga_id])
+            Rails.logger.debug "Found manga: #{manga&.id} - #{manga&.title}"
 
-                # Extract ID from combined ID-slug parameter if present
-          chapter_id = nil
-          if params[:id].to_s.match(/^\d+-/)
-            chapter_id = params[:id].to_s.split('-').first
-            Rails.logger.debug "Extracted chapter_id from slug: #{chapter_id}"
-          end
+            # Extract ID from combined ID-slug parameter if present
+            chapter_id = nil
+            if params[:id].to_s.match(/^\d+-/)
+              chapter_id = params[:id].to_s.split('-').first
+              Rails.logger.debug "Extracted chapter_id from slug: #{chapter_id}"
+            end
 
-          if chapter_id.present?
-                  # If ID is part of the parameter, find by ID
-            @chapter = manga.chapters.find_by(id: chapter_id)
-            Rails.logger.debug "Found chapter by ID: #{@chapter&.id} - #{@chapter&.title}"
-          else
-                  # Try to find by slug or ID
-            @chapter = manga.chapters.find_by(slug: params[:id])
-            Rails.logger.debug "Found chapter by slug: #{@chapter&.id} - #{@chapter&.title}" if @chapter
+            if chapter_id.present?
+              # If ID is part of the parameter, find by ID
+              chapter = manga.chapters.find_by(id: chapter_id)
+              Rails.logger.debug "Found chapter by ID: #{chapter&.id} - #{chapter&.title}"
+            else
+              # Try to find by slug or ID
+              chapter = manga.chapters.find_by(slug: params[:id])
+              Rails.logger.debug "Found chapter by slug: #{chapter&.id} - #{chapter&.title}" if chapter
 
-            # If not found by slug, try by ID
-            if @chapter.nil?
-              begin
-                @chapter = manga.chapters.find(params[:id])
-                Rails.logger.debug "Found chapter by ID (fallback): #{@chapter&.id} - #{@chapter&.title}"
-              rescue ActiveRecord::RecordNotFound => e
-                Rails.logger.error "Chapter not found: #{e.message}"
-                raise
+              # If not found by slug, try by ID
+              if chapter.nil?
+                begin
+                  chapter = manga.chapters.find(params[:id])
+                  Rails.logger.debug "Found chapter by ID (fallback): #{chapter&.id} - #{chapter&.title}"
+                rescue ActiveRecord::RecordNotFound => e
+                  Rails.logger.error "Chapter not found: #{e.message}"
+                  raise
+                end
               end
             end
-          end
           else
             # For routes that don't include manga_id in the URL, find the chapter first
             # Extract ID from combined ID-slug parameter if present
-          chapter_id = nil
-          if params[:id].to_s.match(/^\d+-/)
-            chapter_id = params[:id].to_s.split('-').first
-            Rails.logger.debug "Extracted chapter_id from slug (no manga): #{chapter_id}"
-          end
+            chapter_id = nil
+            if params[:id].to_s.match(/^\d+-/)
+              chapter_id = params[:id].to_s.split('-').first
+              Rails.logger.debug "Extracted chapter_id from slug (no manga): #{chapter_id}"
+            end
 
-          if chapter_id.present?
-            # If ID is part of the parameter, find by ID
-            @chapter = Chapter.find_by(id: chapter_id)
-            Rails.logger.debug "Found chapter by ID (no manga): #{@chapter&.id} - #{@chapter&.title}"
-          else
-                  # Try to find by slug or ID
-            @chapter = Chapter.find_by(slug: params[:id])
-            Rails.logger.debug "Found chapter by slug (no manga): #{@chapter&.id} - #{@chapter&.title}" if @chapter
+            if chapter_id.present?
+              # If ID is part of the parameter, find by ID
+              chapter = Chapter.find_by(id: chapter_id)
+              Rails.logger.debug "Found chapter by ID (no manga): #{chapter&.id} - #{chapter&.title}"
+            else
+              # Try to find by slug or ID
+              chapter = Chapter.find_by(slug: params[:id])
+              Rails.logger.debug "Found chapter by slug (no manga): #{chapter&.id} - #{chapter&.title}" if chapter
 
-            # If not found by slug, try by ID
-            if @chapter.nil?
-              begin
-                @chapter = Chapter.find(params[:id])
-                Rails.logger.debug "Found chapter by ID (fallback, no manga): #{@chapter&.id} - #{@chapter&.title}"
-              rescue ActiveRecord::RecordNotFound => e
-                Rails.logger.error "Chapter not found: #{e.message}"
-                raise
+              # If not found by slug, try by ID
+              if chapter.nil?
+                begin
+                  chapter = Chapter.find(params[:id])
+                  Rails.logger.debug "Found chapter by ID (fallback, no manga): #{chapter&.id} - #{chapter&.title}"
+                rescue ActiveRecord::RecordNotFound => e
+                  Rails.logger.error "Chapter not found: #{e.message}"
+                  raise
+                end
               end
             end
           end
-        end
 
-        # Nếu không tìm thấy chapter, raise error
-        unless @chapter
-          error_message = "Couldn't find Chapter with id=#{params[:id]}"
-          error_message += " for Manga with id=#{params[:manga_id]}" if params[:manga_id].present?
-          Rails.logger.error error_message
-          raise ActiveRecord::RecordNotFound, error_message
-        end
-
-                # If chapter_form_params includes manga_id, verify the chapter belongs to that manga
-        if params[:manga_id].present?
-          manga_id = params[:manga_id]
-                  manga = Manga.find_by(slug: manga_id) || Manga.find_by(id: manga_id)
-          unless @chapter.manga_id.to_s == manga&.id.to_s
-            error_message = "Couldn't find Chapter with id=#{params[:id]} for Manga with id=#{manga_id}"
+          # Nếu không tìm thấy chapter, raise error
+          unless chapter
+            error_message = "Couldn't find Chapter with id=#{params[:id]}"
+            error_message += " for Manga with id=#{params[:manga_id]}" if params[:manga_id].present?
             Rails.logger.error error_message
             raise ActiveRecord::RecordNotFound, error_message
           end
+
+          # If chapter_form_params includes manga_id, verify the chapter belongs to that manga
+          if params[:manga_id].present?
+            manga_id = params[:manga_id]
+            manga = set_manga_from_param(manga_id)
+            unless chapter.manga_id.to_s == manga&.id.to_s
+              error_message = "Couldn't find Chapter with id=#{params[:id]} for Manga with id=#{manga_id}"
+              Rails.logger.error error_message
+              raise ActiveRecord::RecordNotFound, error_message
+            end
+          end
+
+          chapter
         end
+      end
+
+      def set_manga_from_param(manga_param)
+        @manga_cache ||= {}
+        @manga_cache[manga_param] ||= Manga.find_by(slug: manga_param) || Manga.find_by(id: manga_param)
       end
 
       def chapter_form_params
         params.permit(
-          :id,
-          :title,
-          :number,
-          images: [],
-          image_positions_to_delete: [],
-          image_positions: {},
-          new_images: [],
-          new_image_positions: [],
-          external_image_urls: []
+          :title, :number, :manga_id, :slug,
+          images: [
+            :position, :url, :external_url, :is_external, :image
+          ]
         )
       end
     end

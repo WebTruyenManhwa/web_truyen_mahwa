@@ -21,32 +21,65 @@ class Chapter < ApplicationRecord
 
   # Phương thức để lấy tất cả ảnh của chapter theo thứ tự vị trí
   def images
-    return [] unless chapter_image_collection
-    chapter_image_collection.images.sort_by { |img| img['position'] }
+    # Return memoized result if available
+    return @images if defined?(@images) && @images
+
+    # Initialize with empty array if no collection exists
+    @images = begin
+      # Return empty array if no collection exists
+      return [] unless chapter_image_collection
+
+      # Use already loaded association if available to avoid a query
+      collection = if association(:chapter_image_collection).loaded?
+                     chapter_image_collection
+                   else
+                     # Only query if we need to
+                     ChapterImageCollection.find_by(chapter_id: id)
+                   end
+
+      # Return empty array if no collection found
+      return [] unless collection
+
+      # Sort images by position
+      collection.images.sort_by { |img| img['position'] }
+    end
+  end
+
+  # Clear the memoized images when the collection is updated
+  def clear_images_cache
+    remove_instance_variable(:@images) if defined?(@images)
   end
 
   # Thêm ảnh mới vào chapter
   def add_image(image_data)
     ensure_image_collection
-    chapter_image_collection.add_image(image_data)
+    result = chapter_image_collection.add_image(image_data)
+    clear_images_cache
+    result
   end
 
   # Cập nhật ảnh theo vị trí
   def update_image_at_position(position, image_data)
     return unless chapter_image_collection
-    chapter_image_collection.update_image_at_position(position, image_data)
+    result = chapter_image_collection.update_image_at_position(position, image_data)
+    clear_images_cache
+    result
   end
 
   # Xóa ảnh theo vị trí
   def remove_image_at_position(position)
     return unless chapter_image_collection
-    chapter_image_collection.remove_image_at_position(position)
+    result = chapter_image_collection.remove_image_at_position(position)
+    clear_images_cache
+    result
   end
 
   # Sắp xếp lại vị trí các ảnh
   def reorder_images(position_mapping)
     return unless chapter_image_collection
-    chapter_image_collection.reorder_images(position_mapping)
+    result = chapter_image_collection.reorder_images(position_mapping)
+    clear_images_cache
+    result
   end
 
   # Đảm bảo chapter có image collection

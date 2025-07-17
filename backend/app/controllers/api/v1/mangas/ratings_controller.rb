@@ -32,7 +32,8 @@ module Api
           if @rating
             render json: { rating: @rating.value }
           else
-            render json: { message: "User has not rated this manga" }, status: :not_found
+            # Return 200 with null rating instead of 404 to avoid frontend errors
+            render json: { rating: nil, message: "User has not rated this manga" }
           end
         end
 
