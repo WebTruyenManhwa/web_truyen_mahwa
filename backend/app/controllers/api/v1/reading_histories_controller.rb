@@ -50,6 +50,15 @@ module Api
 
         if @history.save
           Rails.logger.info "=== Successfully saved reading history: #{@history.id} ==="
+          # Preload associations to avoid N+1 queries
+          chapter = Chapter.includes(:images, chapter_image_collection: {}).find(chapter.id)
+          
+          # Preload next and previous chapters
+          manga_with_chapters = Manga.includes(:chapters).find(manga.id)
+          chapter.instance_variable_set(:@manga, manga_with_chapters)
+          
+          @history.instance_variable_set(:@chapter, chapter)
+          
           render json: @history, serializer: ReadingHistorySerializer
         else
           Rails.logger.error "=== Failed to save reading history: #{@history.errors.full_messages} ==="

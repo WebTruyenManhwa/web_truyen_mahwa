@@ -26,9 +26,17 @@ module Api
 
       # GET /api/v1/novel_series/:novel_series_id/novel_chapters/:id
       def show
+        # Preload tất cả các chương để tránh N+1 query
+        @novel_series_with_chapters = NovelSeries.includes(:novel_chapters).find(@novel_series.id)
+        all_chapters = @novel_series_with_chapters.novel_chapters
+        
         # Tìm chapter trước và sau
-        @prev_chapter = @novel_series.novel_chapters.where('chapter_number < ?', @novel_chapter.chapter_number).order(chapter_number: :desc).first
-        @next_chapter = @novel_series.novel_chapters.where('chapter_number > ?', @novel_chapter.chapter_number).order(chapter_number: :asc).first
+        @prev_chapter = all_chapters.select { |c| c.chapter_number < @novel_chapter.chapter_number }
+                                   .sort_by(&:chapter_number)
+                                   .last
+        @next_chapter = all_chapters.select { |c| c.chapter_number > @novel_chapter.chapter_number }
+                                   .sort_by(&:chapter_number)
+                                   .first
 
         render json: {
           novel_chapter: @novel_chapter.as_json(only: [:id, :title, :content, :chapter_number, :slug, :created_at, :updated_at]).merge(
