@@ -36,6 +36,7 @@ Rails.application.routes.draw do
 
       # Proxy route for fetching external content
       get 'proxy/fetch', to: 'proxy#fetch_url'
+      post 'proxy/batch_import_chapters', to: 'proxy#batch_import_chapters'
 
       resources :mangas do
         resources :chapters, shallow: true do

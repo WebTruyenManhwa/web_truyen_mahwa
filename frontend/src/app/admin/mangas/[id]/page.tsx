@@ -6,8 +6,9 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import AdminSidebar from "../../../../components/admin/AdminSidebar";
-import { mangaApi, genreApi } from "../../../../services/api";
+import { mangaApi, genreApi, chapterApi } from "../../../../services/api";
 import React from "react";
+import BatchImportModal from "../../../../components/admin/BatchImportModal";
 
 export default function MangaDetailAdmin() {
   const params = useParams<{ id: string }>();
@@ -19,7 +20,7 @@ export default function MangaDetailAdmin() {
     releaseYear?: number;
     status?: string;
     coverImage?: string;
-    genres?: Array<string | {name: string}>;
+    genres?: Array<string | { name: string }>;
   } | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -37,7 +38,9 @@ export default function MangaDetailAdmin() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  console.log("params",params)
+  const [chapters, setChapters] = useState<any>([]);
+  const [isBatchImportModalOpen, setIsBatchImportModalOpen] = useState(false);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -56,7 +59,7 @@ export default function MangaDetailAdmin() {
         setCoverImagePreview(mangaData.coverImage || "");
 
         // Set image source based on whether the cover image is a URL
-        if (mangaData.coverImage && mangaData.coverImage.startsWith('http')) {
+        if (mangaData.coverImage && mangaData.coverImage.startsWith("http")) {
           setCoverImageUrl(mangaData.coverImage);
           setImageSource("url");
         } else {
@@ -65,9 +68,11 @@ export default function MangaDetailAdmin() {
 
         // Set selected genres
         if (mangaData.genres && Array.isArray(mangaData.genres)) {
-          setSelectedGenres(mangaData.genres.map((genre: any) =>
-            typeof genre === 'string' ? genre : genre.name
-          ));
+          setSelectedGenres(
+            mangaData.genres.map((genre: any) =>
+              typeof genre === "string" ? genre : genre.name
+            )
+          );
         }
 
         // Fetch available genres
@@ -77,11 +82,30 @@ export default function MangaDetailAdmin() {
         } else {
           // Fallback to default genres
           setAvailableGenres([
-            "Action", "Adventure", "Comedy", "Drama", "Fantasy",
-            "Horror", "Mystery", "Romance", "Sci-Fi", "Slice of Life",
-            "Sports", "Supernatural", "Thriller"
+            "Action",
+            "Adventure",
+            "Comedy",
+            "Drama",
+            "Fantasy",
+            "Horror",
+            "Mystery",
+            "Romance",
+            "Sci-Fi",
+            "Slice of Life",
+            "Sports",
+            "Supernatural",
+            "Thriller",
           ]);
         }
+
+        // Fetch chapters
+        const res = await chapterApi.getMangaChapters(params.id);
+        const chaptersData = res.chapters;
+        setChapters(
+          Array.isArray(chaptersData)
+            ? chaptersData
+            : Object.values(chaptersData || {})
+        );
       } catch (err) {
         console.error("Failed to fetch data:", err);
         setError("Không thể tải dữ liệu. Vui lòng thử lại sau.");
@@ -117,9 +141,7 @@ export default function MangaDetailAdmin() {
 
   const handleGenreChange = (genre: string) => {
     setSelectedGenres((prev) =>
-      prev.includes(genre)
-        ? prev.filter((g) => g !== genre)
-        : [...prev, genre]
+      prev.includes(genre) ? prev.filter((g) => g !== genre) : [...prev, genre]
     );
   };
 
@@ -186,6 +208,21 @@ export default function MangaDetailAdmin() {
     }
   };
 
+  // Function to refresh chapters after batch import
+  const refreshChapters = async () => {
+    try {
+      const res = await chapterApi.getMangaChapters(params.id, true); // true to bypass cache
+      const chaptersData = res.chapters;
+      setChapters(
+        Array.isArray(chaptersData)
+          ? chaptersData
+          : Object.values(chaptersData || {})
+      );
+    } catch (err) {
+      console.error("Failed to refresh chapters:", err);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen bg-gray-900">
@@ -243,7 +280,10 @@ export default function MangaDetailAdmin() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2 space-y-6">
               <div>
-                <label htmlFor="title" className="block text-sm font-medium mb-2">
+                <label
+                  htmlFor="title"
+                  className="block text-sm font-medium mb-2"
+                >
                   Tên truyện <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -258,7 +298,10 @@ export default function MangaDetailAdmin() {
               </div>
 
               <div>
-                <label htmlFor="description" className="block text-sm font-medium mb-2">
+                <label
+                  htmlFor="description"
+                  className="block text-sm font-medium mb-2"
+                >
                   Mô tả <span className="text-red-500">*</span>
                 </label>
                 <textarea
@@ -274,7 +317,10 @@ export default function MangaDetailAdmin() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="author" className="block text-sm font-medium mb-2">
+                  <label
+                    htmlFor="author"
+                    className="block text-sm font-medium mb-2"
+                  >
                     Tác giả <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -289,7 +335,10 @@ export default function MangaDetailAdmin() {
                 </div>
 
                 <div>
-                  <label htmlFor="artist" className="block text-sm font-medium mb-2">
+                  <label
+                    htmlFor="artist"
+                    className="block text-sm font-medium mb-2"
+                  >
                     Họa sĩ
                   </label>
                   <input
@@ -305,7 +354,10 @@ export default function MangaDetailAdmin() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="release-year" className="block text-sm font-medium mb-2">
+                  <label
+                    htmlFor="release-year"
+                    className="block text-sm font-medium mb-2"
+                  >
                     Năm phát hành
                   </label>
                   <input
@@ -321,7 +373,10 @@ export default function MangaDetailAdmin() {
                 </div>
 
                 <div>
-                  <label htmlFor="status" className="block text-sm font-medium mb-2">
+                  <label
+                    htmlFor="status"
+                    className="block text-sm font-medium mb-2"
+                  >
                     Trạng thái <span className="text-red-500">*</span>
                   </label>
                   <select
@@ -381,7 +436,10 @@ export default function MangaDetailAdmin() {
                       onChange={() => setImageSource("file")}
                       className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
                     />
-                    <label htmlFor="upload-file" className="ml-2 text-sm font-medium text-gray-300">
+                    <label
+                      htmlFor="upload-file"
+                      className="ml-2 text-sm font-medium text-gray-300"
+                    >
                       Tải lên từ máy tính
                     </label>
                   </div>
@@ -394,7 +452,10 @@ export default function MangaDetailAdmin() {
                       onChange={() => setImageSource("url")}
                       className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
                     />
-                    <label htmlFor="upload-url" className="ml-2 text-sm font-medium text-gray-300">
+                    <label
+                      htmlFor="upload-url"
+                      className="ml-2 text-sm font-medium text-gray-300"
+                    >
                       Sử dụng URL hình ảnh
                     </label>
                   </div>
@@ -426,7 +487,10 @@ export default function MangaDetailAdmin() {
                       onClick={() => {
                         setCoverImage(null);
                         setCoverImagePreview(manga?.coverImage || "");
-                        if (manga?.coverImage && manga.coverImage.startsWith('http')) {
+                        if (
+                          manga?.coverImage &&
+                          manga.coverImage.startsWith("http")
+                        ) {
                           setCoverImageUrl(manga.coverImage);
                           setImageSource("url");
                         } else {
@@ -529,6 +593,119 @@ export default function MangaDetailAdmin() {
             </button>
           </div>
         </form>
+
+        {/* Chapters section */}
+        <div className="bg-gray-800 rounded-lg p-6 mt-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">Danh sách chapter</h2>
+            <div className="flex space-x-4">
+              <button
+                type="button"
+                onClick={() => setIsBatchImportModalOpen(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 mr-2"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Import hàng loạt
+              </button>
+              <Link
+                href={`/admin/mangas/${params.id}/chapters/create`}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 mr-2"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Thêm chapter
+              </Link>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs uppercase bg-gray-700">
+                <tr>
+                  <th scope="col" className="px-4 py-3">
+                    Số chapter
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Tiêu đề
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Số ảnh
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Ngày tạo
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Thao tác
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {chapters.length > 0 ? (
+                  chapters.map((chapter, index) => (
+                    <tr
+                      key={chapter.id || `chapter-${index}`}
+                      className="border-b border-gray-700"
+                    >
+                      <td className="px-4 py-3">{chapter.number}</td>
+                      <td className="px-4 py-3">{chapter.title}</td>
+                      <td className="px-4 py-3">
+                        {chapter.images?.length || 0}
+                      </td>
+                      <td className="px-4 py-3">
+                        {new Date(chapter.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex space-x-2">
+                          <Link
+                            href={`/admin/mangas/${params.id}/chapters/${chapter.id}/edit`}
+                            className="text-blue-400 hover:text-blue-300"
+                          >
+                            Sửa
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-3 text-center">
+                      Chưa có chapter nào
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Batch Import Modal */}
+        <BatchImportModal
+          mangaId={params.id}
+          isOpen={isBatchImportModalOpen}
+          onClose={() => setIsBatchImportModalOpen(false)}
+          onSuccess={refreshChapters}
+        />
       </main>
     </div>
   );

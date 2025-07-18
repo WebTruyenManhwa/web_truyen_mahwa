@@ -6,6 +6,7 @@ import React, { useState, useEffect, use } from "react";
 import Link from "next/link";
 import AdminSidebar from "../../../../../../../components/admin/AdminSidebar";
 import { chapterApi, proxyApi } from "../../../../../../../services/api";
+import BatchImportModal from "../../../../../../../components/admin/BatchImportModal";
 
 // Định nghĩa interface cho ảnh chapter
 interface ChapterImage {
@@ -60,6 +61,7 @@ export default function EditChapter(props: Props){
   const [isImporting, setIsImporting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDeleteEmptyConfirm, setShowDeleteEmptyConfirm] = useState(false);
+  const [isBatchImportModalOpen, setIsBatchImportModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchChapter = async () => {
@@ -1500,12 +1502,24 @@ export default function EditChapter(props: Props){
         <div className="mb-8">
           <div className="flex justify-between items-center">
             <h1 className="text-3xl font-bold mb-2">Chỉnh sửa chapter</h1>
-            <Link
-              href={`/admin/mangas/${mangaId}`}
-              className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg"
-            >
-              Quay lại
-            </Link>
+            <div className="flex space-x-2">
+              <button
+                type="button"
+                onClick={() => setIsBatchImportModalOpen(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+                Import hàng loạt
+              </button>
+              <Link
+                href={`/admin/mangas/${mangaId}`}
+                className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg"
+              >
+                Quay lại
+              </Link>
+            </div>
           </div>
           <p className="text-gray-400">Chỉnh sửa thông tin và hình ảnh của chapter</p>
         </div>
@@ -1876,6 +1890,14 @@ export default function EditChapter(props: Props){
             </button>
           </div>
         </form>
+        
+        {/* Batch Import Modal */}
+        <BatchImportModal 
+          mangaId={mangaId}
+          isOpen={isBatchImportModalOpen}
+          onClose={() => setIsBatchImportModalOpen(false)}
+          onSuccess={() => window.location.href = `/admin/mangas/${mangaId}`}
+        />
       </main>
     </div>
   );

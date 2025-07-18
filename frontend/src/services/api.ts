@@ -355,6 +355,20 @@ export const proxyApi = {
     });
     return response.data;
   },
+
+  // Batch import chapters from URLs
+  batchImportChapters: async (mangaId: string | number, urls: string[], options?: {
+    autoNumber?: boolean,
+    startNumber?: number
+  }) => {
+    const response = await api.post(`/v1/proxy/batch_import_chapters`, {
+      manga_id: mangaId,
+      urls: urls,
+      auto_number: options?.autoNumber,
+      start_number: options?.startNumber
+    });
+    return response.data;
+  }
 };
 
 // API cho comment
