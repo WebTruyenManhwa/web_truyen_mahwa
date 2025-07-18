@@ -2,6 +2,7 @@ require 'carrierwave/orm/activerecord'
 require 'carrierwave/storage/abstract'
 require 'carrierwave/storage/file'
 require 'carrierwave/storage/fog'
+require Rails.root.join("app/uploaders/cover_image_uploader")
 
 CarrierWave.configure do |config|
   if ENV['USE_S3'] == 'true' &&

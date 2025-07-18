@@ -73,17 +73,29 @@ class ChapterImageService
     new_images_data = []
 
     Array(new_images).each_with_index do |image, index|
-      position = positions.try(:[], index) ||
+      position = positions.try(:[], index).to_i ||
                 (current_images.map { |img| img['position'].to_i }.max || -1) + 1 + index
 
-      image_data = create_image_data(image, position)
-      new_images_data << image_data if image_data.present?
+      # Kiểm tra xem image có phải là URL không
+      if image.is_a?(String) && image =~ URI::regexp(%w[http https])
+        Rails.logger.debug "Adding external image URL at position #{position}: #{image}"
+        new_images_data << {
+          'image' => nil,
+          'position' => position,
+          'is_external' => true,
+          'external_url' => image
+        }
+      else
+        # Xử lý như file upload thông thường
+        image_data = create_image_data(image, position)
+        new_images_data << image_data if image_data.present?
+      end
     end
 
     # Thêm ảnh mới vào collection nếu có
     if new_images_data.present?
-    updated_images = current_images + new_images_data
-    chapter.chapter_image_collection.update(images: updated_images)
+      updated_images = current_images + new_images_data
+      chapter.chapter_image_collection.update(images: updated_images)
     end
   end
 

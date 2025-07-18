@@ -327,7 +327,7 @@ export default function EditChapter(props: Props){
     if (newImageIndex !== -1) {
       const newImage = newImages[newImageIndex];
       const preview = newImagesPreviews[newImageIndex];
-      console.log("Found new image at position", position, ":", newImage);
+      // console.log("Found new image at position", position, ":", newImage);
       return {
         type: 'new' as const,
         image: newImage,
@@ -1659,7 +1659,7 @@ export default function EditChapter(props: Props){
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {getAllPositions().map((position) => {
                 const imageData = getImageAtPosition(position);
-
+                
                 return (
                   <div key={`position-${position}`} className="relative bg-gray-700 rounded-lg p-2">
                     <div className="aspect-[2/3] relative">
@@ -1667,9 +1667,9 @@ export default function EditChapter(props: Props){
                         <>
                           <img
                             src={
-                              imageData.type === 'current' && imageData.image
+                              imageData.type === 'current' && imageData.image && imageData.image.is_external != true
                                 ? (imageData.image.url)
-                                : (imageData.image && imageData.is_external ? imageData.image.external_url : imageData.preview?.preview || '')
+                                : (imageData.image && imageData.image.is_external ? imageData.image.external_url : imageData.preview?.preview || '')
                             }
                             alt={`Ảnh vị trí ${position}`}
                             onError={(e) => {

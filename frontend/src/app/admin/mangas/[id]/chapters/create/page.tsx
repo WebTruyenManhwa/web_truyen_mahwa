@@ -236,9 +236,9 @@ export default function CreateChapter(props: Props) {
                 !imgSrc.includes('logo') &&
                 !imgSrc.includes('banner') &&
                 !imgSrc.includes('icon') &&
-                !imgSrc.includes('tmp/0.png') &&
-                !imgSrc.includes('tmp/1.png') &&
-                !imgSrc.includes('tmp/2.png') &&
+                !imgSrc.includes('tmp/0.png') && // Bỏ qua ảnh tmp/0.png
+                !imgSrc.includes('tmp/1.png') && // Bỏ qua ảnh tmp/1.png
+                !imgSrc.includes('tmp/2.png') && // Bỏ qua các ảnh tmp khác
                 !imgSrc.includes('ads') &&
                 !imgSrc.includes('facebook') &&
                 !imgSrc.includes('fbcdn') &&
@@ -249,6 +249,27 @@ export default function CreateChapter(props: Props) {
               allImageUrls.add(normalizedUrl);
             }
           }
+
+          // Tìm riêng các thuộc tính data-src và data-original (NetTruyen thường dùng cách này)
+          const dataAttrRegex = /data-(?:src|original)="([^"]+)"/g;
+          while ((match = dataAttrRegex.exec(html)) !== null) {
+            const imgSrc = match[1];
+            if (imgSrc && typeof imgSrc === 'string' &&
+                (imgSrc.includes('.jpg') ||
+                 imgSrc.includes('.jpeg') ||
+                 imgSrc.includes('.png') ||
+                 imgSrc.includes('.webp') ||
+                 imgSrc.includes('.gif')) &&
+                !imgSrc.includes('tmp/0.png') && // Bỏ qua ảnh tmp/0.png
+                !imgSrc.includes('tmp/1.png') && // Bỏ qua ảnh tmp/1.png
+                !imgSrc.includes('tmp/2.png')) { // Bỏ qua các ảnh tmp khác
+              // Chuẩn hóa URL và chuyển đổi kiểu
+              const normalizedUrl = imgSrc.split('?')[0] as string;
+              allImageUrls.add(normalizedUrl);
+            }
+          }
+
+          // console.log("Found all images:", Array.from(allImageUrls));
 
           // Lọc ra các ảnh chapter thực sự
           if (allImageUrls.size > 0) {
@@ -261,6 +282,7 @@ export default function CreateChapter(props: Props) {
               `/ch-${chapterNum}/`,
               `/${chapterNum}.`,
               `/${chapterNum}-`,
+              // Thêm các pattern phổ biến của NetTruyen
               'ntcdn',
               'netcdn',
               'truyenvua.com',
@@ -300,8 +322,51 @@ export default function CreateChapter(props: Props) {
                      !url.includes('small');
             });
 
-            // Nếu tìm được ảnh, thêm vào danh sách
-            imageUrls = filteredUrls;
+            console.log("Filtered images by pattern:", filteredUrls);
+
+            // Nếu sau khi lọc theo pattern vẫn còn nhiều ảnh, thử lọc theo URL pattern phổ biến
+            if (filteredUrls.length > 0) {
+              // Kiểm tra xem có pattern nhất quán không
+              const commonPatterns = [
+                /\/ch\/\d+\/\d+\.(jpg|png|webp|jpeg)/i,
+                /\/images\/\d+\/\d+\.(jpg|png|webp|jpeg)/i,
+                /\/chapter-\d+\/\d+\.(jpg|png|webp|jpeg)/i,
+                // Thêm pattern cho NetTruyen
+                /ntcdn\d+\.netcdn\.one.*\.(jpg|png|webp|jpeg)/i,
+                /i\d+\.truyenvua\.com.*\.(jpg|png|webp|jpeg)/i,
+                /\.netcdn\.one\/.*\/\d+\/\d+\.(jpg|png|webp|jpeg)/i
+              ];
+
+              let foundConsistentPattern = false;
+              let bestMatchUrls: string[] = [];
+
+              for (const pattern of commonPatterns) {
+                const matchingUrls = filteredUrls.filter(url => pattern.test(url));
+                if (matchingUrls.length >= 3) { // Nếu có ít nhất 3 ảnh cùng pattern
+                  // Lấy pattern có nhiều ảnh nhất
+                  if (matchingUrls.length > bestMatchUrls.length) {
+                    bestMatchUrls = matchingUrls;
+                    foundConsistentPattern = true;
+                  }
+                }
+              }
+
+              // Nếu tìm thấy pattern nhất quán, sử dụng nó
+              if (foundConsistentPattern) {
+                imageUrls = bestMatchUrls;
+              } else {
+                // Nếu không tìm thấy pattern nhất quán, sử dụng tất cả các URL đã lọc
+                // nhưng loại bỏ các URL trùng lặp sau khi chuẩn hóa
+                const normalizedUrls = new Set<string>();
+                filteredUrls.forEach(url => {
+                  if (url && typeof url === 'string') {
+                    const normalizedUrl = url.split('?')[0] as string;
+                    normalizedUrls.add(normalizedUrl);
+                  }
+                });
+                imageUrls = Array.from(normalizedUrls);
+              }
+            }
           }
         } catch (err) {
           console.error("Error fetching page HTML:", err);

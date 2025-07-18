@@ -66,6 +66,16 @@ module Api
         chapter = form.save
 
         if chapter
+          # # Đảm bảo reload dữ liệu để có thông tin mới nhất
+          # chapter.reload
+          # # Xóa cache để đảm bảo lấy dữ liệu mới nhất
+          # chapter.clear_images_cache if chapter.respond_to?(:clear_images_cache)
+          # # Đảm bảo preload chapter_image_collection
+          # chapter.association(:chapter_image_collection).reload
+
+          # # Clear any cached data in ChapterPresenterService
+          # ChapterPresenterService.reset_request_cache if ChapterPresenterService.respond_to?(:reset_request_cache)
+          
           render json: ChapterPresenter.new(chapter).as_json, status: :created
         else
           render json: { errors: form.errors }, status: :unprocessable_entity
@@ -81,6 +91,16 @@ module Api
         chapter = form.save
 
         if chapter
+          # # Đảm bảo reload dữ liệu để có thông tin mới nhất
+          # chapter.reload
+          # # Xóa cache để đảm bảo lấy dữ liệu mới nhất
+          # chapter.clear_images_cache if chapter.respond_to?(:clear_images_cache)
+          # # Đảm bảo preload chapter_image_collection
+          # chapter.association(:chapter_image_collection).reload
+
+          # # Clear any cached data in ChapterPresenterService
+          # ChapterPresenterService.reset_request_cache if ChapterPresenterService.respond_to?(:reset_request_cache)
+          
           render json: ChapterPresenter.new(chapter).as_json, status: :ok
         else
           render json: { errors: form.errors }, status: :unprocessable_entity
@@ -270,6 +290,11 @@ module Api
       def chapter_form_params
         params.permit(
           :title, :number, :manga_id, :slug,
+          external_image_urls: [],
+          new_images: [],
+          new_image_positions: [],
+          image_positions_to_delete: [],
+          image_positions: {},
           images: [
             :position, :url, :external_url, :is_external, :image
           ]
