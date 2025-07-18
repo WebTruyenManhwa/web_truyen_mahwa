@@ -17,6 +17,7 @@ interface Chapter {
 interface Manga {
   id: number;
   title: string;
+  slug: string;
 }
 
 type Props = {
@@ -41,7 +42,19 @@ export default function ManageChapters(props: Props) {
         
         // Fetch chapters
         const chaptersData = await mangaApi.getMangaChapters(mangaId);
-        setChapters(chaptersData || []);
+        
+        // Ensure chaptersData is an array before setting state
+        if (Array.isArray(chaptersData)) {
+          setChapters(chaptersData);
+        } else if (chaptersData && typeof chaptersData === 'object') {
+          // If it's an object with chapters property
+          const chapterArray = Array.isArray(chaptersData.chapters) ? chaptersData.chapters : [];
+          console.log("Extracted chapters array:", chapterArray);
+          setChapters(chapterArray);
+        } else {
+          setChapters([]);
+          console.error("Expected array of chapters but got:", chaptersData);
+        }
       } catch (err) {
         console.error("Failed to fetch data:", err);
         setError("Không thể tải dữ liệu. Vui lòng thử lại sau.");
@@ -143,43 +156,47 @@ export default function ManageChapters(props: Props) {
                   </tr>
                 </thead>
                 <tbody className="bg-gray-800 divide-y divide-gray-700">
-                  {chapters.sort((a, b) => b.number - a.number).map((chapter) => (
-                    <tr key={chapter.id} className="hover:bg-gray-750">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
-                        {chapter.number}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                        {chapter.title}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                        {new Date(chapter.createdAt).toLocaleDateString('vi-VN')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                        {chapter.viewCount?.toLocaleString() || 0}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link
-                          href={`/manga/${mangaId}/chapter/${chapter.id}`}
-                          className="text-blue-400 hover:text-blue-300 mr-4"
-                          target="_blank"
-                        >
-                          Xem
-                        </Link>
-                        <Link
-                          href={`/admin/mangas/${mangaId}/chapters/${chapter.id}/edit`}
-                          className="text-blue-400 hover:text-blue-300 mr-4"
-                        >
-                          Sửa
-                        </Link>
-                        <button
-                          onClick={() => handleDeleteChapter(chapter.id)}
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          Xóa
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {/* Xóa console.log và kiểm tra chapters là mảng trước khi gọi sort */}
+                  {Array.isArray(chapters) && chapters.length > 0 ? 
+                    [...chapters].sort((a, b) => b.number - a.number).map((chapter) => (
+                      <tr key={chapter.id} className="hover:bg-gray-750">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
+                          {chapter.number}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                          {chapter.title}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                          {new Date(chapter.createdAt).toLocaleDateString('vi-VN')}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                          {chapter.viewCount?.toLocaleString() || 0}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <Link
+                            href={`/manga/${mangaId}/chapter/${chapter.id}`}
+                            className="text-blue-400 hover:text-blue-300 mr-4"
+                            target="_blank"
+                          >
+                            Xem
+                          </Link>
+                          <Link
+                            href={`/admin/mangas/${mangaId}/chapters/${chapter.id}/edit`}
+                            className="text-blue-400 hover:text-blue-300 mr-4"
+                          >
+                            Sửa
+                          </Link>
+                          <button
+                            onClick={() => handleDeleteChapter(chapter.id)}
+                            className="text-red-400 hover:text-red-300"
+                          >
+                            Xóa
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                    : <tr><td colSpan={5} className="px-6 py-4 text-center text-gray-400">Không có dữ liệu chapter</td></tr>
+                  }
                 </tbody>
               </table>
             </div>
@@ -188,4 +205,4 @@ export default function ManageChapters(props: Props) {
       </main>
     </div>
   );
-} 
+}

@@ -126,8 +126,10 @@ export const chapterApi = {
   },
 
   // Lấy danh sách chapter của một manga
-  getMangaChapters: async (mangaId: string | number) => {
-    const response = await api.get(`/v1/mangas/${mangaId}/chapters`);
+  getMangaChapters: async (mangaId: string | number, noCache: boolean = false) => {
+    const params = noCache ? { _: Date.now() } : {};
+    const response = await api.get(`/v1/mangas/${mangaId}/chapters`, { params });
+    console.log("resp getMangaChapters", response.data)
     return response.data;
   },
 
@@ -466,3 +468,4 @@ export const adminApi = {
 };
 
 export default api;
+

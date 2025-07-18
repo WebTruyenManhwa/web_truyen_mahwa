@@ -169,7 +169,7 @@ module Api
       end
 
       def set_manga
-        @manga ||= Manga.find_by(slug: params[:manga_id]) || Manga.find(params[:manga_id])
+        @manga ||= Manga.find_by(id: params[:manga_id]) || Manga.find_by(slug: params[:manga_id])
       end
 
       def set_chapter
@@ -264,7 +264,7 @@ module Api
 
       def set_manga_from_param(manga_param)
         @manga_cache ||= {}
-        @manga_cache[manga_param] ||= Manga.find_by(slug: manga_param) || Manga.find_by(id: manga_param)
+        @manga_cache[manga_param] ||= Manga.find_by(id: manga_param) || Manga.find_by(slug: manga_param)
       end
 
       def chapter_form_params
