@@ -23,6 +23,14 @@ module Api
         end
       end
 
+      # Phương thức để xác thực admin và trả về lỗi nếu không phải admin
+      def authenticate_admin!
+        authenticate_user!
+        unless current_user&.admin?
+          render json: { error: 'Unauthorized access. Admin privileges required.' }, status: :forbidden
+        end
+      end
+
       # Cache current_user to avoid repeated database lookups
       def current_user
         # Use request store to cache the user for the duration of the request
