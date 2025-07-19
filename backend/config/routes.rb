@@ -37,6 +37,27 @@ Rails.application.routes.draw do
       # Proxy route for fetching external content
       get 'proxy/fetch', to: 'proxy#fetch_url'
       post 'proxy/batch_import_chapters', to: 'proxy#batch_import_chapters'
+      post 'proxy/crawl_manga', to: 'proxy#crawl_manga'
+      post 'proxy/test_extract_images', to: 'proxy#test_extract_images'
+
+      # Scheduled crawls
+      resources :scheduled_crawls do
+        member do
+          post :run_now
+        end
+      end
+
+      # Scheduled jobs
+      resources :scheduled_jobs, only: [:index, :show] do
+        member do
+          post :retry
+          post :cancel
+        end
+
+        collection do
+          get :stats
+        end
+      end
 
       resources :mangas do
         resources :chapters, shallow: true do

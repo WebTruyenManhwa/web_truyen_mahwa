@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_07_16_165432) do
+ActiveRecord::Schema[8.0].define(version: 2025_07_20_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -107,6 +107,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_16_165432) do
     t.decimal "rating", precision: 3, scale: 2, default: "0.0"
     t.integer "total_votes", default: 0
     t.string "slug"
+    t.string "source_url"
     t.index ["slug"], name: "index_mangas_on_slug", unique: true
   end
 
@@ -161,6 +162,44 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_16_165432) do
     t.index ["user_id"], name: "index_reading_histories_on_user_id"
   end
 
+  create_table "scheduled_crawls", force: :cascade do |t|
+    t.bigint "manga_id", null: false
+    t.string "url", null: false
+    t.string "schedule_type", null: false
+    t.time "schedule_time"
+    t.string "schedule_days"
+    t.string "max_chapters"
+    t.string "chapter_range"
+    t.string "delay"
+    t.string "status", default: "active"
+    t.datetime "last_run_at"
+    t.datetime "next_run_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["manga_id"], name: "index_scheduled_crawls_on_manga_id"
+  end
+
+  create_table "scheduled_jobs", force: :cascade do |t|
+    t.string "job_type", null: false
+    t.string "status", default: "pending", null: false
+    t.datetime "scheduled_at", null: false
+    t.datetime "started_at"
+    t.datetime "completed_at"
+    t.text "options"
+    t.text "result"
+    t.text "error_message"
+    t.string "lock_token"
+    t.integer "retry_count", default: 0
+    t.integer "max_retries", default: 3
+    t.bigint "parent_job_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["job_type", "scheduled_at"], name: "index_scheduled_jobs_on_job_type_and_scheduled_at"
+    t.index ["parent_job_id"], name: "index_scheduled_jobs_on_parent_job_id"
+    t.index ["scheduled_at"], name: "index_scheduled_jobs_on_scheduled_at"
+    t.index ["status"], name: "index_scheduled_jobs_on_status"
+  end
+
   create_table "solid_cache_entries", force: :cascade do |t|
     t.binary "key", null: false
     t.binary "value", null: false
@@ -203,4 +242,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_16_165432) do
   add_foreign_key "reading_histories", "chapters"
   add_foreign_key "reading_histories", "mangas"
   add_foreign_key "reading_histories", "users"
+  add_foreign_key "scheduled_crawls", "mangas"
+  add_foreign_key "scheduled_jobs", "scheduled_jobs", column: "parent_job_id"
 end

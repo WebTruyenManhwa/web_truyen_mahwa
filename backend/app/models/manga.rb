@@ -20,6 +20,7 @@ class Manga < ApplicationRecord
   has_many :comments, as: :commentable, dependent: :destroy
   has_many :ratings, dependent: :destroy
   has_many :manga_views, dependent: :destroy
+  has_many :scheduled_crawls, dependent: :destroy
 
   # Validations
   validates :title, presence: true

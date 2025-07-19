@@ -368,6 +368,130 @@ export const proxyApi = {
       start_number: options?.startNumber
     });
     return response.data;
+  },
+
+  // Crawl manga from URL
+  crawlManga: async (url: string, options?: {
+    max_chapters?: number | string,
+    chapter_range?: string,
+    delay?: string,
+    schedule?: boolean,
+    schedule_type?: 'daily' | 'weekly' | 'monthly',
+    schedule_time?: string,
+    schedule_days?: string
+  }) => {
+    const response = await api.post(`/v1/proxy/crawl_manga`, {
+      url,
+      ...options
+    });
+    return response.data;
+  },
+
+  // Test extract images from URL
+  testExtractImages: async (url: string) => {
+    const response = await api.post(`/v1/proxy/test_extract_images`, { url });
+    return response.data;
+  }
+};
+
+// API cho scheduled crawls
+export const scheduledCrawlApi = {
+  // Lấy danh sách scheduled crawls
+  getScheduledCrawls: async (params?: {
+    manga_id?: number,
+    status?: string,
+    page?: number,
+    per_page?: number
+  }) => {
+    const response = await api.get('/v1/scheduled_crawls', { params });
+    return response.data;
+  },
+
+  // Lấy chi tiết một scheduled crawl
+  getScheduledCrawl: async (id: string | number) => {
+    const response = await api.get(`/v1/scheduled_crawls/${id}`);
+    return response.data;
+  },
+
+  // Tạo scheduled crawl mới
+  createScheduledCrawl: async (data: {
+    manga_id: number,
+    url?: string,
+    schedule_type: 'daily' | 'weekly' | 'monthly',
+    schedule_time: string,
+    schedule_days?: string,
+    max_chapters?: number | string,
+    chapter_range?: string,
+    delay?: string,
+    status?: 'active' | 'paused' | 'completed'
+  }) => {
+    const response = await api.post('/v1/scheduled_crawls', data);
+    return response.data;
+  },
+
+  // Cập nhật scheduled crawl
+  updateScheduledCrawl: async (id: string | number, data: {
+    url?: string,
+    schedule_type?: 'daily' | 'weekly' | 'monthly',
+    schedule_time?: string,
+    schedule_days?: string,
+    max_chapters?: number | string,
+    chapter_range?: string,
+    delay?: string,
+    status?: 'active' | 'paused' | 'completed'
+  }) => {
+    const response = await api.put(`/v1/scheduled_crawls/${id}`, data);
+    return response.data;
+  },
+
+  // Xóa scheduled crawl
+  deleteScheduledCrawl: async (id: string | number) => {
+    const response = await api.delete(`/v1/scheduled_crawls/${id}`);
+    return response.data;
+  },
+
+  // Chạy scheduled crawl ngay lập tức
+  runScheduledCrawlNow: async (id: string | number) => {
+    const response = await api.post(`/v1/scheduled_crawls/${id}/run_now`);
+    return response.data;
+  }
+};
+
+// API cho scheduled jobs
+export const scheduledJobApi = {
+  // Lấy danh sách scheduled jobs
+  getScheduledJobs: async (params?: {
+    job_type?: string,
+    status?: string,
+    page?: number,
+    per_page?: number
+  }) => {
+    const response = await api.get('/v1/scheduled_jobs', { params });
+    return response.data;
+  },
+
+  // Lấy chi tiết một scheduled job
+  getScheduledJob: async (id: string | number) => {
+    const response = await api.get(`/v1/scheduled_jobs/${id}`);
+    return response.data;
+  },
+
+  // Retry một job đã thất bại
+  retryJob: async (id: string | number) => {
+    const response = await api.post(`/v1/scheduled_jobs/${id}/retry`);
+    return response.data;
+  },
+
+  // Hủy một job đang chờ
+  cancelJob: async (id: string | number) => {
+    const response = await api.post(`/v1/scheduled_jobs/${id}/cancel`);
+    return response.data;
+  },
+
+  // Lấy thống kê về jobs
+  getJobStats: async () => {
+    const response = await api.get('/v1/scheduled_jobs/stats');
+    return response.data;
   }
 };
 

@@ -103,3 +103,9 @@ gem 'connection_pool', '~> 2.4'
 
 # Markdown processing
 gem 'redcarpet', '~> 3.6.0'
+
+# Scheduler
+gem 'rufus-scheduler'
+
+# Use Kaminari for pagination
+gem "kaminari", "~> 1.2"
