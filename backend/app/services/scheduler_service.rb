@@ -45,7 +45,7 @@ class SchedulerService
 
       begin
         # Chạy job kiểm tra các scheduled crawls
-        result = RunScheduledCrawlsJob.perform_now
+        result = RunScheduledCrawlsJob.perform_now(job.options || {})
 
         # Đánh dấu job đã hoàn thành
         job.mark_as_completed(result.to_json)
@@ -73,7 +73,7 @@ class SchedulerService
         begin
           case job.job_type
           when 'scheduled_crawl_check'
-            result = RunScheduledCrawlsJob.perform_now
+            result = RunScheduledCrawlsJob.perform_now(job.options || {})
             job.mark_as_completed(result.to_json)
           when 'single_job'
             # Xử lý single job với các tham số từ options

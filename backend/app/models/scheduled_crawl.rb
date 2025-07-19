@@ -31,15 +31,21 @@ class ScheduledCrawl < ApplicationRecord
     now = Time.current
     time_of_day = schedule_time || Time.parse('00:00')
 
+    Rails.logger.info "Calculating next run time for scheduled crawl ##{id}. Current time: #{now}, Schedule time: #{time_of_day}"
+
     case schedule_type
     when 'daily'
       # Nếu thời gian đã qua trong ngày, chạy vào ngày mai
       if now.hour > time_of_day.hour || (now.hour == time_of_day.hour && now.min >= time_of_day.min)
         next_run = now.beginning_of_day + 1.day
+        Rails.logger.info "Daily schedule: Time already passed today, scheduling for tomorrow"
       else
         next_run = now.beginning_of_day
+        Rails.logger.info "Daily schedule: Time not passed today, scheduling for today"
       end
-      next_run + time_of_day.hour.hours + time_of_day.min.minutes
+      result = next_run + time_of_day.hour.hours + time_of_day.min.minutes
+      Rails.logger.info "Calculated next run time: #{result}"
+      return result
 
     when 'weekly'
       # Lấy các ngày trong tuần cần chạy

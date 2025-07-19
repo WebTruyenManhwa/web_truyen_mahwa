@@ -178,6 +178,22 @@ class Api::V1::ProxyController < Api::V1::BaseController
       )
 
       if scheduled_crawl.save
+        # Tạo một scheduled job để theo dõi scheduled crawl này
+        # Nhưng đặt scheduled_at theo thời gian đã lên lịch, không phải thời gian hiện tại
+        # Điều này đảm bảo job sẽ chỉ được xử lý khi đến thời gian đã lên lịch
+        scheduled_time = scheduled_crawl.next_run_at
+
+        Rails.logger.info "Creating scheduled job for scheduled crawl ##{scheduled_crawl.id} to run at #{scheduled_time}"
+        job = ScheduledJob.create(
+          job_type: 'scheduled_crawl_check',
+          status: 'pending',
+          scheduled_at: scheduled_time,
+          options: { scheduled_crawl_id: scheduled_crawl.id }
+        )
+
+        # Không thêm job vào hàng đợi để xử lý ngay lập tức
+        # Job sẽ được xử lý tự động khi đến thời gian đã lên lịch thông qua process_database_jobs
+
         render json: {
           status: 'success',
           message: 'Scheduled crawl created successfully',
