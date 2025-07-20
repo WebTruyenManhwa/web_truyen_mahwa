@@ -36,15 +36,17 @@ class ChapterImportService
         )
 
         if chapter.save
-          # Add images to the chapter
-          image_urls.each_with_index do |image_url, position|
-            # Sử dụng add_image thay vì chapter_images.create
-            chapter.add_image({
+          # Chuẩn bị mảng dữ liệu ảnh
+          image_data_array = image_urls.map.with_index do |image_url, position|
+            {
               external_url: image_url,
               position: position,
               is_external: true
-            })
+            }
           end
+
+          # Thêm tất cả ảnh cùng một lúc (chỉ 1 lần cập nhật database)
+          chapter.add_images(image_data_array)
 
           results << {
             url: url,

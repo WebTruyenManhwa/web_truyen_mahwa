@@ -58,6 +58,16 @@ class Chapter < ApplicationRecord
     result
   end
 
+  # Thêm nhiều ảnh cùng một lúc (hiệu quả hơn)
+  def add_images(image_data_array)
+    return if image_data_array.empty?
+
+    ensure_image_collection
+    result = chapter_image_collection.add_images(image_data_array)
+    clear_images_cache
+    result
+  end
+
   # Cập nhật ảnh theo vị trí
   def update_image_at_position(position, image_data)
     return unless chapter_image_collection

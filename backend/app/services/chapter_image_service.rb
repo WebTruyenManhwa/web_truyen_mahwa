@@ -80,10 +80,9 @@ class ChapterImageService
       if image.is_a?(String) && image =~ URI::regexp(%w[http https])
         Rails.logger.debug "Adding external image URL at position #{position}: #{image}"
         new_images_data << {
-          'image' => nil,
+          'external_url' => image,
           'position' => position,
-          'is_external' => true,
-          'external_url' => image
+          'is_external' => true
         }
       else
         # Xử lý như file upload thông thường
@@ -94,8 +93,8 @@ class ChapterImageService
 
     # Thêm ảnh mới vào collection nếu có
     if new_images_data.present?
-      updated_images = current_images + new_images_data
-      chapter.chapter_image_collection.update(images: updated_images)
+      Rails.logger.info "Adding #{new_images_data.size} new images to chapter #{chapter.id} in a single update"
+      chapter.add_images(new_images_data)
     end
   end
 
@@ -119,17 +118,16 @@ class ChapterImageService
       Rails.logger.debug "Adding external image at position #{position}: #{url}"
 
       new_images_data << {
-        'image' => nil,
+        'external_url' => url,
         'position' => position,
-        'is_external' => true,
-        'external_url' => url
+        'is_external' => true
       }
     end
 
     # Thêm ảnh mới vào collection nếu có
     if new_images_data.present?
-      updated_images = current_images + new_images_data
-      chapter.chapter_image_collection.update(images: updated_images)
+      Rails.logger.info "Adding #{new_images_data.size} external images to chapter #{chapter.id} in a single update"
+      chapter.add_images(new_images_data)
     end
   end
 

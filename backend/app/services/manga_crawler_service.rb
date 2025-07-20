@@ -226,17 +226,20 @@ class MangaCrawlerService
         # Log thông tin chapter đã được tạo
         Rails.logger.info "Created chapter #{chapter.number} with ID: #{chapter.id}"
 
-        # Thêm hình ảnh vào chương
-        image_urls.each_with_index do |image_url, position|
-          # Log URL hình ảnh đang thêm vào chapter
-          Rails.logger.debug "Adding image #{position+1}/#{image_urls.size}: #{image_url}"
-
-          chapter.add_image({
+        # Chuẩn bị mảng dữ liệu ảnh
+        image_data_array = image_urls.map.with_index do |image_url, position|
+          {
             external_url: image_url,
             position: position,
             is_external: true
-          })
+          }
         end
+
+        # Thêm tất cả ảnh cùng một lúc (chỉ 1 lần cập nhật database)
+        chapter.add_images(image_data_array)
+
+        # Log thông tin số lượng ảnh đã thêm
+        Rails.logger.info "Added #{image_urls.size} images to chapter #{chapter.number} in a single database update"
 
         {
           status: 'success',

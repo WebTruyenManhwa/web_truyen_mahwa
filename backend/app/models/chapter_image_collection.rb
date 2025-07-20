@@ -13,6 +13,15 @@ class ChapterImageCollection < ApplicationRecord
     update(images: current_images)
   end
 
+  # Thêm nhiều ảnh cùng một lúc (hiệu quả hơn)
+  def add_images(image_data_array)
+    return if image_data_array.empty?
+
+    current_images = images
+    current_images.concat(image_data_array)
+    update(images: current_images)
+  end
+
   # Cập nhật một ảnh theo vị trí
   def update_image_at_position(position, image_data)
     current_images = images
