@@ -72,15 +72,15 @@ RUN getent group rails >/dev/null || groupadd --system --gid 1000 rails \
 RUN mkdir -p /rails/public/uploads /rails/tmp/sockets /rails/tmp/pids \
  && chown -R rails:rails /rails /rails/public/uploads /rails/tmp /rails/log /rails/storage
 
+# Set timezone to Vietnam (Asia/Ho_Chi_Minh)
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 # Chuyển xuống chạy dưới user rails
 USER rails
 
 # Entrypoint chuẩn bị DB
 COPY --chown=root:root --chmod=755 entrypoint.sh /rails/entrypoint.sh
 ENTRYPOINT ["sh", "/rails/entrypoint.sh"]
-
-# Set timezone to Vietnam (Asia/Ho_Chi_Minh)
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Expose port
 EXPOSE 80

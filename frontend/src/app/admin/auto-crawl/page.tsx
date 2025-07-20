@@ -86,6 +86,28 @@ export default function AutoCrawlManga() {
         return;
       }
 
+      // Kiểm tra định dạng chapter range
+      if (chapterRange) {
+        const chapterRangeRegex = /^(\d+(\.\d+)?)-(\d+(\.\d+)?)$/;
+        if (!chapterRangeRegex.test(chapterRange)) {
+          setError("Range chapter không hợp lệ. Định dạng phải là 'start-end' (ví dụ: '1-10' hoặc '17.1-17.5')");
+          setLoading(false);
+          return;
+        }
+
+        // Kiểm tra start <= end
+        const parts = chapterRange.split('-');
+        if (parts.length === 2) {
+          const start = parseFloat(parts[0] || '0');
+          const end = parseFloat(parts[1] || '0');
+          if (start > end) {
+            setError("Range chapter không hợp lệ. Giá trị bắt đầu phải nhỏ hơn hoặc bằng giá trị kết thúc.");
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
       // Prepare options
       const options: Record<string, unknown> = {
         max_chapters: finalMaxChapters,
@@ -329,7 +351,7 @@ export default function AutoCrawlManga() {
                 type="text"
                 value={chapterRange}
                 onChange={(e) => setChapterRange(e.target.value)}
-                placeholder="1-10"
+                placeholder="1-10 hoặc 17.1-17.5"
                 className={`w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${isChapterRangeDisabled ? 'opacity-50' : ''}`}
                 required={isChapterRangeRequired}
                 disabled={isChapterRangeDisabled}
@@ -337,7 +359,7 @@ export default function AutoCrawlManga() {
               <p className="text-gray-400 text-sm mt-1">
                 {isChapterRangeDisabled
                   ? "Không cần nhập range khi chọn tất cả chapter"
-                  : 'Range chapter cần crawl, format: &quot;start-end&quot; (ví dụ: &quot;1-10&quot;)'}
+                  : 'Range chapter cần crawl, format: &quot;start-end&quot; (ví dụ: &quot;1-10&quot;, &quot;17.1-17.5&quot;)'}
               </p>
             </div>
 
