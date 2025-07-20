@@ -22,6 +22,17 @@ interface ScheduledCrawl {
   next_run_at: string | null;
 }
 
+interface UpdateScheduledCrawlData {
+  url: string;
+  schedule_type: "daily" | "weekly" | "monthly";
+  schedule_time: string;
+  max_chapters: string;
+  delay: string;
+  status: "active" | "paused" | "completed";
+  chapter_range?: string;
+  schedule_days?: string;
+}
+
 export default function EditScheduledCrawl() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -34,6 +45,8 @@ export default function EditScheduledCrawl() {
   // Form state
   const [url, setUrl] = useState("");
   const [maxChapters, setMaxChapters] = useState<string>("all");
+  const [isCustomChapters, setIsCustomChapters] = useState<boolean>(false);
+  const [customMaxChapters, setCustomMaxChapters] = useState<string>("");
   const [chapterRange, setChapterRange] = useState<string>("");
   const [delay, setDelay] = useState<string>("3..7");
   const [scheduleType, setScheduleType] = useState<string>("daily");
@@ -41,33 +54,75 @@ export default function EditScheduledCrawl() {
   const [scheduleDays, setScheduleDays] = useState<string[]>([]);
   const [status, setStatus] = useState<string>("active");
 
+  // Determine if chapter range is required
+  const isChapterRangeRequired = maxChapters !== "all" || isCustomChapters;
+  // Determine if chapter range input should be disabled
+  const isChapterRangeDisabled = maxChapters === "all" && !isCustomChapters;
+
   // Fetch scheduled crawl
   useEffect(() => {
     const fetchScheduledCrawl = async () => {
       try {
         setLoading(true);
         const response = await scheduledCrawlApi.getScheduledCrawl(params.id);
-        setScheduledCrawl(response.scheduled_crawl);
 
-        // Set form values
-        setUrl(response.scheduled_crawl.url || "");
-        setMaxChapters(response.scheduled_crawl.max_chapters || "all");
-        setChapterRange(response.scheduled_crawl.chapter_range || "");
-        setDelay(response.scheduled_crawl.delay || "3..7");
-        setScheduleType(response.scheduled_crawl.schedule_type || "daily");
-        setScheduleTime(response.scheduled_crawl.schedule_time || "03:00");
-        setScheduleDays(response.scheduled_crawl.schedule_days ? response.scheduled_crawl.schedule_days.split(",") : []);
-        setStatus(response.scheduled_crawl.status || "active");
-      } catch (err) {
+        // Log response để debug
+        console.log("API Response:", response);
+
+        // Kiểm tra cấu trúc response - API trả về trực tiếp dữ liệu, không có scheduled_crawl
+        const crawlData = response.scheduled_crawl || response;
+
+        if (!crawlData || typeof crawlData !== 'object') {
+          console.error("Invalid response structure:", response);
+          setError("Không tìm thấy thông tin lịch crawl hoặc định dạng dữ liệu không hợp lệ");
+          setLoading(false);
+          return;
+        }
+
+        // Lưu dữ liệu vào state
+        setScheduledCrawl(crawlData);
+
+        // Set form values với kiểm tra null/undefined
+        setUrl(crawlData.url || "");
+
+        // Xử lý max_chapters
+        const maxChaptersValue = crawlData.max_chapters || "all";
+        if (maxChaptersValue === "all" || ["1", "5", "10", "20", "50", "100"].includes(maxChaptersValue)) {
+          setMaxChapters(maxChaptersValue);
+          setIsCustomChapters(false);
+        } else {
+          setMaxChapters("custom");
+          setCustomMaxChapters(maxChaptersValue);
+          setIsCustomChapters(true);
+        }
+
+        setChapterRange(crawlData.chapter_range || "");
+        setDelay(crawlData.delay || "3..7");
+        setScheduleType(crawlData.schedule_type || "daily");
+        setScheduleTime(crawlData.schedule_time || "03:00");
+        setScheduleDays(crawlData.schedule_days ? crawlData.schedule_days.split(",") : []);
+        setStatus(crawlData.status || "active");
+      } catch (err: unknown) {
         console.error("Error fetching scheduled crawl:", err);
-        setError("Không thể tải thông tin lịch crawl. Vui lòng thử lại sau.");
+        const errorResponse = err as { response?: { status?: number, data?: { error?: string } } };
+
+        // Kiểm tra lỗi 401 Unauthorized
+        if (errorResponse.response?.status === 401) {
+          setError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+          // Chuyển hướng đến trang đăng nhập sau 2 giây
+          setTimeout(() => {
+            router.push("/auth/login");
+          }, 2000);
+        } else {
+          setError(errorResponse.response?.data?.error || "Không thể tải thông tin lịch crawl. Vui lòng thử lại sau.");
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchScheduledCrawl();
-  }, [params.id]);
+  }, [params.id, router]);
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -79,10 +134,12 @@ export default function EditScheduledCrawl() {
       setSuccess(null);
 
       // Validate form
-      if (maxChapters !== "all" && !chapterRange) {
-        setError("Vui lòng nhập range chapter khi số lượng chapter không phải 'all'");
-        setSaving(false);
-        return;
+      if ((maxChapters !== "all" && !isCustomChapters) || (isCustomChapters && !customMaxChapters)) {
+        if (!chapterRange) {
+          setError("Vui lòng nhập range chapter khi số lượng chapter không phải 'all'");
+          setSaving(false);
+          return;
+        }
       }
 
       if (scheduleType === "weekly" && scheduleDays.length === 0) {
@@ -92,13 +149,15 @@ export default function EditScheduledCrawl() {
       }
 
       // Prepare data
-      const data: any = {
+      const finalMaxChapters = isCustomChapters ? customMaxChapters : maxChapters;
+
+      const data: UpdateScheduledCrawlData = {
         url,
-        schedule_type: scheduleType,
+        schedule_type: scheduleType as "daily" | "weekly" | "monthly",
         schedule_time: scheduleTime,
-        max_chapters: maxChapters,
+        max_chapters: finalMaxChapters,
         delay,
-        status,
+        status: status as "active" | "paused" | "completed",
       };
 
       if (chapterRange) {
@@ -119,9 +178,20 @@ export default function EditScheduledCrawl() {
       setTimeout(() => {
         router.push("/admin/scheduled-crawls");
       }, 2000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error updating scheduled crawl:", err);
-      setError(err.response?.data?.error || "Có lỗi xảy ra khi cập nhật lịch crawl. Vui lòng thử lại sau.");
+      const errorResponse = err as { response?: { status?: number, data?: { error?: string } } };
+
+      // Kiểm tra lỗi 401 Unauthorized
+      if (errorResponse.response?.status === 401) {
+        setError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+        // Chuyển hướng đến trang đăng nhập sau 2 giây
+        setTimeout(() => {
+          router.push("/auth/login");
+        }, 2000);
+      } else {
+        setError(errorResponse.response?.data?.error || "Có lỗi xảy ra khi cập nhật lịch crawl. Vui lòng thử lại sau.");
+      }
     } finally {
       setSaving(false);
     }
@@ -161,20 +231,6 @@ export default function EditScheduledCrawl() {
         ))}
       </div>
     );
-  };
-
-  // Format status
-  const formatStatus = (status: string) => {
-    switch (status) {
-      case "active":
-        return "Đang hoạt động";
-      case "paused":
-        return "Tạm dừng";
-      case "completed":
-        return "Hoàn thành";
-      default:
-        return status;
-    }
   };
 
   return (
@@ -255,8 +311,20 @@ export default function EditScheduledCrawl() {
                 <div className="flex gap-4">
                   <div className="flex-1">
                     <select
-                      value={maxChapters}
-                      onChange={(e) => setMaxChapters(e.target.value)}
+                      value={isCustomChapters ? "custom" : maxChapters}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === "custom") {
+                          setIsCustomChapters(true);
+                        } else {
+                          setIsCustomChapters(false);
+                          setMaxChapters(value);
+                          // Nếu chọn "all", xóa giá trị chapterRange
+                          if (value === "all") {
+                            setChapterRange("");
+                          }
+                        }
+                      }}
                       className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="all">Tất cả</option>
@@ -266,9 +334,22 @@ export default function EditScheduledCrawl() {
                       <option value="20">20 chapters</option>
                       <option value="50">50 chapters</option>
                       <option value="100">100 chapters</option>
+                      <option value="custom">Tùy chỉnh...</option>
                     </select>
                   </div>
                 </div>
+                {isCustomChapters && (
+                  <div className="mt-2">
+                    <input
+                      type="number"
+                      value={customMaxChapters}
+                      onChange={(e) => setCustomMaxChapters(e.target.value)}
+                      placeholder="Nhập số lượng chapter"
+                      min="1"
+                      className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
                 <p className="text-gray-400 text-sm mt-1">
                   Số lượng chapter tối đa cần crawl
                 </p>
@@ -277,18 +358,21 @@ export default function EditScheduledCrawl() {
               <div>
                 <label className="block text-gray-300 mb-2">
                   Range chapter
-                  {maxChapters !== "all" && <span className="text-red-500 ml-1">*</span>}
+                  {isChapterRangeRequired && <span className="text-red-500 ml-1">*</span>}
                 </label>
                 <input
                   type="text"
                   value={chapterRange}
                   onChange={(e) => setChapterRange(e.target.value)}
                   placeholder="1-10"
-                  className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required={maxChapters !== "all"}
+                  className={`w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${isChapterRangeDisabled ? 'opacity-50' : ''}`}
+                  required={isChapterRangeRequired}
+                  disabled={isChapterRangeDisabled}
                 />
                 <p className="text-gray-400 text-sm mt-1">
-                  Range chapter cần crawl, format: "start-end" (ví dụ: "1-10")
+                  {isChapterRangeDisabled
+                    ? "Không cần nhập range khi chọn tất cả chapter"
+                    : 'Range chapter cần crawl, format: &quot;start-end&quot; (ví dụ: &quot;1-10&quot;)'}
                 </p>
               </div>
 
@@ -304,7 +388,7 @@ export default function EditScheduledCrawl() {
                   className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <p className="text-gray-400 text-sm mt-1">
-                  Range delay giữa các request, format: "min..max" (đơn vị: giây)
+                  Range delay giữa các request, format: &quot;min..max&quot; (đơn vị: giây)
                 </p>
               </div>
 

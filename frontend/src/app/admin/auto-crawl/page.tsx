@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, React } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AdminLayout from "../../../components/admin/AdminLayout";
 import { proxyApi, mangaApi } from "../../../services/api";
@@ -14,7 +14,8 @@ interface Manga {
 
 export default function AutoCrawlManga() {
   const router = useRouter();
-  const [mangas, setMangas] = useState<Manga[]>([]);
+  // Xóa biến không sử dụng _mangas
+  const [, setMangas] = useState<Manga[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -23,7 +24,7 @@ export default function AutoCrawlManga() {
   const [crawlStarted, setCrawlStarted] = useState<boolean>(false);
 
   // Form state
-  const [selectedMangaId, setSelectedMangaId] = useState<number | null>(null);
+  // Xóa biến không sử dụng _selectedMangaId và _setSelectedMangaId
   const [url, setUrl] = useState("");
   const [maxChapters, setMaxChapters] = useState<string>("all");
   const [customMaxChapters, setCustomMaxChapters] = useState<string>("");
@@ -86,7 +87,7 @@ export default function AutoCrawlManga() {
       }
 
       // Prepare options
-      const options: any = {
+      const options: Record<string, unknown> = {
         max_chapters: finalMaxChapters,
         delay: delay,
       };
@@ -133,14 +134,15 @@ export default function AutoCrawlManga() {
           router.push("/admin/scheduled-crawls");
         }, 2000);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error crawling manga:", err);
 
       // Xử lý lỗi source_url
-      if (err.response?.data?.error?.includes('source_url')) {
+      const errorResponse = err as { response?: { data?: { error?: string } } };
+      if (errorResponse.response?.data?.error?.includes('source_url')) {
         setError("Lỗi: Thuộc tính 'source_url' không tồn tại trong model Manga. Vui lòng liên hệ developer để thêm trường này vào database.");
       } else {
-        setError(err.response?.data?.error || "Có lỗi xảy ra khi crawl manga. Vui lòng thử lại sau.");
+        setError(errorResponse.response?.data?.error || "Có lỗi xảy ra khi crawl manga. Vui lòng thử lại sau.");
       }
     } finally {
       setLoading(false);
@@ -189,7 +191,7 @@ export default function AutoCrawlManga() {
   };
 
   return (
-    <AdminLayout children={undefined}>
+    <AdminLayout>
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Auto Crawl Manga</h1>
         <p className="text-gray-400">
@@ -335,7 +337,7 @@ export default function AutoCrawlManga() {
               <p className="text-gray-400 text-sm mt-1">
                 {isChapterRangeDisabled
                   ? "Không cần nhập range khi chọn tất cả chapter"
-                  : "Range chapter cần crawl, format: \"start-end\" (ví dụ: \"1-10\")"}
+                  : 'Range chapter cần crawl, format: &quot;start-end&quot; (ví dụ: &quot;1-10&quot;)'}
               </p>
             </div>
 
@@ -351,7 +353,7 @@ export default function AutoCrawlManga() {
                 className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <p className="text-gray-400 text-sm mt-1">
-                Range delay giữa các request, format: "min..max" (đơn vị: giây)
+                Range delay giữa các request, format: &quot;min..max&quot; (đơn vị: giây)
               </p>
             </div>
           </div>

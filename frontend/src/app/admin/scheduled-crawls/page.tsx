@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import AdminLayout from "../../../components/admin/AdminLayout";
 import { scheduledCrawlApi } from "../../../services/api";
 
@@ -25,7 +24,7 @@ interface ScheduledCrawl {
 }
 
 export default function ScheduledCrawls() {
-  const router = useRouter();
+  // Xóa router vì không sử dụng
   const [scheduledCrawls, setScheduledCrawls] = useState<ScheduledCrawl[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +35,7 @@ export default function ScheduledCrawls() {
   const fetchScheduledCrawls = async () => {
     try {
       setLoading(true);
-      const params: any = {};
+      const params: Record<string, string> = {};
       if (selectedStatus) {
         params.status = selectedStatus;
       }
@@ -51,9 +50,27 @@ export default function ScheduledCrawls() {
     }
   };
 
+  // Chỉ fetch dữ liệu khi selectedStatus thay đổi
   useEffect(() => {
     fetchScheduledCrawls();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStatus]);
+
+  // Handle status change
+  const handleStatusChange = async (id: number, status: "active" | "paused" | "completed") => {
+    try {
+      setLoading(true);
+      await scheduledCrawlApi.updateScheduledCrawl(id, { status });
+      setSuccess(`Đã cập nhật trạng thái thành ${formatStatus(status)}.`);
+      fetchScheduledCrawls();
+    } catch (err: unknown) {
+      console.error("Error updating scheduled crawl status:", err);
+      const errorResponse = err as { response?: { data?: { error?: string } } };
+      setError(errorResponse.response?.data?.error || "Có lỗi xảy ra khi cập nhật trạng thái. Vui lòng thử lại sau.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Format schedule type
   const formatScheduleType = (type: string) => {
@@ -113,9 +130,10 @@ export default function ScheduledCrawls() {
       await scheduledCrawlApi.runScheduledCrawlNow(id);
       setSuccess("Đã bắt đầu chạy crawl. Quá trình này có thể mất vài phút.");
       fetchScheduledCrawls();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error running scheduled crawl:", err);
-      setError(err.response?.data?.error || "Có lỗi xảy ra khi chạy crawl. Vui lòng thử lại sau.");
+      const errorResponse = err as { response?: { data?: { error?: string } } };
+      setError(errorResponse.response?.data?.error || "Có lỗi xảy ra khi chạy crawl. Vui lòng thử lại sau.");
     } finally {
       setLoading(false);
     }
@@ -132,24 +150,10 @@ export default function ScheduledCrawls() {
       await scheduledCrawlApi.deleteScheduledCrawl(id);
       setSuccess("Đã xóa lịch crawl thành công.");
       fetchScheduledCrawls();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error deleting scheduled crawl:", err);
-      setError(err.response?.data?.error || "Có lỗi xảy ra khi xóa lịch crawl. Vui lòng thử lại sau.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle status change
-  const handleStatusChange = async (id: number, status: string) => {
-    try {
-      setLoading(true);
-      await scheduledCrawlApi.updateScheduledCrawl(id, { status });
-      setSuccess(`Đã cập nhật trạng thái thành ${formatStatus(status)}.`);
-      fetchScheduledCrawls();
-    } catch (err: any) {
-      console.error("Error updating scheduled crawl status:", err);
-      setError(err.response?.data?.error || "Có lỗi xảy ra khi cập nhật trạng thái. Vui lòng thử lại sau.");
+      const errorResponse = err as { response?: { data?: { error?: string } } };
+      setError(errorResponse.response?.data?.error || "Có lỗi xảy ra khi xóa lịch crawl. Vui lòng thử lại sau.");
     } finally {
       setLoading(false);
     }

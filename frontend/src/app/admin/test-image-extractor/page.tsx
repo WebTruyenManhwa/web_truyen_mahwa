@@ -1,16 +1,20 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
 import AdminLayout from "../../../components/admin/AdminLayout";
 import { proxyApi } from "../../../services/api";
 
+interface ExtractImagesResult {
+  url: string;
+  image_count: number;
+  images: string[];
+}
+
 export default function TestImageExtractor() {
-  const router = useRouter();
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<ExtractImagesResult | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,16 +34,17 @@ export default function TestImageExtractor() {
       // Call API
       const response = await proxyApi.testExtractImages(url);
       setResult(response);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error extracting images:", err);
-      setError(err.response?.data?.error || "Có lỗi xảy ra khi extract hình ảnh. Vui lòng thử lại sau.");
+      const errorResponse = err as { response?: { data?: { error?: string } } };
+      setError(errorResponse.response?.data?.error || "Có lỗi xảy ra khi extract hình ảnh. Vui lòng thử lại sau.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <AdminLayout children={undefined}>
+    <AdminLayout>
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Test Image Extractor</h1>
         <p className="text-gray-400">

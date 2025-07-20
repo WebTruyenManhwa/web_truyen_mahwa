@@ -48,7 +48,7 @@ export default function ScheduledJobs() {
   const fetchJobs = async () => {
     try {
       setLoading(true);
-      const params: any = {
+      const params: Record<string, string | number> = {
         page: currentPage,
         per_page: 20
       };
@@ -67,7 +67,7 @@ export default function ScheduledJobs() {
       const jobsData = response.scheduled_jobs || [];
 
       // Chuẩn hóa dữ liệu jobs
-      const normalizedJobs = jobsData.map((job: any) => ({
+      const normalizedJobs = jobsData.map((job: Record<string, unknown>) => ({
         ...job,
         options: typeof job.options === 'string' ? job.options : JSON.stringify(job.options || {}),
         result: job.result === null ? null :
@@ -125,6 +125,7 @@ export default function ScheduledJobs() {
   useEffect(() => {
     fetchJobs();
     fetchStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, selectedJobType, selectedStatus]);
 
   // Format job type
@@ -169,9 +170,10 @@ export default function ScheduledJobs() {
       setSuccess("Đã lên lịch chạy lại job thành công.");
       fetchJobs();
       fetchStats();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error retrying job:", err);
-      setError(err.response?.data?.error || "Có lỗi xảy ra khi chạy lại job. Vui lòng thử lại sau.");
+      const errorResponse = err as { response?: { data?: { error?: string } } };
+      setError(errorResponse.response?.data?.error || "Có lỗi xảy ra khi chạy lại job. Vui lòng thử lại sau.");
     } finally {
       setLoading(false);
     }
@@ -189,9 +191,10 @@ export default function ScheduledJobs() {
       setSuccess("Đã hủy job thành công.");
       fetchJobs();
       fetchStats();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error canceling job:", err);
-      setError(err.response?.data?.error || "Có lỗi xảy ra khi hủy job. Vui lòng thử lại sau.");
+      const errorResponse = err as { response?: { data?: { error?: string } } };
+      setError(errorResponse.response?.data?.error || "Có lỗi xảy ra khi hủy job. Vui lòng thử lại sau.");
     } finally {
       setLoading(false);
     }
@@ -220,7 +223,7 @@ export default function ScheduledJobs() {
     try {
       const parsedOptions = JSON.parse(options);
       return JSON.stringify(parsedOptions, null, 2);
-    } catch (err) {
+    } catch {
       return String(options);
     }
   };
@@ -232,7 +235,7 @@ export default function ScheduledJobs() {
     try {
       const parsedResult = JSON.parse(result);
       return JSON.stringify(parsedResult, null, 2);
-    } catch (err) {
+    } catch {
       return String(result);
     }
   };
@@ -243,7 +246,7 @@ export default function ScheduledJobs() {
     const maxPagesToShow = 5;
 
     let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
-    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+    const endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
 
     if (endPage - startPage + 1 < maxPagesToShow) {
       startPage = Math.max(1, endPage - maxPagesToShow + 1);

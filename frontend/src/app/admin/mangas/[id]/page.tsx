@@ -10,6 +10,14 @@ import { mangaApi, genreApi, chapterApi } from "../../../../services/api";
 import React from "react";
 import BatchImportModal from "../../../../components/admin/BatchImportModal";
 
+interface Chapter {
+  id: number;
+  number: string;
+  title: string;
+  images?: string[];
+  created_at: string;
+}
+
 export default function MangaDetailAdmin() {
   const params = useParams<{ id: string }>();
   const [manga, setManga] = useState<{
@@ -38,7 +46,7 @@ export default function MangaDetailAdmin() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [chapters, setChapters] = useState<any>([]);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
   const [isBatchImportModalOpen, setIsBatchImportModalOpen] = useState(false);
 
   useEffect(() => {
@@ -103,8 +111,8 @@ export default function MangaDetailAdmin() {
         const chaptersData = res.chapters;
         setChapters(
           Array.isArray(chaptersData)
-            ? chaptersData
-            : Object.values(chaptersData || {})
+            ? chaptersData as Chapter[]
+            : (Object.values(chaptersData || {}) as Chapter[])
         );
       } catch (err) {
         console.error("Failed to fetch data:", err);
@@ -215,8 +223,8 @@ export default function MangaDetailAdmin() {
       const chaptersData = res.chapters;
       setChapters(
         Array.isArray(chaptersData)
-          ? chaptersData
-          : Object.values(chaptersData || {})
+          ? chaptersData as Chapter[]
+          : (Object.values(chaptersData || {}) as Chapter[])
       );
     } catch (err) {
       console.error("Failed to refresh chapters:", err);
@@ -662,7 +670,7 @@ export default function MangaDetailAdmin() {
               </thead>
               <tbody>
                 {chapters.length > 0 ? (
-                  chapters.map((chapter, index) => (
+                  chapters.map((chapter: Chapter, index) => (
                     <tr
                       key={chapter.id || `chapter-${index}`}
                       className="border-b border-gray-700"
