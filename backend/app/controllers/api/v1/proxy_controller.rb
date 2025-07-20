@@ -52,7 +52,8 @@ class Api::V1::ProxyController < Api::V1::BaseController
   # Params:
   # - url: URL của trang truyện cần crawl
   # - max_chapters: Số lượng chương tối đa cần crawl hoặc "all" (optional)
-  # - chapter_range: Range chương cần crawl, ví dụ: "7-20" (optional, bắt buộc nếu max_chapters là số)
+  # - chapter_range: Range chương cần crawl, ví dụ: "7-20" (optional, bắt buộc nếu max_chapters là số và không có auto_next_chapters)
+  # - auto_next_chapters: Nếu true, sẽ tự động crawl từ chapter mới nhất trong hệ thống (optional)
   # - delay: Range delay giữa các request, ví dụ: "2..5" (optional)
   # - schedule: Tùy chọn đặt lịch, nếu true thì sẽ tạo lịch crawl thay vì chạy ngay (optional)
   # - schedule_type: Loại lịch (daily, weekly, monthly) (required if schedule=true)
@@ -68,20 +69,24 @@ class Api::V1::ProxyController < Api::V1::BaseController
     # Tùy chọn
     options = {}
 
+    # Xử lý auto_next_chapters
+    auto_next_chapters = params[:auto_next_chapters] == 'true' || params[:auto_next_chapters] == true
+    options[:auto_next_chapters] = auto_next_chapters if auto_next_chapters
+
     # Xử lý max_chapters
     if params[:max_chapters].present?
       if params[:max_chapters].downcase == 'all'
         options[:max_chapters] = nil # Crawl tất cả
       else
-        # Nếu max_chapters là số, kiểm tra xem có chapter_range không
+        # Nếu max_chapters là số, kiểm tra xem có chapter_range hoặc auto_next_chapters không
         begin
           max_chapters = Integer(params[:max_chapters])
           options[:max_chapters] = max_chapters
 
-          # Nếu max_chapters là số và không có chapter_range, báo lỗi
-          unless params[:chapter_range].present?
+          # Nếu max_chapters là số và không có chapter_range và không có auto_next_chapters, báo lỗi
+          if !params[:chapter_range].present? && !auto_next_chapters
             return render json: {
-              error: 'chapter_range is required when max_chapters is a number. Format: "start-end" (e.g., "7-20")'
+              error: 'chapter_range is required when max_chapters is a number and auto_next_chapters is not enabled. Format: "start-end" (e.g., "7-20")'
             }, status: :bad_request
           end
         rescue ArgumentError
@@ -99,16 +104,23 @@ class Api::V1::ProxyController < Api::V1::BaseController
         }, status: :bad_request
       end
 
-      # Kiểm tra format của chapter_range (phải là "start-end")
-      range_match = params[:chapter_range].match(/^(\d+)-(\d+)$/)
-      unless range_match
+      # Nếu đã bật auto_next_chapters, không cho phép nhập chapter_range
+      if auto_next_chapters
         return render json: {
-          error: 'Invalid chapter_range format. Must be "start-end" (e.g., "7-20")'
+          error: 'chapter_range is not allowed when auto_next_chapters is enabled'
         }, status: :bad_request
       end
 
-      start_chapter = range_match[1].to_i
-      end_chapter = range_match[2].to_i
+      # Kiểm tra format của chapter_range (phải là "start-end")
+      range_match = params[:chapter_range].match(/^(\d+(\.\d+)?)-(\d+(\.\d+)?)$/)
+      unless range_match
+        return render json: {
+          error: 'Invalid chapter_range format. Must be "start-end" (e.g., "7-20" or "17.1-17.5")'
+        }, status: :bad_request
+      end
+
+      start_chapter = range_match[1].to_f
+      end_chapter = range_match[3].to_f
 
       # Kiểm tra start_chapter <= end_chapter
       if start_chapter > end_chapter
@@ -174,6 +186,7 @@ class Api::V1::ProxyController < Api::V1::BaseController
         max_chapters: params[:max_chapters],
         chapter_range: params[:chapter_range],
         delay: params[:delay],
+        auto_next_chapters: auto_next_chapters,
         status: 'active'
       )
 

@@ -176,6 +176,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_20_000003) do
     t.datetime "next_run_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "auto_next_chapters", default: false
     t.index ["manga_id"], name: "index_scheduled_crawls_on_manga_id"
   end
 

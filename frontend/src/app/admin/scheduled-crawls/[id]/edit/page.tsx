@@ -31,6 +31,7 @@ interface UpdateScheduledCrawlData {
   status: "active" | "paused" | "completed";
   chapter_range?: string;
   schedule_days?: string;
+  auto_next_chapters?: boolean;
 }
 
 export default function EditScheduledCrawl() {
@@ -55,9 +56,9 @@ export default function EditScheduledCrawl() {
   const [status, setStatus] = useState<string>("active");
 
   // Determine if chapter range is required
-  const isChapterRangeRequired = maxChapters !== "all" || isCustomChapters;
+  const isChapterRangeRequired = (maxChapters !== "all" && isCustomChapters) || maxChapters === "custom";
   // Determine if chapter range input should be disabled
-  const isChapterRangeDisabled = maxChapters === "all" && !isCustomChapters;
+  const isChapterRangeDisabled = maxChapters === "all" || (!isCustomChapters && maxChapters !== "custom");
 
   // Fetch scheduled crawl
   useEffect(() => {
@@ -134,9 +135,9 @@ export default function EditScheduledCrawl() {
       setSuccess(null);
 
       // Validate form
-      if ((maxChapters !== "all" && !isCustomChapters) || (isCustomChapters && !customMaxChapters)) {
+      if ((maxChapters !== "all" && isCustomChapters) || maxChapters === "custom") {
         if (!chapterRange) {
-          setError("Vui lòng nhập range chapter khi số lượng chapter không phải 'all'");
+          setError("Vui lòng nhập range chapter khi chọn số lượng chapter tùy chỉnh");
           setSaving(false);
           return;
         }
@@ -182,8 +183,11 @@ export default function EditScheduledCrawl() {
         status: status as "active" | "paused" | "completed",
       };
 
-      if (chapterRange) {
+      if (chapterRange && ((finalMaxChapters !== "all" && isCustomChapters) || maxChapters === "custom")) {
         data.chapter_range = chapterRange;
+      } else if (finalMaxChapters !== "all" && !isCustomChapters && maxChapters !== "custom") {
+        // Khi chọn số lượng chapter cố định (1, 5, 10, 20, 50, 100)
+        data.auto_next_chapters = true;
       }
 
       if (scheduleType === "weekly") {
@@ -393,7 +397,9 @@ export default function EditScheduledCrawl() {
                 />
                 <p className="text-gray-400 text-sm mt-1">
                   {isChapterRangeDisabled
-                    ? "Không cần nhập range khi chọn tất cả chapter"
+                    ? maxChapters === "all"
+                      ? "Không cần nhập range khi chọn tất cả chapter"
+                      : "Không cần nhập range khi chọn số lượng chapter cố định. Hệ thống sẽ tự động crawl từ chapter mới nhất tiếp theo."
                     : 'Range chapter cần crawl, format: &quot;start-end&quot; (ví dụ: &quot;1-10&quot;, &quot;17.1-17.5&quot;)'}
                 </p>
               </div>

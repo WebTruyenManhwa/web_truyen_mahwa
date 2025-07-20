@@ -37,9 +37,9 @@ export default function AutoCrawlManga() {
   const [scheduleDays, setScheduleDays] = useState<string[]>(["1"]);
 
   // Determine if chapter range is required
-  const isChapterRangeRequired = maxChapters !== "all" || isCustomChapters;
+  const isChapterRangeRequired = (maxChapters !== "all" && isCustomChapters) || maxChapters === "custom";
   // Determine if chapter range input should be disabled
-  const isChapterRangeDisabled = maxChapters === "all" && !isCustomChapters;
+  const isChapterRangeDisabled = maxChapters === "all" || (!isCustomChapters && maxChapters !== "custom");
 
   // Fetch mangas for dropdown
   useEffect(() => {
@@ -80,10 +80,12 @@ export default function AutoCrawlManga() {
 
       const finalMaxChapters = isCustomChapters ? customMaxChapters : maxChapters;
 
-      if (finalMaxChapters !== "all" && !chapterRange) {
-        setError("Vui lòng nhập range chapter khi số lượng chapter không phải 'all'");
-        setLoading(false);
-        return;
+      if ((finalMaxChapters !== "all" && isCustomChapters) || maxChapters === "custom") {
+        if (!chapterRange) {
+          setError("Vui lòng nhập range chapter khi chọn số lượng chapter tùy chỉnh");
+          setLoading(false);
+          return;
+        }
       }
 
       // Kiểm tra định dạng chapter range
@@ -114,8 +116,11 @@ export default function AutoCrawlManga() {
         delay: delay,
       };
 
-      if (chapterRange && finalMaxChapters !== "all") {
+      if (chapterRange && ((finalMaxChapters !== "all" && isCustomChapters) || maxChapters === "custom")) {
         options.chapter_range = chapterRange;
+      } else if (finalMaxChapters !== "all" && !isCustomChapters && maxChapters !== "custom") {
+        // Khi chọn số lượng chapter cố định (1, 5, 10, 20, 50, 100)
+        options.auto_next_chapters = true;
       }
 
       if (isScheduled) {
@@ -358,7 +363,9 @@ export default function AutoCrawlManga() {
               />
               <p className="text-gray-400 text-sm mt-1">
                 {isChapterRangeDisabled
-                  ? "Không cần nhập range khi chọn tất cả chapter"
+                  ? maxChapters === "all"
+                    ? "Không cần nhập range khi chọn tất cả chapter"
+                    : "Không cần nhập range khi chọn số lượng chapter cố định. Hệ thống sẽ tự động crawl từ chapter mới nhất tiếp theo."
                   : 'Range chapter cần crawl, format: &quot;start-end&quot; (ví dụ: &quot;1-10&quot;, &quot;17.1-17.5&quot;)'}
               </p>
             </div>
@@ -450,6 +457,12 @@ export default function AutoCrawlManga() {
               <li>Nếu truyện <strong>đã tồn tại</strong> trong hệ thống, hệ thống sẽ sử dụng truyện đó thay vì tạo mới.</li>
               <li>Các chapter đã tồn tại sẽ được bỏ qua trong quá trình crawl.</li>
               <li>Chỉ các chapter mới sẽ được thêm vào truyện.</li>
+              <li>Khi chọn số lượng chapter cố định (1, 5, 10, 20, 50, 100):</li>
+              <ul className="list-circle pl-5 text-gray-300 space-y-1 mt-1 mb-2">
+                <li>Hệ thống sẽ <strong>tự động crawl từ chapter mới nhất</strong> trong hệ thống trở đi</li>
+                <li>Ví dụ: Nếu truyện đã có chapter 13 trong hệ thống và chapter tiếp theo từ nguồn là 14.1, hệ thống sẽ crawl từ chapter 14.1 trở đi</li>
+                <li>Không cần nhập range chapter trong trường hợp này</li>
+              </ul>
             </ul>
           </div>
 
