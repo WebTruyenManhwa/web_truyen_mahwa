@@ -13,6 +13,22 @@ if !defined?(Rails::Console) && Rails.env != 'test'
     Rails.logger.error "❌ Lỗi khi xóa scheduler locks: #{e.message}"
   end
 
+  # Cấu hình connection pool
+  begin
+    # Tăng timeout cho connection pool
+    ActiveRecord::Base.connection_pool.instance_variable_set(:@timeout, 10)
+
+    # Tăng kích thước pool nếu cần
+    current_pool_size = ActiveRecord::Base.connection_pool.size
+    if current_pool_size < 10
+      Rails.logger.info "⚠️ Connection pool size hiện tại (#{current_pool_size}) có thể quá nhỏ cho scheduler"
+    end
+
+    Rails.logger.info "🔄 Connection pool: size=#{ActiveRecord::Base.connection_pool.size}, timeout=#{ActiveRecord::Base.connection_pool.instance_variable_get(:@timeout)}s"
+  rescue => e
+    Rails.logger.error "❌ Lỗi khi cấu hình connection pool: #{e.message}"
+  end
+
   # Log để kiểm tra scheduler khởi động
   Rails.logger.info "🔄 Attempting to initialize scheduler in process #{Process.pid}"
 

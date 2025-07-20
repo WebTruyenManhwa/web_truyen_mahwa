@@ -15,18 +15,8 @@ class MangaCrawlerService
     end
 
     begin
-      # Chuẩn hóa options
-      options = options.transform_keys(&:to_sym) if options.is_a?(Hash)
-
-      # Chuyển đổi auto_next_chapters từ string thành boolean
-      if options[:auto_next_chapters].is_a?(String)
-        options[:auto_next_chapters] = options[:auto_next_chapters].to_s.downcase == 'true'
-      end
-
-      # Đảm bảo auto_next_chapters là boolean
-      if options['auto_next_chapters'].present?
-        options[:auto_next_chapters] = options['auto_next_chapters'].to_s.downcase == 'true'
-      end
+      # Chuẩn hóa options - chuyển đổi đệ quy tất cả các nested hash
+      options = deep_symbolize_keys(options)
 
       # Log options ban đầu
       Rails.logger.info "Original options: #{options.inspect}"
@@ -51,11 +41,11 @@ class MangaCrawlerService
 
       if auto_next_chapters && options[:max_chapters].present?
         # Lấy số chapter lớn nhất hiện tại trong database
-        latest_chapter = manga.chapters.maximum(:number)
+        latest_chapter = manga.chapters.maximum(:number) || 0
 
         Rails.logger.info "Auto next chapters is enabled and max_chapters is present: #{options[:max_chapters]}"
 
-        if latest_chapter.present?
+        if latest_chapter > 0
           Rails.logger.info "Auto next chapters enabled. Latest chapter in database: #{latest_chapter}"
           Rails.logger.info "First 5 chapters from source (newest first): #{chapters.take(5).map { |c| "#{c[:title]} (#{c[:number]})" }.join(', ')}"
 
@@ -63,6 +53,8 @@ class MangaCrawlerService
           # Lưu ý: chapters từ trang web đã được sắp xếp từ mới đến cũ
           new_chapters = chapters.select do |chapter|
             chapter_number = chapter[:number].to_f
+            # Đảm bảo chapter_number không nil
+            next false unless chapter_number > 0
             result = chapter_number > latest_chapter
             Rails.logger.info "Checking chapter #{chapter[:title]} (#{chapter_number}) > #{latest_chapter}? #{result}"
             result
@@ -82,17 +74,44 @@ class MangaCrawlerService
         end
       # Xử lý chapter range nếu có
       elsif options[:chapter_range].present?
-        start_chapter = options[:chapter_range][:start]
-        end_chapter = options[:chapter_range][:end]
+        start_chapter = options[:chapter_range][:start].to_f
+        end_chapter = options[:chapter_range][:end].to_f
+
+        Rails.logger.info "Filtering chapters with range: #{start_chapter} to #{end_chapter}"
+        Rails.logger.info "Chapter range raw data: #{options[:chapter_range].inspect}"
+        Rails.logger.info "First 10 chapters before filtering: #{chapters.take(10).map { |c| "#{c[:title]} (#{c[:number]})" }.join(', ')}"
+
+        # Kiểm tra xem có chapter nào trong khoảng 47.0 đến 49.0 không
+        test_chapters = chapters.select { |c| c[:number].to_f >= start_chapter && c[:number].to_f <= end_chapter }
+        Rails.logger.info "Test chapters in range 47.0-49.0: #{test_chapters.map { |c| "#{c[:title]} (#{c[:number]})" }.join(', ')}"
 
         # Lọc chapters theo range
-        chapters = chapters.select do |chapter|
+        filtered_chapters = chapters.select do |chapter|
           chapter_number = chapter[:number].to_f
-          chapter_number >= start_chapter && chapter_number <= end_chapter
+          # Đảm bảo chapter_number không nil và nằm trong khoảng
+          if chapter_number && chapter_number >= start_chapter && chapter_number <= end_chapter
+            Rails.logger.info "Selected chapter in range: #{chapter[:title]} (#{chapter_number})"
+            true
+          else
+            false
+          end
         end
 
+        # Log số lượng chapter tìm được
+        Rails.logger.info "Found #{filtered_chapters.size} chapters in range #{start_chapter} to #{end_chapter}"
+
+        if filtered_chapters.empty?
+          Rails.logger.warn "⚠️ No chapters found in range #{start_chapter} to #{end_chapter}!"
+          return { status: 'error', message: "No chapters found in range #{start_chapter} to #{end_chapter}" }
+        end
+
+        Rails.logger.info "Filtered chapters: #{filtered_chapters.map { |c| "#{c[:title]} (#{c[:number]})" }.join(', ')}"
+
         # Sắp xếp lại theo số chương tăng dần
-        chapters = chapters.sort_by { |c| c[:number] || 0 }
+        filtered_chapters = filtered_chapters.sort_by { |c| c[:number] || 0 }
+
+        # Gán lại biến chapters
+        chapters = filtered_chapters
       end
 
       # Log options sau khi xử lý auto_next_chapters
@@ -259,6 +278,12 @@ class MangaCrawlerService
       # Lấy số chương
       chapter_number_match = chapter_title.match(/Chapter\s+(\d+(\.\d+)?)/i)
       chapter_number = chapter_number_match ? chapter_number_match[1].to_f : nil
+
+      # Bỏ qua các chapter không có số chapter hoặc có URL chứa "thong-bao"
+      if chapter_number.nil? && chapter_url.include?("thong-bao")
+        Rails.logger.info "Skipping announcement chapter: #{chapter_title} (#{chapter_url})"
+        next
+      end
 
       # Lấy ngày đăng
       chapter_date = li.at_css('.col-xs-4')&.text&.strip
@@ -503,5 +528,11 @@ class MangaCrawlerService
       'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Mobile/15E148 Safari/604.1'
     ]
     user_agents.sample
+  end
+
+  # Hàm đệ quy để chuyển đổi các key của hash thành symbol
+  def self.deep_symbolize_keys(hash)
+    return hash unless hash.is_a?(Hash)
+    hash.transform_keys { |key| key.is_a?(String) ? key.to_sym : key }.transform_values { |value| deep_symbolize_keys(value) }
   end
 end

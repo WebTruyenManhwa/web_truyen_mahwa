@@ -78,6 +78,9 @@ class SchedulerService
 
         # Đánh dấu job thất bại
         job.mark_as_failed(e.message)
+      ensure
+        # Đảm bảo connection được trả về pool (Rails 8.0.2+)
+        ActiveRecord::Base.connection_pool.release_connection
       end
     end
 
@@ -86,58 +89,67 @@ class SchedulerService
       # Log bắt đầu
       Rails.logger.info "🔍 Checking for pending jobs at #{Time.current}"
 
-      # Tìm tất cả các job đến hạn và chưa được xử lý
-      pending_jobs = ScheduledJob.pending_and_due
+      begin
+        # Tìm tất cả các job đến hạn và chưa được xử lý
+        pending_jobs = ScheduledJob.pending_and_due
 
-      # Log số lượng job tìm thấy
-      if pending_jobs.exists?
-        Rails.logger.info "📋 Found #{pending_jobs.count} pending jobs to process"
-      end
-
-      pending_jobs.find_each do |job|
-        # Kiểm tra xem job này đã được xử lý chưa
-        next if job.locked?
-
-        # Log job đang xử lý
-        Rails.logger.info "🔄 Processing job ##{job.id} (#{job.job_type})"
-
-        # Đánh dấu job đang chạy
-        job.mark_as_running
-
-        # Xử lý job theo loại
-        begin
-          case job.job_type
-          when 'scheduled_crawl_check'
-            result = RunScheduledCrawlsJob.perform_now(job.options || {})
-            job.mark_as_completed(result.to_json)
-            Rails.logger.info "✅ Completed job ##{job.id} (scheduled_crawl_check)"
-          when 'single_job'
-            # Xử lý single job với các tham số từ options
-            options = job.options
-            if options[:job_class] && options[:job_args]
-              job_class = options[:job_class].constantize
-              job_args = options[:job_args]
-
-              Rails.logger.info "🚀 Running #{job_class} with args: #{job_args.inspect}"
-              result = job_class.perform_now(*job_args)
-              job.mark_as_completed(result.to_json)
-              Rails.logger.info "✅ Completed job ##{job.id} (#{job_class})"
-            else
-              job.mark_as_failed('Missing job_class or job_args in options')
-              Rails.logger.error "❌ Failed job ##{job.id}: Missing job_class or job_args"
-            end
-          else
-            job.mark_as_failed("Unknown job type: #{job.job_type}")
-            Rails.logger.error "❌ Failed job ##{job.id}: Unknown job type: #{job.job_type}"
-          end
-        rescue => e
-          # Log lỗi
-          Rails.logger.error "❌ Error processing job ##{job.id} (#{job.job_type}): #{e.message}"
-          Rails.logger.error e.backtrace.join("\n")
-
-          # Đánh dấu job thất bại
-          job.mark_as_failed(e.message)
+        # Log số lượng job tìm thấy
+        if pending_jobs.exists?
+          Rails.logger.info "📋 Found #{pending_jobs.count} pending jobs to process"
         end
+
+        pending_jobs.find_each do |job|
+          # Kiểm tra xem job này đã được xử lý chưa
+          next if job.locked?
+
+          # Log job đang xử lý
+          Rails.logger.info "🔄 Processing job ##{job.id} (#{job.job_type})"
+
+          # Đánh dấu job đang chạy
+          job.mark_as_running
+
+          # Xử lý job theo loại
+          begin
+            case job.job_type
+            when 'scheduled_crawl_check'
+              result = RunScheduledCrawlsJob.perform_now(job.options || {})
+              job.mark_as_completed(result.to_json)
+              Rails.logger.info "✅ Completed job ##{job.id} (scheduled_crawl_check)"
+            when 'single_job'
+              # Xử lý single job với các tham số từ options
+              options = job.options || {}
+              if options[:job_class].present? && options[:job_args].present?
+                job_class = options[:job_class].constantize
+                job_args = options[:job_args]
+
+                Rails.logger.info "🚀 Running #{job_class} with args: #{job_args.inspect}"
+                result = job_class.perform_now(*job_args)
+                job.mark_as_completed(result.to_json)
+                Rails.logger.info "✅ Completed job ##{job.id} (#{job_class})"
+              else
+                job.mark_as_failed('Missing job_class or job_args in options')
+                Rails.logger.error "❌ Failed job ##{job.id}: Missing job_class or job_args"
+              end
+            else
+              job.mark_as_failed("Unknown job type: #{job.job_type}")
+              Rails.logger.error "❌ Failed job ##{job.id}: Unknown job type: #{job.job_type}"
+            end
+          rescue => e
+            # Log lỗi
+            Rails.logger.error "❌ Error processing job ##{job.id} (#{job.job_type}): #{e.message}"
+            Rails.logger.error e.backtrace.join("\n")
+
+            # Đánh dấu job thất bại
+            job.mark_as_failed(e.message)
+          end
+        end
+      rescue => e
+        # Log lỗi
+        Rails.logger.error "❌ Error in process_database_jobs: #{e.message}"
+        Rails.logger.error e.backtrace.join("\n")
+      ensure
+        # Đảm bảo connection được trả về pool (Rails 8.0.2+)
+        ActiveRecord::Base.connection_pool.release_connection
       end
     end
 
