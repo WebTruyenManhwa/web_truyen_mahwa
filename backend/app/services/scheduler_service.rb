@@ -16,13 +16,18 @@ class SchedulerService
       end
 
       # Thêm một job để dọn dẹp các job cũ
-      @scheduler.every '1h', first_in: '30s', overlap: false, name: 'cleanup_old_jobs' do
+      @scheduler.every '6h', first_in: '30s', overlap: false, name: 'cleanup_old_jobs' do
         cleanup_old_jobs
       end
 
       # Thêm một job để kiểm tra và giải phóng các lock bị treo
       @scheduler.every '5m', first_in: '20s', overlap: false, name: 'release_stale_locks' do
         release_stale_locks
+      end
+
+      # Thêm một job để dọn dẹp các job thừa nếu có quá nhiều job trong ngày
+      @scheduler.every '3h', first_in: '2m', overlap: false, name: 'cleanup_excess_jobs' do
+        cleanup_excess_jobs
       end
 
       # Log thông tin khởi tạo
@@ -112,6 +117,36 @@ class SchedulerService
       ScheduledJob.where(status: 'failed')
                  .where('completed_at < ?', 30.days.ago)
                  .delete_all
+    end
+
+    # Dọn dẹp các job thừa nếu có quá nhiều job trong ngày
+    def cleanup_excess_jobs
+      # Số lượng job tối đa cho phép trong một ngày
+      max_jobs_per_day = 100
+
+      # Lấy ngày hiện tại
+      today = Time.current.beginning_of_day
+
+      # Đếm số lượng job đã tạo trong ngày hôm nay
+      job_count = ScheduledJob.where('created_at >= ?', today).count
+
+      # Nếu số lượng job vượt quá giới hạn
+      if job_count > max_jobs_per_day
+        Rails.logger.warn "⚠️ Phát hiện #{job_count} jobs trong ngày hôm nay, vượt quá giới hạn #{max_jobs_per_day}. Tiến hành dọn dẹp..."
+
+        # Xóa các job đã hoàn thành trong ngày hôm nay
+        completed_count = ScheduledJob.where(status: 'completed')
+                                    .where('created_at >= ?', today)
+                                    .delete_all
+
+        # Xóa các job đã thất bại trong ngày hôm nay
+        failed_count = ScheduledJob.where(status: 'failed')
+                                 .where('created_at >= ?', today)
+                                 .delete_all
+
+        # Log kết quả
+        Rails.logger.info "🧹 Đã xóa #{completed_count} jobs hoàn thành và #{failed_count} jobs thất bại trong ngày hôm nay"
+      end
     end
 
     # Giải phóng các lock bị treo

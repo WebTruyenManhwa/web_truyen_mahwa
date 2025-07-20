@@ -31,7 +31,8 @@ ENV RAILS_ENV="production" \
     BUNDLE_DEPLOYMENT="1" \
     BUNDLE_PATH="/usr/local/bundle" \
     BUNDLE_WITHOUT="development" \
-    RAILS_LOG_TO_STDOUT="true"
+    RAILS_LOG_TO_STDOUT="true" \
+    TZ=Asia/Ho_Chi_Minh
 
 # Throw-away build stage to reduce size of final image
 FROM base AS build
@@ -77,6 +78,9 @@ USER rails
 # Entrypoint chuẩn bị DB
 COPY --chown=root:root --chmod=755 entrypoint.sh /rails/entrypoint.sh
 ENTRYPOINT ["sh", "/rails/entrypoint.sh"]
+
+# Set timezone to Vietnam (Asia/Ho_Chi_Minh)
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Expose port
 EXPOSE 80

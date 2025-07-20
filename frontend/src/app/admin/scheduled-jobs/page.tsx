@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import AdminLayout from "../../../components/admin/AdminLayout";
 import { scheduledJobApi } from "../../../services/api";
 
@@ -62,7 +62,24 @@ export default function ScheduledJobs() {
       }
 
       const response = await scheduledJobApi.getScheduledJobs(params);
-      setJobs(response.scheduled_jobs || []);
+
+      // Đảm bảo dữ liệu trả về từ API được xử lý đúng cách
+      const jobsData = response.scheduled_jobs || [];
+
+      // Chuẩn hóa dữ liệu jobs
+      const normalizedJobs = jobsData.map((job: any) => ({
+        ...job,
+        options: typeof job.options === 'string' ? job.options : JSON.stringify(job.options || {}),
+        result: job.result === null ? null :
+                typeof job.result === 'string' ? job.result : JSON.stringify(job.result || null),
+        error_message: job.error_message || null,
+        started_at: job.started_at || null,
+        completed_at: job.completed_at || null,
+        retry_count: job.retry_count || 0,
+        max_retries: job.max_retries || 0
+      }));
+
+      setJobs(normalizedJobs);
       setTotalPages(response.meta?.total_pages || 1);
     } catch (err) {
       console.error("Error fetching scheduled jobs:", err);
@@ -76,9 +93,32 @@ export default function ScheduledJobs() {
   const fetchStats = async () => {
     try {
       const response = await scheduledJobApi.getJobStats();
-      setStats(response.stats);
+
+      // Kiểm tra dữ liệu trả về có đúng định dạng không
+      if (response && response.stats && typeof response.stats === 'object') {
+        // Đảm bảo tất cả các trường cần thiết đều tồn tại
+        const defaultStats: JobStats = {
+          total: 0,
+          pending: 0,
+          running: 0,
+          completed: 0,
+          failed: 0,
+          due: 0,
+          by_job_type: {}
+        };
+
+        // Merge với dữ liệu trả về từ API
+        setStats({
+          ...defaultStats,
+          ...response.stats
+        });
+      } else {
+        console.error("Invalid stats data format:", response);
+        setStats(null);
+      }
     } catch (err) {
       console.error("Error fetching job stats:", err);
+      setStats(null);
     }
   };
 
@@ -159,17 +199,29 @@ export default function ScheduledJobs() {
 
   // Show job details
   const showJobDetails = (job: ScheduledJob) => {
-    setSelectedJob(job);
+    // Đảm bảo tất cả các trường của job đều có giá trị hợp lệ
+    const safeJob = {
+      ...job,
+      options: job.options || '{}',
+      result: job.result || null,
+      error_message: job.error_message || null,
+      started_at: job.started_at || null,
+      completed_at: job.completed_at || null
+    };
+
+    setSelectedJob(safeJob);
     setShowModal(true);
   };
 
   // Format options
   const formatOptions = (options: string) => {
+    if (!options) return "Không có options";
+
     try {
       const parsedOptions = JSON.parse(options);
       return JSON.stringify(parsedOptions, null, 2);
     } catch (err) {
-      return options;
+      return String(options);
     }
   };
 
@@ -181,13 +233,13 @@ export default function ScheduledJobs() {
       const parsedResult = JSON.parse(result);
       return JSON.stringify(parsedResult, null, 2);
     } catch (err) {
-      return result;
+      return String(result);
     }
   };
 
   // Render pagination
   const renderPagination = () => {
-    const pages = [];
+    const pages: React.ReactElement[] = [];
     const maxPagesToShow = 5;
 
     let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
@@ -255,7 +307,7 @@ export default function ScheduledJobs() {
         </div>
       )}
 
-      {stats && (
+      {stats && typeof stats.total === 'number' && (
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
           <div className="bg-gray-800 rounded-lg p-4">
             <div className="text-gray-400 text-sm mb-1">Tổng số jobs</div>
@@ -560,7 +612,7 @@ export default function ScheduledJobs() {
               <div className="mb-6">
                 <p className="text-gray-400 mb-1">Options:</p>
                 <pre className="bg-gray-900 p-4 rounded-lg overflow-x-auto text-sm">
-                  {formatOptions(selectedJob.options)}
+                  {formatOptions(selectedJob.options || '{}')}
                 </pre>
               </div>
 
@@ -577,7 +629,7 @@ export default function ScheduledJobs() {
                 <div className="mb-6">
                   <p className="text-gray-400 mb-1">Lỗi:</p>
                   <pre className="bg-red-900/30 text-red-100 p-4 rounded-lg overflow-x-auto text-sm">
-                    {selectedJob.error_message}
+                    {selectedJob.error_message || 'Không có thông tin lỗi'}
                   </pre>
                 </div>
               )}

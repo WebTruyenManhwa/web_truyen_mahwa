@@ -84,7 +84,9 @@ module Api
       end
 
       def scheduled_crawl_params
-        params.permit(
+        # Chấp nhận tham số ở cả root level và nested object
+        params_to_use = params[:scheduled_crawl] || params
+        params_to_use.permit(
           :manga_id, :url, :schedule_type, :schedule_time, :schedule_days,
           :max_chapters, :chapter_range, :delay, :status
         )
