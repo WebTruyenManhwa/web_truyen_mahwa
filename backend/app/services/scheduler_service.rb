@@ -3,35 +3,52 @@ class SchedulerService
   class << self
     # Khởi tạo scheduler
     def initialize_scheduler
-      return if @scheduler
+      if @scheduler
+        Rails.logger.info "⚠️ Scheduler đã được khởi tạo trước đó, bỏ qua"
+        return @scheduler
+      end
 
+      Rails.logger.info "🚀 Khởi tạo Rufus Scheduler mới"
       @scheduler = Rufus::Scheduler.new
+
+      Rails.logger.info "📅 Đăng ký job kiểm tra scheduled crawls mỗi 5 phút"
       @scheduler.every '5m', first_in: '1s', overlap: false, name: 'scheduled_crawl_check' do
         schedule_crawl_check
       end
 
       # Thêm một job để kiểm tra các job đã lên lịch trong database
+      Rails.logger.info "📅 Đăng ký job xử lý database jobs mỗi 1 phút"
       @scheduler.every '1m', first_in: '10s', overlap: false, name: 'process_database_jobs' do
         process_database_jobs
       end
 
       # Thêm một job để dọn dẹp các job cũ
+      Rails.logger.info "📅 Đăng ký job dọn dẹp old jobs mỗi 6 giờ"
       @scheduler.every '6h', first_in: '30s', overlap: false, name: 'cleanup_old_jobs' do
         cleanup_old_jobs
       end
 
       # Thêm một job để kiểm tra và giải phóng các lock bị treo
+      Rails.logger.info "📅 Đăng ký job giải phóng stale locks mỗi 5 phút"
       @scheduler.every '5m', first_in: '20s', overlap: false, name: 'release_stale_locks' do
         release_stale_locks
       end
 
       # Thêm một job để dọn dẹp các job thừa nếu có quá nhiều job trong ngày
+      Rails.logger.info "📅 Đăng ký job dọn dẹp excess jobs mỗi 3 giờ"
       @scheduler.every '3h', first_in: '2m', overlap: false, name: 'cleanup_excess_jobs' do
         cleanup_excess_jobs
       end
 
       # Log thông tin khởi tạo
-      Rails.logger.info "Scheduler initialized with #{@scheduler.jobs.size} jobs"
+      Rails.logger.info "✅ Scheduler đã được khởi tạo với #{@scheduler.jobs.size} jobs"
+
+      # Log danh sách các jobs
+      @scheduler.jobs.each do |job|
+        Rails.logger.info "  • Job #{job.id}: #{job.name || 'unnamed'} (#{job.original})"
+      end
+
+      return @scheduler
     end
 
     # Lên lịch kiểm tra các scheduled crawls
@@ -66,10 +83,23 @@ class SchedulerService
 
     # Xử lý các job đã lên lịch trong database
     def process_database_jobs
+      # Log bắt đầu
+      Rails.logger.info "🔍 Checking for pending jobs at #{Time.current}"
+
       # Tìm tất cả các job đến hạn và chưa được xử lý
-      ScheduledJob.pending_and_due.find_each do |job|
+      pending_jobs = ScheduledJob.pending_and_due
+
+      # Log số lượng job tìm thấy
+      if pending_jobs.exists?
+        Rails.logger.info "📋 Found #{pending_jobs.count} pending jobs to process"
+      end
+
+      pending_jobs.find_each do |job|
         # Kiểm tra xem job này đã được xử lý chưa
         next if job.locked?
+
+        # Log job đang xử lý
+        Rails.logger.info "🔄 Processing job ##{job.id} (#{job.job_type})"
 
         # Đánh dấu job đang chạy
         job.mark_as_running
@@ -80,6 +110,7 @@ class SchedulerService
           when 'scheduled_crawl_check'
             result = RunScheduledCrawlsJob.perform_now(job.options || {})
             job.mark_as_completed(result.to_json)
+            Rails.logger.info "✅ Completed job ##{job.id} (scheduled_crawl_check)"
           when 'single_job'
             # Xử lý single job với các tham số từ options
             options = job.options
@@ -87,17 +118,21 @@ class SchedulerService
               job_class = options[:job_class].constantize
               job_args = options[:job_args]
 
+              Rails.logger.info "🚀 Running #{job_class} with args: #{job_args.inspect}"
               result = job_class.perform_now(*job_args)
               job.mark_as_completed(result.to_json)
+              Rails.logger.info "✅ Completed job ##{job.id} (#{job_class})"
             else
               job.mark_as_failed('Missing job_class or job_args in options')
+              Rails.logger.error "❌ Failed job ##{job.id}: Missing job_class or job_args"
             end
           else
             job.mark_as_failed("Unknown job type: #{job.job_type}")
+            Rails.logger.error "❌ Failed job ##{job.id}: Unknown job type: #{job.job_type}"
           end
         rescue => e
           # Log lỗi
-          Rails.logger.error "Error processing job ##{job.id} (#{job.job_type}): #{e.message}"
+          Rails.logger.error "❌ Error processing job ##{job.id} (#{job.job_type}): #{e.message}"
           Rails.logger.error e.backtrace.join("\n")
 
           # Đánh dấu job thất bại
@@ -163,7 +198,7 @@ class SchedulerService
     # Lên lịch cho một job cụ thể
     def schedule_job(job_class, job_args = [], run_at = Time.current)
       # Tạo một job trong database
-      ScheduledJob.create(
+      job = ScheduledJob.create(
         job_type: 'single_job',
         status: 'pending',
         scheduled_at: run_at,
@@ -172,6 +207,18 @@ class SchedulerService
           job_args: job_args
         }
       )
+
+      # Nếu job_args[1] là một hash (options), thêm job_id vào đó
+      if job_args.size > 1 && job_args[1].is_a?(Hash)
+        # Cập nhật options trong database
+        job_args[1][:job_id] = job.id
+        job.update(options: {
+          job_class: job_class.to_s,
+          job_args: job_args
+        })
+      end
+
+      job
     end
   end
 end

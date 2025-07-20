@@ -214,7 +214,7 @@ export default function AutoCrawlManga() {
 
   // Chuyển đến trang Scheduled Jobs để xem tiến trình
   const goToScheduledCrawls = () => {
-    router.push("/admin/scheduled-crawls");
+    router.push("/admin/scheduled-jobs");
   };
 
   return (

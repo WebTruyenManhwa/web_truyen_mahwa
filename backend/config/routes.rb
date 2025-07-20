@@ -52,6 +52,7 @@ Rails.application.routes.draw do
         member do
           post :retry
           post :cancel
+          post :pause
         end
 
         collection do

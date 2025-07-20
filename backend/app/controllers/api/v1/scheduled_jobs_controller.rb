@@ -2,7 +2,7 @@ module Api
   module V1
     class ScheduledJobsController < BaseController
       before_action :authenticate_admin!
-      before_action :set_scheduled_job, only: [:show, :retry, :cancel]
+      before_action :set_scheduled_job, only: [:show, :retry, :cancel, :pause]
 
       # GET /api/v1/scheduled_jobs
       def index
@@ -69,6 +69,19 @@ module Api
         @scheduled_job.update(status: 'failed', error_message: 'Canceled by user')
 
         render json: { message: 'Job has been canceled' }
+      end
+
+      # POST /api/v1/scheduled_jobs/:id/pause
+      def pause
+        # Chỉ có thể pause các job đang running
+        unless @scheduled_job.status == 'running'
+          return render json: { error: 'Only running jobs can be paused' }, status: :bad_request
+        end
+
+        # Cập nhật trạng thái của job
+        @scheduled_job.update(status: 'failed', error_message: 'Paused by user')
+
+        render json: { message: 'Job has been paused' }
       end
 
       # GET /api/v1/scheduled_jobs/stats

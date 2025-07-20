@@ -15,6 +15,23 @@ class MangaCrawlerService
     end
 
     begin
+      # Chuẩn hóa options
+      options = options.transform_keys(&:to_sym) if options.is_a?(Hash)
+
+      # Chuyển đổi auto_next_chapters từ string thành boolean
+      if options[:auto_next_chapters].is_a?(String)
+        options[:auto_next_chapters] = options[:auto_next_chapters].to_s.downcase == 'true'
+      end
+
+      # Đảm bảo auto_next_chapters là boolean
+      if options['auto_next_chapters'].present?
+        options[:auto_next_chapters] = options['auto_next_chapters'].to_s.downcase == 'true'
+      end
+
+      # Log options ban đầu
+      Rails.logger.info "Original options: #{options.inspect}"
+      Rails.logger.info "Original max_chapters type: #{options[:max_chapters].class.name}, value: #{options[:max_chapters].inspect}"
+      Rails.logger.info "Original auto_next_chapters type: #{options[:auto_next_chapters].class.name}, value: #{options[:auto_next_chapters].inspect}"
       # Lấy thông tin truyện
       manga_info = extract_manga_info(manga_url)
 
@@ -28,14 +45,49 @@ class MangaCrawlerService
       # Tạo manga nếu chưa tồn tại
       manga = find_or_create_manga(manga_info)
 
+      # Xử lý auto_next_chapters nếu được bật
+      auto_next_chapters = [true, 'true'].include?(options[:auto_next_chapters])
+      Rails.logger.info "Auto next chapters is: #{auto_next_chapters} (original value: #{options[:auto_next_chapters].inspect})"
+
+      if auto_next_chapters && options[:max_chapters].present?
+        # Lấy số chapter lớn nhất hiện tại trong database
+        latest_chapter = manga.chapters.maximum(:number)
+
+        Rails.logger.info "Auto next chapters is enabled and max_chapters is present: #{options[:max_chapters]}"
+
+        if latest_chapter.present?
+          Rails.logger.info "Auto next chapters enabled. Latest chapter in database: #{latest_chapter}"
+          Rails.logger.info "First 5 chapters from source (newest first): #{chapters.take(5).map { |c| "#{c[:title]} (#{c[:number]})" }.join(', ')}"
+
+          # Lọc chapters chỉ lấy những chapter có số lớn hơn chapter mới nhất trong database
+          # Lưu ý: chapters từ trang web đã được sắp xếp từ mới đến cũ
+          new_chapters = chapters.select do |chapter|
+            chapter_number = chapter[:number].to_f
+            result = chapter_number > latest_chapter
+            Rails.logger.info "Checking chapter #{chapter[:title]} (#{chapter_number}) > #{latest_chapter}? #{result}"
+            result
+          end
+
+          Rails.logger.info "Found #{new_chapters.size} chapters newer than #{latest_chapter}"
+
+          # Sắp xếp lại theo số chương tăng dần để crawl từ cũ đến mới
+          new_chapters = new_chapters.sort_by { |c| c[:number] || 0 }
+
+          Rails.logger.info "Chapters to crawl (sorted ascending): #{new_chapters.take(5).map { |c| "#{c[:title]} (#{c[:number]})" }.join(', ')}"
+
+          # Gán lại biến chapters
+          chapters = new_chapters
+        else
+          Rails.logger.info "No existing chapters found in database, will crawl from beginning"
+        end
       # Xử lý chapter range nếu có
-      if options[:chapter_range].present?
+      elsif options[:chapter_range].present?
         start_chapter = options[:chapter_range][:start]
         end_chapter = options[:chapter_range][:end]
 
         # Lọc chapters theo range
         chapters = chapters.select do |chapter|
-          chapter_number = chapter[:number].to_i
+          chapter_number = chapter[:number].to_f
           chapter_number >= start_chapter && chapter_number <= end_chapter
         end
 
@@ -43,8 +95,31 @@ class MangaCrawlerService
         chapters = chapters.sort_by { |c| c[:number] || 0 }
       end
 
-      # Số chương cần crawl
-      max_chapters = options[:max_chapters] || chapters.size
+      # Log options sau khi xử lý auto_next_chapters
+      Rails.logger.info "Options after processing: #{options.inspect}"
+      Rails.logger.info "Max chapters after processing type: #{options[:max_chapters].class.name}, value: #{options[:max_chapters].inspect}"
+
+      # Số chương cần crawl - Xử lý triệt để
+      max_chapters = if options[:max_chapters].present?
+        # Nếu là chuỗi "all", lấy tất cả chapter
+        if options[:max_chapters].to_s.downcase == "all"
+          chapters.size
+        else
+          # Đảm bảo chuyển đổi thành số nguyên
+          limit = options[:max_chapters].to_i
+          # Nếu giá trị chuyển đổi là 0 (không hợp lệ), mặc định là 5
+          limit = 5 if limit <= 0
+          limit
+        end
+      else
+        # Mặc định là 5 chapter nếu không có giá trị
+        5
+      end
+
+      # Log thông tin về max_chapters
+      Rails.logger.info "Final max chapters to crawl: #{max_chapters}, Available chapters: #{chapters.size}"
+
+      # Đảm bảo chỉ lấy đúng số lượng chapter được chỉ định
       chapters_to_crawl = chapters.take(max_chapters)
 
       # Kết quả crawl
@@ -60,8 +135,27 @@ class MangaCrawlerService
 
       # Crawl từng chương
       chapters_to_crawl.each_with_index do |chapter_data, index|
-        # Delay ngẫu nhiên để tránh bị chặn
-        sleep(rand(options[:delay] || DEFAULT_DELAY))
+        # Nếu job_id được truyền vào, kiểm tra trạng thái của job
+        if options[:job_id].present?
+          job = ScheduledJob.find_by(id: options[:job_id])
+          if job && job.status != 'running'
+            Rails.logger.info "Job ##{options[:job_id]} is no longer running (status: #{job.status}). Stopping crawl."
+            break
+          end
+        end
+
+        # Xử lý delay
+        delay = options[:delay] || DEFAULT_DELAY
+        if delay.is_a?(String) && delay.include?('..')
+          # Chuyển đổi chuỗi "3..7" thành range 3..7
+          start_delay, end_delay = delay.split('..').map(&:to_i)
+          sleep_time = rand(start_delay..end_delay)
+          Rails.logger.info "Sleeping for #{sleep_time} seconds (delay: #{delay})"
+          sleep(sleep_time)
+        else
+          # Sử dụng delay như bình thường
+          sleep(rand(delay))
+        end
 
         # Crawl chương
         chapter_result = crawl_chapter(manga, chapter_data)
@@ -177,8 +271,13 @@ class MangaCrawlerService
       }
     end
 
-    # Sắp xếp chương theo số thứ tự tăng dần
-    chapters.sort_by { |c| c[:number] || 0 }
+    # Log thông tin về chapters
+    Rails.logger.info "Found #{chapters.size} chapters from source"
+    Rails.logger.info "First 5 chapters from source: #{chapters.take(5).map { |c| "#{c[:title]} (#{c[:number]})" }.join(', ')}"
+
+    # KHÔNG sắp xếp lại chapters, giữ nguyên thứ tự từ trang web (mới nhất trước)
+    # Trên NetTruyen, chapters được hiển thị từ mới nhất đến cũ nhất
+    chapters
   end
 
   # Crawl một chương cụ thể

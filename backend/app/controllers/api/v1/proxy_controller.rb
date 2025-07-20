@@ -76,12 +76,12 @@ class Api::V1::ProxyController < Api::V1::BaseController
     # Xử lý max_chapters
     if params[:max_chapters].present?
       if params[:max_chapters].downcase == 'all'
-        options[:max_chapters] = nil # Crawl tất cả
+        options[:max_chapters] = "all" # Crawl tất cả - lưu dưới dạng chuỗi để dễ nhận diện
       else
         # Nếu max_chapters là số, kiểm tra xem có chapter_range hoặc auto_next_chapters không
         begin
           max_chapters = Integer(params[:max_chapters])
-          options[:max_chapters] = max_chapters
+          options[:max_chapters] = max_chapters.to_s # Lưu dưới dạng chuỗi để tránh vấn đề khi serialize
 
           # Nếu max_chapters là số và không có chapter_range và không có auto_next_chapters, báo lỗi
           if !params[:chapter_range].present? && !auto_next_chapters
@@ -221,14 +221,17 @@ class Api::V1::ProxyController < Api::V1::BaseController
       end
     else
       # Chạy trong background job để không block request
-      job = CrawlMangaJob.perform_later(url, options)
+      # job = CrawlMangaJob.perform_later(url, options)
+
+      # Sử dụng SchedulerService.schedule_job thay vì tạo ScheduledJob trực tiếp
+      job = SchedulerService.schedule_job('CrawlMangaJob', [url, options])
 
       render json: {
         status: 'success',
         message: 'Crawl manga job has been queued',
         url: url,
         options: options,
-        job_id: job.job_id
+        job_id: job.id
       }
     end
   end

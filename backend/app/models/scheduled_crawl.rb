@@ -93,12 +93,14 @@ class ScheduledCrawl < ApplicationRecord
     update(last_run_at: Time.current)
 
     # Chuẩn bị options cho crawl
-    options = {}
+    options = {
+      auto_next_chapters: true  # Mặc định bật auto_next_chapters
+    }
 
     # Xử lý max_chapters
     if max_chapters.present?
       if max_chapters.downcase == 'all'
-        options[:max_chapters] = nil
+        options[:max_chapters] = 'all'
       else
         options[:max_chapters] = max_chapters.to_i
       end
@@ -117,12 +119,17 @@ class ScheduledCrawl < ApplicationRecord
 
     # Xử lý delay
     if delay.present? && delay.include?('..')
-      min, max = delay.split('..').map(&:to_i)
-      options[:delay] = min..max if min && max && min < max
+      options[:delay] = delay
     end
 
-    # Chạy crawl
-    CrawlMangaJob.perform_later(url, options)
+    # Tạo một scheduled job trong database thay vì sử dụng ActiveJob
+    scheduled_job = SchedulerService.schedule_job(
+      'CrawlMangaJob',
+      [url, options],
+      Time.current
+    )
+
+    Rails.logger.info "Scheduled crawl ##{id} for manga '#{manga_title}' created job ##{scheduled_job.id}"
 
     # Cập nhật thời gian chạy tiếp theo
     set_next_run_time

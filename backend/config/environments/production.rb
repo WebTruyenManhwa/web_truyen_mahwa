@@ -100,5 +100,5 @@ Rails.application.configure do
   config.public_file_server.enabled = true
 
   # Giới hạn số lượng worker processes để giảm sử dụng RAM
-  config.active_job.queue_adapter = :sidekiq
+  # config.active_job.queue_adapter = :sidekiq
 end

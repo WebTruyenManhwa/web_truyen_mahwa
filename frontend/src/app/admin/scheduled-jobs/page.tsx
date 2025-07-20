@@ -200,6 +200,23 @@ export default function ScheduledJobs() {
     }
   };
 
+  // Handle pause job
+  const handlePauseJob = async (id: number) => {
+    try {
+      setLoading(true);
+      await scheduledJobApi.pauseJob(id);
+      setSuccess("Đã tạm dừng job thành công.");
+      fetchJobs();
+      fetchStats();
+    } catch (err: unknown) {
+      console.error("Error pausing job:", err);
+      const errorResponse = err as { response?: { data?: { error?: string } } };
+      setError(errorResponse.response?.data?.error || "Có lỗi xảy ra khi tạm dừng job. Vui lòng thử lại sau.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Show job details
   const showJobDetails = (job: ScheduledJob) => {
     // Đảm bảo tất cả các trường của job đều có giá trị hợp lệ
@@ -505,6 +522,29 @@ export default function ScheduledJobs() {
                           </button>
                         )}
 
+                        {job.status === "running" && (
+                          <button
+                            onClick={() => handlePauseJob(job.id)}
+                            className="text-yellow-500 hover:text-yellow-400"
+                            title="Tạm dừng"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                              />
+                            </svg>
+                          </button>
+                        )}
+
                         {job.status === "pending" && (
                           <button
                             onClick={() => handleCancel(job.id)}
@@ -647,6 +687,17 @@ export default function ScheduledJobs() {
                     className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
                   >
                     Chạy lại
+                  </button>
+                )}
+                {selectedJob.status === "running" && (
+                  <button
+                    onClick={() => {
+                      handlePauseJob(selectedJob.id);
+                      setShowModal(false);
+                    }}
+                    className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg"
+                  >
+                    Tạm dừng
                   </button>
                 )}
                 {selectedJob.status === "pending" && (

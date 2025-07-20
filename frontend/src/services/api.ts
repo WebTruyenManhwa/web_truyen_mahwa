@@ -488,6 +488,12 @@ export const scheduledJobApi = {
     return response.data;
   },
 
+  // Tạm dừng một job đang chạy
+  pauseJob: async (id: string | number) => {
+    const response = await api.post(`/v1/scheduled_jobs/${id}/pause`);
+    return response.data;
+  },
+
   // Lấy thống kê về jobs
   getJobStats: async () => {
     const response = await api.get('/v1/scheduled_jobs/stats');

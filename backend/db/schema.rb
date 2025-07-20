@@ -201,6 +201,14 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_20_000003) do
     t.index ["status"], name: "index_scheduled_jobs_on_status"
   end
 
+  create_table "scheduler_locks", force: :cascade do |t|
+    t.string "name", null: false
+    t.integer "process_id", null: false
+    t.datetime "locked_at", null: false
+    t.datetime "heartbeat_at"
+    t.index ["name"], name: "index_scheduler_locks_on_name", unique: true
+  end
+
   create_table "solid_cache_entries", force: :cascade do |t|
     t.binary "key", null: false
     t.binary "value", null: false
