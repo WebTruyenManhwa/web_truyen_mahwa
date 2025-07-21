@@ -43,6 +43,48 @@ class ChapterPresenterService
       chapters
     end
 
+    # Preload all chapters for multiple mangas in a single query
+    def preload_chapters_for_multiple_mangas(manga_ids)
+      return {} if manga_ids.blank?
+
+      @chapters_by_manga ||= {}
+      @next_prev_map ||= {}
+
+      # Filter out manga IDs that are already cached
+      missing_manga_ids = manga_ids.reject { |id| @chapters_by_manga.key?(id) }
+
+      # If there are missing manga IDs, load them all at once
+      unless missing_manga_ids.empty?
+        # Load all chapters for these mangas in one query
+        chapters = Chapter.where(manga_id: missing_manga_ids).order(number: :asc).to_a
+
+        # Group chapters by manga_id
+        chapters_by_manga_id = chapters.group_by(&:manga_id)
+
+        # Process each manga and its chapters
+        missing_manga_ids.each do |manga_id|
+          manga_chapters = chapters_by_manga_id[manga_id] || []
+          @chapters_by_manga[manga_id] = manga_chapters
+
+          # Create next/prev mapping for this manga
+          @next_prev_map[manga_id] = {}
+
+          # Process chapters to create next/prev mapping
+          manga_chapters.each_with_index do |chapter, index|
+            @next_prev_map[manga_id][chapter.id] = {
+              prev: index > 0 ? manga_chapters[index - 1] : nil,
+              next: index < manga_chapters.length - 1 ? manga_chapters[index + 1] : nil
+            }
+          end
+        end
+      end
+
+      # Return a hash of manga_id => chapters
+      manga_ids.each_with_object({}) do |id, result|
+        result[id] = @chapters_by_manga[id] || []
+      end
+    end
+
     # Get next chapter data for a specific chapter
     def next_chapter_data(chapter)
       manga_id = chapter.manga_id

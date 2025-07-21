@@ -25,9 +25,9 @@ module Api
         # Preload all chapters for these mangas to optimize next/prev chapter lookups
         # Store in instance variable to avoid redundant queries
         @cached_chapters = {}
-        manga_ids.each do |manga_id|
-          @cached_chapters[manga_id] = ChapterPresenterService.preload_chapters_for_manga(manga_id)
-        end
+
+        # Sử dụng phương thức mới để preload chapters cho nhiều manga cùng lúc
+        @cached_chapters = ChapterPresenterService.preload_chapters_for_multiple_mangas(manga_ids)
 
         # Preload all chapter image collections in one query
         image_collections = ChapterPresenterService.preload_image_collections(chapter_ids)

@@ -79,7 +79,10 @@ class ReadingHistorySerializer < ActiveModel::Serializer
     {
       id: object.manga.id,
       title: object.manga.title,
-      slug: object.manga.slug
+      slug: object.manga.slug,
+      cover_image: {
+        url: object.manga.cover_image_url
+      }
     }
   end
 end
