@@ -1,9 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import AdminLayout from "../../../components/admin/AdminLayout";
 import { scheduledCrawlApi } from "../../../services/api";
+import React from "react";
+import { scheduledJobApi } from "../../../services/api";
 
 interface ScheduledCrawl {
   id: number;
@@ -147,8 +150,45 @@ export default function ScheduledCrawls() {
 
     try {
       setLoading(true);
+      
+      // Xóa scheduled crawl
       await scheduledCrawlApi.deleteScheduledCrawl(id);
-      setSuccess("Đã xóa lịch crawl thành công.");
+      
+      // Tìm và xóa tất cả scheduled jobs liên quan đến scheduled crawl này
+      try {
+        // Lấy tất cả jobs
+        const response = await scheduledJobApi.getScheduledJobs({ per_page: 100 });
+        const jobs = response.scheduled_jobs || [];
+        
+        // Tìm các jobs có options chứa scheduled_crawl_id trùng với id đã xóa
+        const relatedJobs = jobs.filter(job => {
+          try {
+            const options = typeof job.options === 'string' 
+              ? JSON.parse(job.options) 
+              : job.options;
+            
+            return options && options.scheduled_crawl_id === id;
+          } catch {
+            return false;
+          }
+        });
+        
+        // Xóa từng job liên quan
+        for (const job of relatedJobs) {
+          await scheduledJobApi.cancelJob(job.id);
+          console.log(`Đã xóa job #${job.id} liên quan đến scheduled crawl #${id}`);
+        }
+        
+        if (relatedJobs.length > 0) {
+          setSuccess(`Đã xóa lịch crawl và ${relatedJobs.length} jobs liên quan thành công.`);
+        } else {
+          setSuccess("Đã xóa lịch crawl thành công.");
+        }
+      } catch (jobErr) {
+        console.error("Error deleting related jobs:", jobErr);
+        setSuccess("Đã xóa lịch crawl thành công, nhưng có lỗi khi xóa các jobs liên quan.");
+      }
+      
       fetchScheduledCrawls();
     } catch (err: unknown) {
       console.error("Error deleting scheduled crawl:", err);

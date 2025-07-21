@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import AdminLayout from "../../../../../components/admin/AdminLayout";
 import { scheduledCrawlApi } from "../../../../../services/api";
+import React from "react";
 
 interface ScheduledCrawl {
   id: number;

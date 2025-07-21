@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AdminLayout from "../../../components/admin/AdminLayout";
 import { proxyApi, mangaApi } from "../../../services/api";
+import React from "react";
 
 interface Manga {
   id: number;
