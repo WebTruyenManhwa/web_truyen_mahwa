@@ -104,16 +104,17 @@ Rails.application.configure do
 
   # Thêm cấu hình tối ưu bộ nhớ cho môi trường ít tài nguyên
   if ENV["LOW_MEMORY_ENV"] == "true" || ENV["RENDER"] == "true"
-    # Tối ưu GC cho môi trường ít RAM
-    GC.configure(
-      malloc_limit: 8_000_000,
-      malloc_limit_max: 16_000_000,
-      oldmalloc_limit: 8_000_000,
-      oldmalloc_limit_max: 16_000_000
-    )
+    # Tối ưu GC cho môi trường ít RAM bằng cách thiết lập các biến môi trường
+    ENV['RUBY_GC_MALLOC_LIMIT'] = '8000000'
+    ENV['RUBY_GC_MALLOC_LIMIT_MAX'] = '16000000'
+    ENV['RUBY_GC_OLDMALLOC_LIMIT'] = '8000000'
+    ENV['RUBY_GC_OLDMALLOC_LIMIT_MAX'] = '16000000'
     
     # Chạy GC thường xuyên hơn
     GC::Profiler.enable
+    
+    # Thực hiện GC ngay lập tức để giải phóng bộ nhớ
+    GC.start
     
     # Giảm kích thước của các bộ đệm
     config.action_controller.default_url_options = { protocol: 'https' }
@@ -138,17 +139,17 @@ Rails.application.configure do
     config.active_record.cache_versioning = false
     config.active_record.collection_cache_versioning = false
     
-    # Tối ưu Active Storage (nếu sử dụng)
-    if defined?(ActiveStorage)
-      config.active_storage.service = :amazon
-      config.active_storage.queue = :active_storage
-      config.active_storage.variant_processor = :mini_magick
-    end
+    # # Tối ưu Active Storage (nếu sử dụng)
+    # if defined?(ActiveStorage)
+    #   config.active_storage.service = :local
+    #   config.active_storage.queue = :active_storage
+    #   config.active_storage.variant_processor = :mini_magick
+    # end
     
-    # Tối ưu Action Cable (nếu sử dụng)
-    if defined?(ActionCable)
-      config.action_cable.mount_path = nil
-      config.action_cable.allowed_request_origins = ['https://yourdomain.com']
-    end
+    # # Tối ưu Action Cable (nếu sử dụng)
+    # if defined?(ActionCable)
+    #   config.action_cable.mount_path = nil
+    #   config.action_cable.allowed_request_origins = ['https://webtruyen.mahwa.vn']
+    # end
   end
 end
