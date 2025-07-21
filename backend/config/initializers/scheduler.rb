@@ -16,15 +16,15 @@ if !defined?(Rails::Console) && Rails.env != 'test'
   # Cấu hình connection pool
   begin
     # Tăng timeout cho connection pool
-    ActiveRecord::Base.connection_pool.instance_variable_set(:@timeout, 10)
+    ActiveRecord::Base.connection_pool.instance_variable_set(:@timeout, 15)
 
-    # Tăng kích thước pool nếu cần
+    # Tăng kích thước pool
+    db_config = ActiveRecord::Base.configurations.configs_for(env_name: Rails.env).first
+    db_config_hash = db_config.configuration_hash.merge(pool: 20)
+    ActiveRecord::Base.establish_connection(db_config_hash)
+
     current_pool_size = ActiveRecord::Base.connection_pool.size
-    if current_pool_size < 10
-      Rails.logger.info "⚠️ Connection pool size hiện tại (#{current_pool_size}) có thể quá nhỏ cho scheduler"
-    end
-
-    Rails.logger.info "🔄 Connection pool: size=#{ActiveRecord::Base.connection_pool.size}, timeout=#{ActiveRecord::Base.connection_pool.instance_variable_get(:@timeout)}s"
+    Rails.logger.info "🔄 Connection pool: size=#{current_pool_size}, timeout=#{ActiveRecord::Base.connection_pool.instance_variable_get(:@timeout)}s"
   rescue => e
     Rails.logger.error "❌ Lỗi khi cấu hình connection pool: #{e.message}"
   end
@@ -109,10 +109,12 @@ if !defined?(Rails::Console) && Rails.env != 'test'
     # Thêm một job để cập nhật heartbeat định kỳ
     scheduler.every '30s' do
       begin
-        # Cập nhật heartbeat
-        ActiveRecord::Base.connection.execute(
-          "UPDATE scheduler_locks SET heartbeat_at = NOW() WHERE name = 'main_scheduler' AND process_id = #{Process.pid}"
-        )
+        # Bọc trong with_connection để đảm bảo connection được trả lại pool sau khi sử dụng
+        ActiveRecord::Base.connection_pool.with_connection do |conn|
+          conn.execute(
+            "UPDATE scheduler_locks SET heartbeat_at = NOW() WHERE name = 'main_scheduler' AND process_id = #{Process.pid}"
+          )
+        end
       rescue => e
         Rails.logger.error "Error updating scheduler heartbeat: #{e.message}"
       end
@@ -121,28 +123,35 @@ if !defined?(Rails::Console) && Rails.env != 'test'
     # Thêm một job để kiểm tra xem khóa có còn thuộc về process hiện tại không
     scheduler.every '1m' do
       begin
-        # Kiểm tra xem khóa có còn thuộc về process hiện tại không
-        result = ActiveRecord::Base.connection.execute(
-          "SELECT process_id FROM scheduler_locks WHERE name = 'main_scheduler'"
-        ).first
-
-        if result.nil?
-          # Nếu không tìm thấy khóa, thử lấy lại
-          begin
-            ActiveRecord::Base.connection.execute(
-              "INSERT INTO scheduler_locks (name, process_id, locked_at) VALUES ('main_scheduler', #{Process.pid}, NOW())"
-            )
-            Rails.logger.info "🔒 Re-acquired scheduler lock for process #{Process.pid}"
-          rescue
-            # Nếu không lấy được khóa, dừng scheduler
-            Rails.logger.info "🛑 Could not re-acquire lock, stopping scheduler in process #{Process.pid}"
-            scheduler.shutdown
+        # Bọc trong with_connection để đảm bảo connection được trả lại pool sau khi sử dụng
+        lock_valid = ActiveRecord::Base.connection_pool.with_connection do |conn|
+          result = conn.execute(
+            "SELECT process_id FROM scheduler_locks WHERE name = 'main_scheduler'"
+          ).first
+          
+          if result.nil?
+            # Nếu không tìm thấy khóa, thử lấy lại
+            begin
+              conn.execute(
+                "INSERT INTO scheduler_locks (name, process_id, locked_at) VALUES ('main_scheduler', #{Process.pid}, NOW())"
+              )
+              Rails.logger.info "🔒 Re-acquired scheduler lock for process #{Process.pid}"
+              true
+            rescue
+              # Nếu không lấy được khóa, dừng scheduler
+              Rails.logger.info "🛑 Could not re-acquire lock, stopping scheduler in process #{Process.pid}"
+              false
+            end
+          elsif result['process_id'] != Process.pid
+            # Nếu khóa thuộc về process khác, dừng scheduler
+            Rails.logger.info "🛑 Lock owned by process #{result['process_id']}, stopping scheduler in process #{Process.pid}"
+            false
+          else
+            true
           end
-        elsif result['process_id'] != Process.pid
-          # Nếu khóa thuộc về process khác, dừng scheduler
-          Rails.logger.info "🛑 Lock owned by process #{result['process_id']}, stopping scheduler in process #{Process.pid}"
-          scheduler.shutdown
         end
+        
+        scheduler.shutdown unless lock_valid
       rescue => e
         Rails.logger.error "Error checking scheduler lock: #{e.message}"
       end
@@ -153,13 +162,15 @@ if !defined?(Rails::Console) && Rails.env != 'test'
 
     # Hiển thị thông tin về process đang giữ khóa
     begin
-      lock_info = ActiveRecord::Base.connection.execute(
-        "SELECT process_id, locked_at, heartbeat_at FROM scheduler_locks WHERE name = 'main_scheduler'"
-      ).first
+      ActiveRecord::Base.connection_pool.with_connection do |conn|
+        lock_info = conn.execute(
+          "SELECT process_id, locked_at, heartbeat_at FROM scheduler_locks WHERE name = 'main_scheduler'"
+        ).first
 
-      if lock_info
-        Rails.logger.info "ℹ️ Lock held by process #{lock_info['process_id']} since #{lock_info['locked_at']}, last heartbeat: #{lock_info['heartbeat_at'] || 'none'}"
-        Rails.logger.info "💡 To clear stale locks, run: rake scheduler:clear_locks"
+        if lock_info
+          Rails.logger.info "ℹ️ Lock held by process #{lock_info['process_id']} since #{lock_info['locked_at']}, last heartbeat: #{lock_info['heartbeat_at'] || 'none'}"
+          Rails.logger.info "💡 To clear stale locks, run: rake scheduler:clear_locks"
+        end
       end
     rescue => e
       Rails.logger.error "Error getting lock info: #{e.message}"
