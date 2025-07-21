@@ -70,7 +70,18 @@ class MangaCrawlerService
           # Gán lại biến chapters
           chapters = new_chapters
         else
+          # Khi chưa có chapter nào trong database, sắp xếp chapters theo thứ tự tăng dần
+          # để bắt đầu crawl từ chapter đầu tiên
           Rails.logger.info "No existing chapters found in database, will crawl from beginning"
+          
+          # Đảo ngược mảng chapters để lấy từ cũ đến mới
+          sorted_chapters = chapters.sort_by { |c| c[:number] || Float::INFINITY }
+          
+          Rails.logger.info "Sorting chapters in ascending order to start from the first chapter"
+          Rails.logger.info "First 5 chapters after sorting (oldest first): #{sorted_chapters.take(5).map { |c| "#{c[:title]} (#{c[:number]})" }.join(', ')}"
+          
+          # Gán lại biến chapters
+          chapters = sorted_chapters
         end
       # Xử lý chapter range nếu có
       elsif options[:chapter_range].present?
@@ -414,8 +425,27 @@ class MangaCrawlerService
       # Thêm thể loại nếu có
       if manga_info[:genres].present?
         manga_info[:genres].each do |genre_name|
-          genre = Genre.find_or_create_by(name: genre_name)
-          manga.genres << genre unless manga.genres.include?(genre)
+          begin
+            # Tìm genre với tên chính xác
+            genre = Genre.where("lower(name) = ?", genre_name.downcase).first
+            
+            # Nếu không tìm thấy, tạo mới với xử lý lỗi
+            unless genre
+              genre = Genre.create(name: genre_name)
+              Rails.logger.info "Created new genre: #{genre_name}"
+            end
+            
+            # Thêm genre vào manga nếu chưa có
+            manga.genres << genre unless manga.genres.include?(genre)
+          rescue ActiveRecord::RecordNotUnique, PG::UniqueViolation => e
+            # Xử lý lỗi trùng lặp
+            Rails.logger.warn "Duplicate genre detected: #{genre_name}. Retrying with find..."
+            # Thử tìm lại genre sau khi bị lỗi trùng lặp
+            genre = Genre.find_by(name: genre_name)
+            manga.genres << genre if genre && !manga.genres.include?(genre)
+          rescue => e
+            Rails.logger.error "Error adding genre #{genre_name}: #{e.message}"
+          end
         end
       end
 
