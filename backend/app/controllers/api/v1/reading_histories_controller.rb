@@ -99,18 +99,37 @@ module Api
         # Use a single transaction for the entire operation
         @history = nil
 
-        ActiveRecord::Base.transaction do
-          @history = current_user.reading_histories.find_or_initialize_by(
+        begin
+          ActiveRecord::Base.transaction do
+            @history = current_user.reading_histories.find_or_initialize_by(
+              manga_id: manga.id,
+              chapter_id: chapter.id
+            )
+
+            # Update the last_read_at timestamp
+            @history.last_read_at = Time.current
+            @history.save!
+          end
+
+          Rails.logger.info "=== Successfully saved reading history: #{@history.id} ==="
+        rescue ActiveRecord::RecordNotUnique => e
+          # Xử lý trường hợp record đã tồn tại
+          Rails.logger.warn "=== Reading history already exists, trying to find and update: #{e.message} ==="
+
+          # Tìm và cập nhật bản ghi hiện có
+          @history = current_user.reading_histories.find_by(
             manga_id: manga.id,
             chapter_id: chapter.id
           )
 
-          # Update the last_read_at timestamp
-          @history.last_read_at = Time.current
-          @history.save!
+          if @history
+            @history.update(last_read_at: Time.current)
+            Rails.logger.info "=== Successfully updated existing reading history: #{@history.id} ==="
+          else
+            Rails.logger.error "=== Failed to find existing reading history ==="
+            return render json: { errors: ["Failed to update reading history"] }, status: :unprocessable_entity
+          end
         end
-
-        Rails.logger.info "=== Successfully saved reading history: #{@history.id} ==="
 
         # Preload chapters for this manga to optimize next/prev lookups
         # This will store all chapters in the ChapterPresenterService cache
@@ -194,11 +213,34 @@ module Api
 
           # Case 2: If param starts with "chapter-X", extract the number
           if chapter_id_param.start_with?('chapter-')
-            chapter_number = chapter_id_param.sub('chapter-', '').to_f
+            # Check if it's a decimal format like "chapter-47-1"
+            chapter_id = chapter_id_param.sub('chapter-', '')
+
+            if chapter_id.include?('-')
+              parts = chapter_id.split('-')
+              if parts.length == 2 && parts.all? { |part| part.match?(/^\d+$/) }
+                # Convert "47-1" to 47.1
+                integer_part = parts[0].to_i
+                decimal_part = parts[1].to_i
+                chapter_number = integer_part + (decimal_part / 10.0)
+                Rails.logger.info "=== Case 2a: Decimal chapter number: #{chapter_number} (from #{chapter_id_param}) ==="
+
+                # Try to find by decimal number
+                chapter = manga.chapters.find_by(number: chapter_number)
+                return chapter if chapter
+              else
+                # Regular format
+                chapter_number = chapter_id.to_f
+              end
+            else
+              # Simple format like "chapter-47"
+              chapter_number = chapter_id.to_f
+            end
+
             if chapter_number > 0
               # Direct query by number is more efficient than filtering an array
               chapter = manga.chapters.find_by(number: chapter_number)
-              Rails.logger.info "=== Case 2: Chapter number: #{chapter_number}, found: #{chapter&.id} ==="
+              Rails.logger.info "=== Case 2b: Chapter number: #{chapter_number}, found: #{chapter&.id} ==="
               return chapter if chapter
             end
           end

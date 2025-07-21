@@ -43,19 +43,81 @@ module Api
         def set_chapter
           # Memoize manga to avoid redundant lookups
           @manga ||= if params[:manga_id].present?
-            Manga.find_by(slug: params[:manga_id]) || Manga.find_by(id: params[:manga_id])
+            manga = Manga.find_by(slug: params[:manga_id]) || Manga.find_by(id: params[:manga_id])
+            Rails.logger.info "Found manga: #{manga&.id} - #{manga&.title} - #{manga&.slug}" if manga
+            manga
           end
 
           # Find chapter efficiently using memoized manga
           @chapter ||= if @manga
-            # Try to find by number if chapter_id is in format "chapter-X"
+            # Try to find by number if chapter_id is in format "chapter-X" or "chapter-X-Y"
             if params[:chapter_id].to_s.start_with?('chapter-')
-              chapter_number = params[:chapter_id].sub('chapter-', '').to_f
-              @manga.chapters.find_by(number: chapter_number)
+              chapter_id = params[:chapter_id].sub('chapter-', '')
+
+              # Check if it's a decimal format like "chapter-47-1"
+              if chapter_id.include?('-')
+                parts = chapter_id.split('-')
+                if parts.length == 2 && parts.all? { |part| part.match?(/^\d+$/) }
+                  # Convert "47-1" to 47.1
+                  integer_part = parts[0].to_i
+                  decimal_part = parts[1].to_i
+                  chapter_number = integer_part + (decimal_part / 10.0)
+                  Rails.logger.info "Looking for chapter with decimal number: #{chapter_number} (from #{params[:chapter_id]})"
+                else
+                  # Regular format or other hyphenated format
+                  chapter_number = chapter_id.to_f
+                  Rails.logger.info "Looking for chapter with number: #{chapter_number} (from #{params[:chapter_id]})"
+                end
+              else
+                # Simple format like "chapter-47"
+                chapter_number = chapter_id.to_f
+                Rails.logger.info "Looking for chapter with number: #{chapter_number} (from #{params[:chapter_id]})"
+              end
+
+              # Kiểm tra tất cả các chapter của manga này để debug
+              # all_chapters = @manga.chapters.pluck(:id, :number, :title, :slug)
+              # Rails.logger.info "All chapters for manga #{@manga.id}: #{all_chapters.inspect}"
+
+              # Tìm kiếm chính xác theo số chapter
+              chapter = @manga.chapters.find_by(number: chapter_number)
+
+              # Nếu không tìm thấy, thử tìm theo slug trực tiếp
+              if chapter.nil?
+                Rails.logger.info "Chapter not found by number, trying to find by slug: #{params[:chapter_id]}"
+                chapter = @manga.chapters.find_by(slug: params[:chapter_id])
+              end
+
+              # Nếu không tìm thấy, thử tìm với số nguyên (nếu chapter_number là số thập phân)
+              if chapter.nil? && chapter_number.to_i != chapter_number
+                Rails.logger.info "Trying to find chapter with integer number: #{chapter_number.to_i}"
+                chapter = @manga.chapters.find_by(number: chapter_number.to_i)
+              end
+
+              # Nếu không tìm thấy, thử tìm với số thập phân (nếu chapter_number là số nguyên)
+              if chapter.nil? && chapter_number.to_i == chapter_number
+                Rails.logger.info "Trying to find chapter with decimal numbers: #{chapter_number}.1, #{chapter_number}.2"
+                chapter = @manga.chapters.find_by(number: "#{chapter_number}.1") ||
+                          @manga.chapters.find_by(number: "#{chapter_number}.2")
+              end
+
+              # Nếu vẫn không tìm thấy, thử tìm với số gần đúng
+              if chapter.nil?
+                Rails.logger.info "Trying to find chapter with approximate number"
+                # Tìm chapter có số gần nhất với chapter_number
+                closest_chapter = @manga.chapters.order(Arel.sql("ABS(number - #{chapter_number})")).first
+                if closest_chapter && (closest_chapter.number - chapter_number).abs <= 0.2
+                  Rails.logger.info "Found approximate chapter: #{closest_chapter.id} - #{closest_chapter.title} - #{closest_chapter.number}"
+                  chapter = closest_chapter
+                end
+              end
+
+              Rails.logger.info "Found chapter by number: #{chapter&.id} - #{chapter&.title} - #{chapter&.number}" if chapter
+              chapter
             else
               # Try to find by slug or ID
-              @manga.chapters.find_by(slug: params[:chapter_id]) ||
-              @manga.chapters.find_by(id: params[:chapter_id])
+              chapter = @manga.chapters.find_by(slug: params[:chapter_id]) || @manga.chapters.find_by(id: params[:chapter_id])
+              Rails.logger.info "Found chapter by slug/id: #{chapter&.id} - #{chapter&.title}" if chapter
+              chapter
             end
           end
 
@@ -63,6 +125,7 @@ module Api
           unless @chapter
             error_message = "Couldn't find Chapter with id=#{params[:chapter_id]}"
             error_message += " for Manga with id=#{params[:manga_id]}" if @manga
+            Rails.logger.error error_message
             raise ActiveRecord::RecordNotFound, error_message
           end
         end

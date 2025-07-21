@@ -127,8 +127,15 @@ class Chapter < ApplicationRecord
   def set_slug
     return if slug.present?
 
-    # Tạo slug từ số chapter - chỉ lấy phần số nguyên
-    chapter_number = number.to_i
-    self.slug = "chapter-#{chapter_number}"
+    # Tạo slug từ số chapter - xử lý cả số thập phân
+    if number.to_f == number.to_i
+      # Số nguyên: 12 -> chapter-12
+      self.slug = "chapter-#{number.to_i}"
+    else
+      # Số thập phân: 12.1 -> chapter-12-1, 47.2 -> chapter-47-2
+      integer_part = number.to_i
+      decimal_part = ((number - integer_part) * 10).to_i
+      self.slug = "chapter-#{integer_part}-#{decimal_part}"
+    end
   end
 end
