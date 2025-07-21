@@ -1,14 +1,31 @@
 class SchedulerService
   # Singleton instance
   class << self
+    # Đọc cấu hình scheduler từ biến môi trường hoặc sử dụng giá trị mặc định
+    def get_scheduler_config
+      low_memory = ENV["LOW_MEMORY_ENV"] == "true" || ENV["RENDER"] == "true"
+      
+      {
+        scheduled_crawl_check_interval: low_memory ? '10m' : '5m',
+        database_jobs_interval: low_memory ? '2m' : '1m',
+        cleanup_old_jobs_interval: low_memory ? '12h' : '6h',
+        release_stale_locks_interval: low_memory ? '10m' : '5m',
+        cleanup_excess_jobs_interval: low_memory ? '6h' : '3h',
+        max_jobs_per_day: low_memory ? 50 : 100
+      }
+    end
+
     # Khởi tạo scheduler
     def initialize_scheduler
       if @scheduler
         Rails.logger.info "⚠️ Scheduler đã được khởi tạo trước đó, bỏ qua"
         return @scheduler
       end
-
-      Rails.logger.info "🚀 Khởi tạo Rufus Scheduler mới"
+      
+      # Lấy cấu hình dựa trên môi trường
+      config = get_scheduler_config
+      
+      Rails.logger.info "🚀 Khởi tạo Rufus Scheduler mới (#{ENV["LOW_MEMORY_ENV"] == "true" || ENV["RENDER"] == "true" ? "low memory mode" : "normal mode"})"
       @scheduler = Rufus::Scheduler.new
 
       # Đảm bảo có kết nối database trước khi đăng ký các jobs
@@ -32,8 +49,8 @@ class SchedulerService
         return @scheduler
       end
 
-      Rails.logger.info "📅 Đăng ký job kiểm tra scheduled crawls mỗi 5 phút"
-      @scheduler.every '5m', first_in: '1s', overlap: false, name: 'scheduled_crawl_check' do
+      Rails.logger.info "📅 Đăng ký job kiểm tra scheduled crawls mỗi #{config[:scheduled_crawl_check_interval]}"
+      @scheduler.every config[:scheduled_crawl_check_interval], first_in: '1s', overlap: false, name: 'scheduled_crawl_check' do
         # Bọc trong khối begin/rescue để xử lý lỗi kết nối
         begin
           schedule_crawl_check
@@ -44,8 +61,8 @@ class SchedulerService
       end
 
       # Thêm một job để kiểm tra các job đã lên lịch trong database
-      Rails.logger.info "📅 Đăng ký job xử lý database jobs mỗi 1 phút"
-      @scheduler.every '1m', first_in: '10s', overlap: false, name: 'process_database_jobs' do
+      Rails.logger.info "📅 Đăng ký job xử lý database jobs mỗi #{config[:database_jobs_interval]}"
+      @scheduler.every config[:database_jobs_interval], first_in: '10s', overlap: false, name: 'process_database_jobs' do
         # Bọc trong khối begin/rescue để xử lý lỗi kết nối
         begin
           process_database_jobs
@@ -56,8 +73,8 @@ class SchedulerService
       end
 
       # Thêm một job để dọn dẹp các job cũ
-      Rails.logger.info "📅 Đăng ký job dọn dẹp old jobs mỗi 6 giờ"
-      @scheduler.every '6h', first_in: '30s', overlap: false, name: 'cleanup_old_jobs' do
+      Rails.logger.info "📅 Đăng ký job dọn dẹp old jobs mỗi #{config[:cleanup_old_jobs_interval]}"
+      @scheduler.every config[:cleanup_old_jobs_interval], first_in: '30s', overlap: false, name: 'cleanup_old_jobs' do
         # Bọc trong khối begin/rescue để xử lý lỗi kết nối
         begin
           cleanup_old_jobs
@@ -68,8 +85,8 @@ class SchedulerService
       end
 
       # Thêm một job để kiểm tra và giải phóng các lock bị treo
-      Rails.logger.info "📅 Đăng ký job giải phóng stale locks mỗi 5 phút"
-      @scheduler.every '5m', first_in: '20s', overlap: false, name: 'release_stale_locks' do
+      Rails.logger.info "📅 Đăng ký job giải phóng stale locks mỗi #{config[:release_stale_locks_interval]}"
+      @scheduler.every config[:release_stale_locks_interval], first_in: '20s', overlap: false, name: 'release_stale_locks' do
         # Bọc trong khối begin/rescue để xử lý lỗi kết nối
         begin
           release_stale_locks
@@ -80,8 +97,8 @@ class SchedulerService
       end
 
       # Thêm một job để dọn dẹp các job thừa nếu có quá nhiều job trong ngày
-      Rails.logger.info "📅 Đăng ký job dọn dẹp excess jobs mỗi 3 giờ"
-      @scheduler.every '3h', first_in: '2m', overlap: false, name: 'cleanup_excess_jobs' do
+      Rails.logger.info "📅 Đăng ký job dọn dẹp excess jobs mỗi #{config[:cleanup_excess_jobs_interval]}"
+      @scheduler.every config[:cleanup_excess_jobs_interval], first_in: '2m', overlap: false, name: 'cleanup_excess_jobs' do
         # Bọc trong khối begin/rescue để xử lý lỗi kết nối
         begin
           cleanup_excess_jobs
@@ -230,9 +247,12 @@ class SchedulerService
 
     # Dọn dẹp các job thừa nếu có quá nhiều job trong ngày
     def cleanup_excess_jobs
+      # Lấy cấu hình dựa trên môi trường
+      config = get_scheduler_config
+      
       # Số lượng job tối đa cho phép trong một ngày
-      max_jobs_per_day = 100
-
+      max_jobs_per_day = config[:max_jobs_per_day]
+      
       # Lấy ngày hiện tại
       today = Time.current.beginning_of_day
 

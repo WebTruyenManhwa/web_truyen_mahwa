@@ -101,4 +101,54 @@ Rails.application.configure do
 
   # Giới hạn số lượng worker processes để giảm sử dụng RAM
   # config.active_job.queue_adapter = :sidekiq
+
+  # Thêm cấu hình tối ưu bộ nhớ cho môi trường ít tài nguyên
+  if ENV["LOW_MEMORY_ENV"] == "true" || ENV["RENDER"] == "true"
+    # Tối ưu GC cho môi trường ít RAM
+    GC.configure(
+      malloc_limit: 8_000_000,
+      malloc_limit_max: 16_000_000,
+      oldmalloc_limit: 8_000_000,
+      oldmalloc_limit_max: 16_000_000
+    )
+    
+    # Chạy GC thường xuyên hơn
+    GC::Profiler.enable
+    
+    # Giảm kích thước của các bộ đệm
+    config.action_controller.default_url_options = { protocol: 'https' }
+    config.action_mailer.default_url_options = { protocol: 'https' }
+    
+    # Tắt các tính năng không cần thiết
+    config.log_level = :warn
+    config.log_tags = [:request_id]
+    config.logger = ActiveSupport::Logger.new(STDOUT)
+    config.logger.formatter = ::Logger::Formatter.new
+    
+    # Tối ưu bộ nhớ cache
+    config.cache_store = :memory_store, { size: 16.megabytes }
+    
+    # Nén response để giảm kích thước
+    config.middleware.use Rack::Deflater
+    
+    # Tắt các tính năng debug không cần thiết
+    config.active_record.verbose_query_logs = false
+    
+    # Tối ưu Active Record
+    config.active_record.cache_versioning = false
+    config.active_record.collection_cache_versioning = false
+    
+    # Tối ưu Active Storage (nếu sử dụng)
+    if defined?(ActiveStorage)
+      config.active_storage.service = :amazon
+      config.active_storage.queue = :active_storage
+      config.active_storage.variant_processor = :mini_magick
+    end
+    
+    # Tối ưu Action Cable (nếu sử dụng)
+    if defined?(ActionCable)
+      config.action_cable.mount_path = nil
+      config.action_cable.allowed_request_origins = ['https://yourdomain.com']
+    end
+  end
 end
