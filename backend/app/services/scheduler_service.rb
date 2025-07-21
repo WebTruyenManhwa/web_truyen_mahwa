@@ -92,10 +92,13 @@ class SchedulerService
       begin
         # Tìm tất cả các job đến hạn và chưa được xử lý
         pending_jobs = ScheduledJob.pending_and_due
-
-        # Log số lượng job tìm thấy
+        
+        # Kiểm tra và log chi tiết về các job đang chờ xử lý
         if pending_jobs.exists?
           Rails.logger.info "📋 Found #{pending_jobs.count} pending jobs to process"
+          pending_jobs.each do |job|
+            Rails.logger.info "  • Job ##{job.id}: scheduled_at=#{job.scheduled_at} (UTC: #{job.scheduled_at.utc}), current time=#{Time.current} (UTC: #{Time.current.utc})"
+          end
         end
 
         pending_jobs.find_each do |job|
@@ -103,7 +106,7 @@ class SchedulerService
           next if job.locked?
 
           # Log job đang xử lý
-          Rails.logger.info "🔄 Processing job ##{job.id} (#{job.job_type})"
+          Rails.logger.info "🔄 Processing job ##{job.id} (#{job.job_type}) scheduled at #{job.scheduled_at}"
 
           # Đánh dấu job đang chạy
           job.mark_as_running
@@ -209,6 +212,12 @@ class SchedulerService
 
     # Lên lịch cho một job cụ thể
     def schedule_job(job_class, job_args = [], run_at = Time.current)
+      # Đảm bảo run_at là Time object trong múi giờ hiện tại
+      run_at = run_at.in_time_zone(Time.zone) if run_at.respond_to?(:in_time_zone)
+      
+      # Log thời gian lên lịch để debug
+      Rails.logger.info "Scheduling job #{job_class} to run at #{run_at} (UTC: #{run_at.utc}) (Zone: #{Time.zone.name})"
+
       # Tạo một job trong database
       job = ScheduledJob.create(
         job_type: 'single_job',

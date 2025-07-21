@@ -181,7 +181,7 @@ class Api::V1::ProxyController < Api::V1::BaseController
         manga: manga,
         url: url,
         schedule_type: params[:schedule_type],
-        schedule_time: Time.parse(params[:schedule_time]),
+        schedule_time: Time.zone.parse(params[:schedule_time]),
         schedule_days: params[:schedule_days],
         max_chapters: params[:max_chapters],
         chapter_range: params[:chapter_range],
@@ -197,6 +197,10 @@ class Api::V1::ProxyController < Api::V1::BaseController
         scheduled_time = scheduled_crawl.next_run_at
 
         Rails.logger.info "Creating scheduled job for scheduled crawl ##{scheduled_crawl.id} to run at #{scheduled_time}"
+        Rails.logger.info "- Next run time: #{scheduled_crawl.next_run_at} (UTC: #{scheduled_crawl.next_run_at.utc})"
+        Rails.logger.info "- Schedule time: #{scheduled_crawl.schedule_time} (#{scheduled_crawl.schedule_time.class.name})"
+        Rails.logger.info "- Job scheduled for: #{scheduled_time} (UTC: #{scheduled_time.utc})"
+        
         job = ScheduledJob.create(
           job_type: 'scheduled_crawl_check',
           status: 'pending',

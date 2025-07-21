@@ -29,9 +29,18 @@ class ScheduledCrawl < ApplicationRecord
   # Tính toán thời gian chạy tiếp theo dựa trên lịch
   def calculate_next_run_time
     now = Time.current
-    time_of_day = schedule_time || Time.parse('00:00')
 
-    Rails.logger.info "Calculating next run time for scheduled crawl ##{id}. Current time: #{now}, Schedule time: #{time_of_day}"
+    # Chuyển đổi schedule_time từ chuỗi thành đối tượng Time trong múi giờ hiện tại
+    time_of_day = if schedule_time.is_a?(String)
+                    # Đảm bảo thời gian được parse trong múi giờ hiện tại
+                    Time.zone.parse(schedule_time)
+                  else
+                    schedule_time || Time.zone.parse('00:00')
+                  end
+
+    Rails.logger.info "Calculating next run time for scheduled crawl ##{id}."
+    Rails.logger.info "Current time: #{now} (UTC: #{now.utc})"
+    Rails.logger.info "Schedule time: #{time_of_day} (hour: #{time_of_day.hour}, min: #{time_of_day.min})"
 
     case schedule_type
     when 'daily'
@@ -43,8 +52,9 @@ class ScheduledCrawl < ApplicationRecord
         next_run = now.beginning_of_day
         Rails.logger.info "Daily schedule: Time not passed today, scheduling for today"
       end
+
       result = next_run + time_of_day.hour.hours + time_of_day.min.minutes
-      Rails.logger.info "Calculated next run time: #{result}"
+      Rails.logger.info "Calculated next run time: #{result} (UTC: #{result.utc})"
       return result
 
     when 'weekly'
@@ -69,7 +79,9 @@ class ScheduledCrawl < ApplicationRecord
       end
 
       next_run = now.beginning_of_day + days_to_add.days
-      next_run + time_of_day.hour.hours + time_of_day.min.minutes
+      result = next_run + time_of_day.hour.hours + time_of_day.min.minutes
+      Rails.logger.info "Weekly schedule: Next run at #{result} (UTC: #{result.utc})"
+      return result
 
     when 'monthly'
       # Chạy vào ngày đầu tiên của tháng tiếp theo
@@ -81,9 +93,12 @@ class ScheduledCrawl < ApplicationRecord
         next_run = now.beginning_of_month
       end
 
-      next_run + (day_of_month - 1).days + time_of_day.hour.hours + time_of_day.min.minutes
+      result = next_run + (day_of_month - 1).days + time_of_day.hour.hours + time_of_day.min.minutes
+      Rails.logger.info "Monthly schedule: Next run at #{result} (UTC: #{result.utc})"
+      return result
     else
-      now
+      Rails.logger.info "Unknown schedule type: #{schedule_type}, using current time"
+      return now
     end
   end
 
@@ -123,13 +138,34 @@ class ScheduledCrawl < ApplicationRecord
     end
 
     # Tạo một scheduled job trong database thay vì sử dụng ActiveJob
+    # Đảm bảo thời gian chạy là thời gian hiện tại trong múi giờ của ứng dụng
+    current_time = Time.current
+    
+    # Quan trọng: Khi lưu thời gian từ schedule_time sang scheduled_jobs,
+    # cần đảm bảo múi giờ được xử lý đúng
+    # Nếu schedule_time là chuỗi (ví dụ: "11:38:00"), chuyển đổi thành đối tượng Time trong múi giờ hiện tại
+    if schedule_time.is_a?(String)
+      # Lấy ngày hiện tại và giờ từ schedule_time
+      time_parts = schedule_time.split(':').map(&:to_i)
+      hour = time_parts[0]
+      minute = time_parts[1]
+      second = time_parts[2] || 0
+      
+      # Tạo đối tượng Time với ngày hiện tại và giờ từ schedule_time, trong múi giờ hiện tại
+      current_time = Time.zone.now.change(hour: hour, min: minute, sec: second)
+      
+      Rails.logger.info "Using schedule_time: #{schedule_time} to create job at: #{current_time} (UTC: #{current_time.utc}) (Zone: #{Time.zone.name})"
+    else
+      Rails.logger.info "Using current time: #{current_time} (UTC: #{current_time.utc}) (Zone: #{Time.zone.name})"
+    end
+    
     scheduled_job = SchedulerService.schedule_job(
       'CrawlMangaJob',
       [url, options],
-      Time.current
+      current_time
     )
 
-    Rails.logger.info "Scheduled crawl ##{id} for manga '#{manga_title}' created job ##{scheduled_job.id}"
+    Rails.logger.info "Scheduled crawl ##{id} for manga '#{manga_title}' created job ##{scheduled_job.id} with scheduled_at: #{scheduled_job.scheduled_at} (UTC: #{scheduled_job.scheduled_at.utc})"
 
     # Cập nhật thời gian chạy tiếp theo
     set_next_run_time
