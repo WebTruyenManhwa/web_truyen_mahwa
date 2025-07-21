@@ -161,7 +161,7 @@ export default function ScheduledCrawls() {
         const jobs = response.scheduled_jobs || [];
         
         // Tìm các jobs có options chứa scheduled_crawl_id trùng với id đã xóa
-        const relatedJobs = jobs.filter(job => {
+        const relatedJobs = jobs.filter((job: { id: number; options: string | { scheduled_crawl_id?: number } }) => {
           try {
             const options = typeof job.options === 'string' 
               ? JSON.parse(job.options) 
