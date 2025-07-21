@@ -38,30 +38,46 @@ class MangaService
       # Đảm bảo manga_ids là mảng các số nguyên
       manga_ids = manga_ids.map(&:to_i).uniq
 
+      # Giới hạn số lượng manga_ids để tránh truy vấn quá lớn
+      if manga_ids.size > 100
+        Rails.logger.warn "Large number of manga_ids (#{manga_ids.size}) in get_latest_chapters, limiting to 100"
+        manga_ids = manga_ids.take(100)
+      end
+
       latest_chapters = {}
-      # Sử dụng DISTINCT ON để lấy chapter mới nhất cho mỗi manga trong một truy vấn duy nhất
+      
+      # Sử dụng prepared statement để tránh SQL injection
+      placeholders = manga_ids.map.with_index { |_, i| "$#{i+1}" }.join(',')
       latest_chapters_sql = <<-SQL
         SELECT DISTINCT ON (manga_id) id, manga_id, number, title, slug, created_at
         FROM chapters
-        WHERE manga_id IN (#{manga_ids.join(',')})
+        WHERE manga_id IN (#{placeholders})
         ORDER BY manga_id, number::decimal DESC
       SQL
 
-      # Thực thi truy vấn trực tiếp
-      result = ActiveRecord::Base.connection.execute(latest_chapters_sql)
+      # Thực thi truy vấn với tham số an toàn
+      begin
+        result = ActiveRecord::Base.connection.exec_query(
+          latest_chapters_sql,
+          'Get latest chapters',
+          manga_ids.map { |id| id }
+        )
 
-      # Xử lý kết quả
-      result.each do |row|
-        manga_id = row['manga_id'].to_i
-        latest_chapters[manga_id] = {
-          id: row['id'],
-          number: row['number'],
-          title: row['title'],
-          slug: row['slug'],
-          created_at: row['created_at']
-        }
+        # Xử lý kết quả
+        result.each do |row|
+          manga_id = row['manga_id'].to_i
+          latest_chapters[manga_id] = {
+            id: row['id'],
+            number: row['number'],
+            title: row['title'],
+            slug: row['slug'],
+            created_at: row['created_at']
+          }
+        end
+      rescue => e
+        Rails.logger.error "Error in get_latest_chapters: #{e.message}"
       end
-
+      
       latest_chapters
     end
 
@@ -69,11 +85,30 @@ class MangaService
     def get_chapters_count(manga_ids)
       return {} if manga_ids.empty?
 
-      # Sử dụng GROUP BY để đếm số lượng chapter cho tất cả manga trong một truy vấn
-      count_sql = "SELECT manga_id, COUNT(*) as count FROM chapters WHERE manga_id IN (#{manga_ids.join(',')}) GROUP BY manga_id"
+      # Giới hạn số lượng manga_ids để tránh truy vấn quá lớn
+      if manga_ids.size > 100
+        Rails.logger.warn "Large number of manga_ids (#{manga_ids.size}) in get_chapters_count, limiting to 100"
+        manga_ids = manga_ids.take(100)
+      end
+
+      # Sử dụng prepared statement để tránh SQL injection
+      placeholders = manga_ids.map.with_index { |_, i| "$#{i+1}" }.join(',')
+      count_sql = "SELECT manga_id, COUNT(*) as count FROM chapters WHERE manga_id IN (#{placeholders}) GROUP BY manga_id"
+      
       chapters_count = {}
-      ActiveRecord::Base.connection.execute(count_sql).each do |row|
-        chapters_count[row['manga_id']] = row['count']
+      
+      begin
+        result = ActiveRecord::Base.connection.exec_query(
+          count_sql,
+          'Get chapters count',
+          manga_ids.map { |id| id }
+        )
+        
+        result.each do |row|
+          chapters_count[row['manga_id']] = row['count']
+        end
+      rescue => e
+        Rails.logger.error "Error in get_chapters_count: #{e.message}"
       end
 
       chapters_count
@@ -173,23 +208,36 @@ class MangaService
         # Truy vấn SQL để lấy tổng lượt xem cho mỗi manga trong khoảng thời gian
         # Sử dụng format chuỗi ISO 8601 cho thời gian để tránh lỗi
         formatted_date = start_date.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Sử dụng prepared statement để tránh SQL injection
         sql = <<-SQL
           SELECT manga_id, SUM(view_count) as total_views
           FROM manga_views
-          WHERE created_at >= '#{formatted_date}'
+          WHERE created_at >= $1
           GROUP BY manga_id
+          LIMIT 100
         SQL
 
-        # Thực thi truy vấn và lưu kết quả
+        # Thực thi truy vấn với tham số an toàn
         views_data = {}
-        ActiveRecord::Base.connection.execute(sql).each do |row|
-          views_data[row['manga_id'].to_i] = row['total_views'].to_i
+        begin
+          result = ActiveRecord::Base.connection.exec_query(
+            sql, 
+            'Get period views',
+            [[nil, formatted_date]]
+          )
+          
+          result.each do |row|
+            views_data[row['manga_id'].to_i] = row['total_views'].to_i
+          end
+        rescue => e
+          Rails.logger.error "Error in get_period_views_for_all_manga: #{e.message}"
         end
 
-        # Nếu không có dữ liệu views, lấy từ manga.view_count
+        # Nếu không có dữ liệu views, lấy từ manga.view_count (giới hạn 100 manga)
         if views_data.empty?
-          Manga.pluck(:id, :view_count).each do |id, view_count|
-            views_data[id] = view_count.to_i
+          Manga.select(:id, :view_count).limit(100).each do |manga|
+            views_data[manga.id] = manga.view_count.to_i
           end
         end
 

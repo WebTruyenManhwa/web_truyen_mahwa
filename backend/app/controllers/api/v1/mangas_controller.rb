@@ -15,7 +15,10 @@ module Api
         end
 
         # Giảm số lượng items mặc định xuống 20
-        @pagy, @mangas = pagy(@mangas, items: params[:per_page] || 20)
+        per_page = [params[:per_page].to_i, 50].min if params[:per_page].present?
+        per_page ||= 20
+        
+        @pagy, @mangas = pagy(@mangas, items: per_page)
 
         # Lấy manga IDs cho trang hiện tại
         manga_ids = @mangas.map(&:id)
@@ -25,6 +28,7 @@ module Api
         @mangas = Manga.eager_load(:genres, :manga_genres)
                       .where(id: manga_ids)
                       .order(created_at: :desc)
+                      .distinct
 
         # Preload tất cả dữ liệu cần thiết trong một lần
         preloaded_data = preload_manga_data(manga_ids)

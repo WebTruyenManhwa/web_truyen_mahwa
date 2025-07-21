@@ -6,7 +6,19 @@ module Api
       before_action :set_chapter, only: [:show, :update, :destroy]
 
       def index
+        # Hỗ trợ phân trang thay vì giới hạn cứng
+        page = params[:page].to_i
+        page = 1 if page <= 0
+        per_page = params[:per_page].to_i
+        per_page = 50 if per_page <= 0 || per_page > 100 # Giới hạn tối đa 100 chapters mỗi trang
+
+        # Lấy tổng số lượng chapters để trả về metadata
+        total_chapters = @manga.chapters.count
+
+        # Lấy chapters theo trang
         @chapters = @manga.chapters.ordered
+                          .offset((page - 1) * per_page)
+                          .limit(per_page)
 
         # Preload all chapters for this manga to optimize next/prev chapter lookups - only once
         all_chapters = fetch_cached_chapters(@manga.id)
@@ -26,8 +38,16 @@ module Api
         # Convert chapters to JSON using the presenter with list_view option
         chapter_data = @chapters.map { |chapter| ChapterPresenter.new(chapter).as_json(list_view: true) }
 
-        # Return the data directly as JSON array to ensure it's always an array
-        render json: { chapters: chapter_data || [] }
+        # Return the data with pagination metadata
+        render json: { 
+          chapters: chapter_data || [], 
+          pagination: {
+            total: total_chapters,
+            page: page,
+            per_page: per_page,
+            total_pages: (total_chapters.to_f / per_page).ceil
+          }
+        }
       end
 
       def show

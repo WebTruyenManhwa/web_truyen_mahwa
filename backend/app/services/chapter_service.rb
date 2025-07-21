@@ -14,6 +14,12 @@ class ChapterService
       # Initialize cache if needed
       @chapters_cache ||= {}
 
+      # Giới hạn số lượng manga_ids để tránh truy vấn quá lớn
+      if manga_ids.size > 50
+        Rails.logger.warn "Large number of manga_ids (#{manga_ids.size}) in preload_chapters_for_mangas, limiting to 50"
+        manga_ids = manga_ids.take(50)
+      end
+
       # Create a cache key for this specific set of manga_ids
       cache_key = manga_ids.sort.join('-')
 
@@ -32,6 +38,12 @@ class ChapterService
       # Group chapters by manga_id
       chapters_by_manga = chapters.group_by(&:manga_id)
 
+      # Giới hạn kích thước cache để tránh memory leak
+      if @chapters_cache.size > 20
+        Rails.logger.info "Clearing chapters_cache to prevent memory growth (size: #{@chapters_cache.size})"
+        @chapters_cache = {}
+      end
+
       # Cache the result
       @chapters_cache[cache_key] = chapters_by_manga
 
@@ -45,6 +57,12 @@ class ChapterService
       # Initialize cache if needed
       @first_images_cache ||= {}
 
+      # Giới hạn số lượng chapter_ids để tránh truy vấn quá lớn
+      if chapter_ids.size > 100
+        Rails.logger.warn "Large number of chapter_ids (#{chapter_ids.size}) in preload_first_images_for_chapters, limiting to 100"
+        chapter_ids = chapter_ids.take(100)
+      end
+
       # Create a cache key for this specific set of chapter_ids
       cache_key = chapter_ids.sort.join('-')
 
@@ -56,9 +74,9 @@ class ChapterService
 
       # Use raw SQL to fetch only the first image for each chapter
       # This is much more efficient than loading all images and then filtering
-      # Use proper JSON extraction for PostgreSQL with -> operator
       sql = <<-SQL
-        SELECT DISTINCT ON (chapter_id) chapter_id, images->0 as first_image
+        SELECT DISTINCT ON (chapter_id) chapter_id, 
+               images->0 as first_image
         FROM chapter_image_collections
         WHERE chapter_id IN (#{chapter_ids.join(',')})
         ORDER BY chapter_id
@@ -75,6 +93,12 @@ class ChapterService
         first_images_by_chapter[chapter_id] = [first_image] if first_image.present?
       end
 
+      # Giới hạn kích thước cache để tránh memory leak
+      if @first_images_cache.size > 20
+        Rails.logger.info "Clearing first_images_cache to prevent memory growth (size: #{@first_images_cache.size})"
+        @first_images_cache = {}
+      end
+
       # Cache the result
       @first_images_cache[cache_key] = first_images_by_chapter
 
@@ -88,6 +112,12 @@ class ChapterService
       # Initialize cache if needed
       @images_cache ||= {}
 
+      # Giới hạn số lượng chapter_ids để tránh truy vấn quá lớn
+      if chapter_ids.size > 50
+        Rails.logger.warn "Large number of chapter_ids (#{chapter_ids.size}) in preload_images_for_chapters, limiting to 50"
+        chapter_ids = chapter_ids.take(50)
+      end
+
       # Create a cache key for this specific set of chapter_ids
       cache_key = chapter_ids.sort.join('-')
 
@@ -99,12 +129,19 @@ class ChapterService
 
       # Fetch all chapter image collections in one query
       collections = ChapterImageCollection.where(chapter_id: chapter_ids)
+                                         .select(:chapter_id, :images)
                                          .to_a
 
       # Create a map of chapter_id to images
       images_by_chapter = {}
       collections.each do |collection|
         images_by_chapter[collection.chapter_id] = collection.images if collection.present?
+      end
+
+      # Giới hạn kích thước cache để tránh memory leak
+      if @images_cache.size > 10
+        Rails.logger.info "Clearing images_cache to prevent memory growth (size: #{@images_cache.size})"
+        @images_cache = {}
       end
 
       # Cache the result

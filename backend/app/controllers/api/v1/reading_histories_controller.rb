@@ -8,10 +8,19 @@ module Api
           .select('DISTINCT ON (manga_id) *')
           .includes(:manga, chapter: { manga: {}, chapter_image_collection: {} })
           .order('manga_id, last_read_at DESC')
+          .limit(50)  # Giới hạn số lượng lịch sử đọc trả về
 
         # Get all unique manga IDs and chapter IDs from the histories
         manga_ids = @histories.map { |h| h.manga_id }.uniq
         chapter_ids = @histories.map { |h| h.chapter_id }.uniq
+
+        # Giới hạn số lượng để tránh quá tải bộ nhớ
+        if manga_ids.size > 30
+          Rails.logger.warn "Large number of manga_ids in reading histories (#{manga_ids.size}), limiting to 30"
+          manga_ids = manga_ids.take(30)
+          @histories = @histories.select { |h| manga_ids.include?(h.manga_id) }
+          chapter_ids = @histories.map { |h| h.chapter_id }.uniq
+        end
 
         # Preload all chapters for these mangas to optimize next/prev chapter lookups
         # Store in instance variable to avoid redundant queries
