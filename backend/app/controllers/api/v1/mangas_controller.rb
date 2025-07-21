@@ -17,7 +17,7 @@ module Api
         # Giảm số lượng items mặc định xuống 20
         per_page = [params[:per_page].to_i, 50].min if params[:per_page].present?
         per_page ||= 20
-        
+
         @pagy, @mangas = pagy(@mangas, items: per_page)
 
         # Lấy manga IDs cho trang hiện tại
@@ -211,7 +211,7 @@ module Api
       # Preload dữ liệu và serialize manga để tránh N+1 query
       def preload_and_serialize_manga(manga)
         # Preload tất cả chapters và chapter_image_collection cho manga này
-        chapters = manga.chapters.includes(:chapter_image_collection, :manga).order(number: :asc).to_a
+        chapters = manga.chapters.includes(:manga).order(number: :asc).to_a
 
         # Sắp xếp chapters theo số chapter để tối ưu hóa việc tìm kiếm next/prev
         sorted_chapters = chapters.sort_by { |c| c.number.to_f }
@@ -223,7 +223,24 @@ module Api
         chapter_ids = sorted_chapters.map(&:id)
 
         # Preload images cho tất cả chapter trong một truy vấn
-        images_by_chapter = ChapterService.preload_images_for_chapters(chapter_ids)
+        image_collections = ChapterPresenterService.preload_image_collections(chapter_ids)
+
+        # Gán image collections vào chapters để tránh N+1 query
+        sorted_chapters.each do |chapter|
+          if image_collections[chapter.id]
+            # Gán image collection vào chapter để tránh truy vấn lại
+            chapter.association(:chapter_image_collection).target = image_collections[chapter.id]
+          end
+        end
+
+        # Tạo hash images_by_chapter để truyền vào serializer
+        images_by_chapter = {}
+        image_collections.each do |chapter_id, collection|
+          if collection
+            # Sắp xếp images theo position
+            images_by_chapter[chapter_id] = collection.images.sort_by { |img| img['position'] }
+          end
+        end
 
         # Serialize manga với dữ liệu đã preload
         data = MangaSerializer.new(
