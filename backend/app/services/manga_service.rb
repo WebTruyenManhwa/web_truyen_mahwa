@@ -209,29 +209,21 @@ class MangaService
         # Sử dụng format chuỗi ISO 8601 cho thời gian để tránh lỗi
         formatted_date = start_date.strftime('%Y-%m-%d %H:%M:%S')
         
-        # Sử dụng prepared statement để tránh SQL injection
-        sql = <<-SQL
-          SELECT manga_id, SUM(view_count) as total_views
-          FROM manga_views
-          WHERE created_at >= $1
-          GROUP BY manga_id
-          LIMIT 100
-        SQL
+        # Sử dụng truy vấn SQL đơn giản với tham số được nhúng trực tiếp
+        # Vì formatted_date đã được định dạng đúng và không có nguy cơ SQL injection
+        sql = "SELECT manga_id, SUM(view_count) as total_views FROM manga_views WHERE created_at >= '#{formatted_date}' GROUP BY manga_id LIMIT 100"
 
-        # Thực thi truy vấn với tham số an toàn
+        # Thực thi truy vấn trực tiếp
         views_data = {}
         begin
-          result = ActiveRecord::Base.connection.exec_query(
-            sql, 
-            'Get period views',
-            [[nil, formatted_date]]
-          )
+          result = ActiveRecord::Base.connection.execute(sql)
           
           result.each do |row|
             views_data[row['manga_id'].to_i] = row['total_views'].to_i
           end
         rescue => e
           Rails.logger.error "Error in get_period_views_for_all_manga: #{e.message}"
+          Rails.logger.error "SQL: #{sql}"
         end
 
         # Nếu không có dữ liệu views, lấy từ manga.view_count (giới hạn 100 manga)
