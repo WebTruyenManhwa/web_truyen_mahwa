@@ -14,7 +14,7 @@ class User < ApplicationRecord
   end
 
   # Enums
-  enum :role, { user: 0, admin: 1 }, default: :user
+  enum :role, { user: 0, admin: 1, super_admin: 2 }, default: :user
 
   # Associations
   has_many :comments, dependent: :destroy

@@ -343,6 +343,18 @@ export const userApi = {
     });
     return response.data;
   },
+
+  // Xóa một lịch sử đọc truyện
+  deleteReadingHistory: async (historyId: string | number) => {
+    const response = await api.delete(`/v1/reading_histories/${historyId}`);
+    return response.data;
+  },
+
+  // Xóa tất cả lịch sử đọc truyện
+  deleteAllReadingHistory: async () => {
+    const response = await api.delete('/v1/reading_histories/destroy_all');
+    return response.data;
+  },
 };
 
 // API cho proxy
@@ -596,6 +608,13 @@ export const adminApi = {
   getDashboardStats: async () => {
     const response = await api.get('/v1/admin/dashboard/stats');
     return response.data;
+  },
+
+  // Backup database (chỉ dành cho super_admin hoặc owner)
+  backupDatabase: async () => {
+    // Sử dụng window.open để mở URL trong tab mới, cho phép tải file trực tiếp
+    window.open(`${API_URL}/v1/admin/dashboard/backup_database`, '_blank');
+    return { success: true };
   },
 
   // Lấy danh sách người dùng (cần quyền admin)

@@ -117,7 +117,12 @@ Rails.application.routes.draw do
       end
 
       resources :favorites, only: [:create, :destroy]
-      resources :reading_histories, only: [:index, :create]
+      # Reading histories
+      resources :reading_histories, only: [:index, :create, :destroy] do
+        collection do
+          delete :destroy_all
+        end
+      end
       resources :comments, only: [:index, :create, :destroy]
     end
   end
@@ -132,6 +137,7 @@ Rails.application.routes.draw do
   # Admin routes
   namespace :admin do
     get :stats, to: 'dashboard#stats'
+    get 'dashboard/backup_database', to: 'dashboard#backup_database'
     resources :users, only: [:index] do
       member do
         put :role, to: 'users#update_role'

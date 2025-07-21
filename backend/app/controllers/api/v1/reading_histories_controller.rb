@@ -150,6 +150,26 @@ module Api
                images_by_chapter: images_by_chapter
       end
 
+      # Xóa một lịch sử đọc cụ thể
+      def destroy
+        @history = current_user.reading_histories.find(params[:id])
+
+        if @history.destroy
+          render json: { message: "Đã xóa lịch sử đọc thành công" }, status: :ok
+        else
+          render json: { errors: ["Không thể xóa lịch sử đọc"] }, status: :unprocessable_entity
+        end
+      end
+
+      # Xóa tất cả lịch sử đọc của user hiện tại
+      def destroy_all
+        if current_user.reading_histories.destroy_all
+          render json: { message: "Đã xóa tất cả lịch sử đọc thành công" }, status: :ok
+        else
+          render json: { errors: ["Không thể xóa lịch sử đọc"] }, status: :unprocessable_entity
+        end
+      end
+
       private
 
       def set_manga(manga_id_param)

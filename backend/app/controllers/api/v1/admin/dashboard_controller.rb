@@ -62,6 +62,53 @@ module Api
           }
         end
 
+        # Backup database
+        def backup_database
+          binding.pry
+          # Kiểm tra quyền super_admin hoặc owner
+          unless current_user.super_admin? || current_user.owner?
+            return render json: { error: "Bạn không có quyền thực hiện thao tác này" }, status: :forbidden
+          end
+
+          begin
+            # Lấy thông tin kết nối database từ config
+            db_config = ActiveRecord::Base.connection_db_config.configuration_hash
+            timestamp = Time.current.strftime("%Y%m%d%H%M%S")
+            filename = "database_backup_#{timestamp}.sql"
+            filepath = Rails.root.join("tmp", filename)
+
+            # Tạo lệnh pg_dump
+            cmd = [
+              "PGPASSWORD=#{db_config[:password]}",
+              "pg_dump",
+              "-h", db_config[:host],
+              "-p", db_config[:port] || "5432",
+              "-U", db_config[:username],
+              "-F", "c", # Format: custom
+              "-b", # Include large objects
+              "-v", # Verbose
+              "-f", filepath.to_s,
+              db_config[:database]
+            ].join(" ")
+
+            # Thực hiện lệnh backup
+            system(cmd)
+
+            if File.exist?(filepath)
+              # Gửi file về client
+              send_file filepath, 
+                        type: 'application/octet-stream',
+                        disposition: 'attachment',
+                        filename: filename
+            else
+              render json: { error: "Không thể tạo file backup" }, status: :unprocessable_entity
+            end
+          rescue => e
+            Rails.logger.error "Backup database error: #{e.message}"
+            render json: { error: "Đã xảy ra lỗi: #{e.message}" }, status: :unprocessable_entity
+          end
+        end
+
         private
 
         def authorize_admin
