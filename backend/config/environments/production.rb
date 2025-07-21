@@ -100,7 +100,8 @@ Rails.application.configure do
   config.public_file_server.enabled = true
 
   # Giới hạn số lượng worker processes để giảm sử dụng RAM
-  # config.active_job.queue_adapter = :sidekiq
+  config.active_job.queue_adapter = :solid_queue
+  config.solid_queue.connects_to = { database: { writing: :queue } }
 
   # Thêm cấu hình tối ưu bộ nhớ cho môi trường ít tài nguyên
   if ENV["LOW_MEMORY_ENV"] == "true" || ENV["RENDER"] == "true"

@@ -246,7 +246,7 @@ export default function Header() {
             >
               Lịch sử đọc
             </Link>
-            {user?.role === 'admin' && (
+            {(user?.role === 'admin' || user?.role === 'super_admin') && (
               <Link
                 href="/admin/dashboard"
                 className="block px-4 py-2 text-gray-300 hover:bg-gray-700 text-sm"

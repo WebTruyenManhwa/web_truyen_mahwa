@@ -60,8 +60,8 @@ module Api
       end
 
       def authorize_admin
-        unless current_user.admin?
-          render json: { error: 'Chỉ admin mới có thể thực hiện hành động này' }, status: :forbidden
+        unless current_user.admin? || current_user.super_admin?
+          render json: { error: 'Unauthorized access' }, status: :forbidden
         end
       end
     end

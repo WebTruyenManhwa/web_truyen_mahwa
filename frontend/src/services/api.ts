@@ -612,9 +612,35 @@ export const adminApi = {
 
   // Backup database (chỉ dành cho super_admin hoặc owner)
   backupDatabase: async () => {
-    // Sử dụng window.open để mở URL trong tab mới, cho phép tải file trực tiếp
-    window.open(`${API_URL}/v1/admin/dashboard/backup_database`, '_blank');
-    return { success: true };
+    try {
+      console.log("Starting database backup download...");
+
+      // Tạo timestamp để tránh cache
+      const timestamp = new Date().getTime();
+      const downloadUrl = `${API_URL}/v1/admin/dashboard/backup_database?_=${timestamp}`;
+
+      // Tạo iframe ẩn để tải xuống
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = downloadUrl;
+      document.body.appendChild(iframe);
+
+      // Xóa iframe sau một khoảng thời gian
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 60000); // 60 giây
+
+      return {
+        success: true,
+        message: "Đang tải xuống bản sao lưu... Vui lòng đợi trong giây lát."
+      };
+    } catch (error) {
+      console.error("Error in backupDatabase:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Đã xảy ra lỗi không xác định khi tải xuống bản sao lưu"
+      };
+    }
   },
 
   // Lấy danh sách người dùng (cần quyền admin)
@@ -626,6 +652,12 @@ export const adminApi = {
   // Cập nhật vai trò người dùng (cần quyền admin)
   updateUserRole: async (userId: number, role: string) => {
     const response = await api.put(`/v1/admin/users/${userId}/role`, { role });
+    return response.data;
+  },
+
+  // Xóa người dùng (cần quyền admin hoặc super_admin)
+  deleteUser: async (userId: number) => {
+    const response = await api.delete(`/v1/admin/users/${userId}`);
     return response.data;
   }
 };

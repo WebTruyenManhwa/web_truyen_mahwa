@@ -18,7 +18,7 @@ module Api
       end
 
       def authorize_admin
-        unless current_user&.admin?
+        unless current_user&.admin? || current_user&.super_admin?
           render json: { error: 'Unauthorized access' }, status: :forbidden
         end
       end
@@ -26,7 +26,7 @@ module Api
       # Phương thức để xác thực admin và trả về lỗi nếu không phải admin
       def authenticate_admin!
         authenticate_user!
-        unless current_user&.admin?
+        unless current_user&.admin? || current_user&.super_admin?
           render json: { error: 'Unauthorized access. Admin privileges required.' }, status: :forbidden
         end
       end

@@ -4,7 +4,7 @@ module Api
       class NovelSeriesController < ApplicationController
         include Pagy::Backend
         before_action :authenticate_user!
-        before_action :ensure_admin
+        before_action :authorize_admin
         before_action :set_novel_series, only: [:show, :update, :destroy]
 
         # GET /api/v1/admin/novel_series
@@ -103,8 +103,8 @@ module Api
           params.require(:novel_series).permit(:title, :author, :description, :cover_image, :status, :slug)
         end
 
-        def ensure_admin
-          unless current_user.admin?
+        def authorize_admin
+          unless current_user.admin? || current_user.super_admin?
             render json: { error: 'Unauthorized' }, status: :unauthorized
           end
         end

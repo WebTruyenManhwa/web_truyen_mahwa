@@ -4,7 +4,7 @@ module Api
       class NovelChaptersController < ApplicationController
         include Pagy::Backend
         before_action :authenticate_user!
-        before_action :ensure_admin
+        before_action :authorize_admin
         before_action :set_novel_series, except: [:show, :update, :destroy]
         before_action :set_novel_chapter, only: [:show, :update, :destroy]
 
@@ -47,31 +47,31 @@ module Api
         # POST /api/v1/admin/novel_series/:novel_series_id/novel_chapters
         def create
           # Kiểm tra xem có phải tạo chương gộp không
-          if params[:batch_info].present? && 
-             params[:batch_info][:start_chapter].present? && 
+          if params[:batch_info].present? &&
+             params[:batch_info][:start_chapter].present? &&
              params[:batch_info][:end_chapter].present?
-            
+
             # Xử lý tạo chương gộp
             start_chapter = params[:batch_info][:start_chapter].to_i
             end_chapter = params[:batch_info][:end_chapter].to_i
-            
+
             # Đảm bảo start_chapter < end_chapter
             if start_chapter >= end_chapter
               return render json: { errors: ["Số chương bắt đầu phải nhỏ hơn số chương kết thúc"] }, status: :unprocessable_entity
             end
-            
+
             # Cập nhật tiêu đề nếu cần
             if novel_chapter_params[:title].blank?
               params[:novel_chapter][:title] = "Chương #{start_chapter}-#{end_chapter}"
             end
-            
+
             # Cập nhật số chương
             params[:novel_chapter][:chapter_number] = start_chapter
-            
+
             # Thêm thông tin chương gộp vào nội dung
             batch_info_text = "\n\n**Chương gộp từ #{start_chapter} đến #{end_chapter}**\n\n"
             params[:novel_chapter][:content] = batch_info_text + params[:novel_chapter][:content].to_s
-            
+
             # Tạo chương mới với thông tin đã cập nhật
             @novel_chapter = @novel_series.novel_chapters.new(novel_chapter_params)
             @novel_chapter.is_batch_chapter = true
@@ -144,8 +144,8 @@ module Api
           params.require(:novel_chapter).permit(:title, :content, :chapter_number, :slug, :is_batch_chapter, :batch_start, :batch_end)
         end
 
-        def ensure_admin
-          unless current_user.admin?
+        def authorize_admin
+          unless current_user.admin? || current_user.super_admin?
             render json: { error: 'Unauthorized' }, status: :unauthorized
           end
         end

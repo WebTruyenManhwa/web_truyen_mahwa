@@ -27,10 +27,18 @@ Rails.application.routes.draw do
       # Admin routes
       namespace :admin do
         get 'dashboard/stats', to: 'dashboard#stats'
+        get 'dashboard/backup_database', to: 'dashboard#backup_database'
 
         # Admin routes for novel series
         resources :novel_series do
           resources :novel_chapters, shallow: true
+        end
+
+        # Admin routes for users
+        resources :users, only: [:index, :destroy] do
+          member do
+            put :role, to: 'users#update_role'
+          end
         end
       end
 
@@ -133,15 +141,4 @@ Rails.application.routes.draw do
   # Fallback route for SPA
   root to: 'home#index'
   get '*path', to: 'home#index', constraints: ->(req) { !req.xhr? && req.format.html? }
-
-  # Admin routes
-  namespace :admin do
-    get :stats, to: 'dashboard#stats'
-    get 'dashboard/backup_database', to: 'dashboard#backup_database'
-    resources :users, only: [:index] do
-      member do
-        put :role, to: 'users#update_role'
-      end
-    end
-  end
 end

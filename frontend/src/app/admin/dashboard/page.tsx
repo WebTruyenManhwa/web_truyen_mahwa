@@ -51,6 +51,9 @@ export default function AdminDashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardData>(defaultData);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [backupLoading, setBackupLoading] = useState<boolean>(false);
+  const [backupError, setBackupError] = useState<string | null>(null);
+  const [backupSuccess, setBackupSuccess] = useState<string | boolean>(false);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -69,6 +72,34 @@ export default function AdminDashboard() {
 
     fetchDashboardData();
   }, []);
+
+  // Xử lý backup database
+  const handleBackupDatabase = async () => {
+    try {
+      setBackupLoading(true);
+      setBackupError(null);
+      setBackupSuccess(false);
+
+      const result = await adminApi.backupDatabase();
+
+      if (result.success) {
+        if (result.message) {
+          setBackupSuccess(result.message);
+        } else {
+          setBackupSuccess("Backup thành công! File đang được tải xuống...");
+        }
+        // Tự động ẩn thông báo thành công sau 5 giây
+        setTimeout(() => setBackupSuccess(false), 5000);
+      } else {
+        setBackupError(result.error || "Có lỗi xảy ra khi tạo backup");
+      }
+    } catch (err) {
+      console.error("Error backing up database:", err);
+      setBackupError("Có lỗi xảy ra khi tạo backup. Vui lòng thử lại sau.");
+    } finally {
+      setBackupLoading(false);
+    }
+  };
 
   // Hiển thị trạng thái loading
   if (loading) {
@@ -149,20 +180,38 @@ export default function AdminDashboard() {
                   Tạo bản sao lưu cơ sở dữ liệu. Hữu ích trước khi nâng cấp hoặc thay đổi lớn.
                 </p>
                 <button
-                  onClick={() => adminApi.backupDatabase()}
+                  onClick={handleBackupDatabase}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center text-sm"
+                  disabled={backupLoading}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Tải xuống backup
+                  {backupLoading ? (
+                    <svg className="animate-spin h-4 w-4 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  )}
+                  {backupLoading ? "Đang tạo backup..." : "Tải xuống backup"}
                 </button>
-                <p className="text-xs text-yellow-400 mt-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  Database sẽ hết hạn vào ngày 6/8/2025
-                </p>
+                {backupSuccess && (
+                  <p className="text-xs text-green-400 mt-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {typeof backupSuccess === 'string' ? backupSuccess : 'Backup thành công!'}
+                  </p>
+                )}
+                {backupError && (
+                  <p className="text-xs text-red-400 mt-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    {backupError}
+                  </p>
+                )}
               </div>
             </div>
           </div>

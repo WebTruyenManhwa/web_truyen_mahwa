@@ -57,7 +57,7 @@ export default function HistoryPage() {
       await userApi.deleteReadingHistory(id);
       setHistories(histories.filter(history => history.id !== id));
       setSuccess("Đã xóa lịch sử đọc thành công");
-      
+
       // Tự động ẩn thông báo thành công sau 3 giây
       setTimeout(() => {
         setSuccess("");
@@ -75,13 +75,13 @@ export default function HistoryPage() {
     if (!confirm("Bạn có chắc chắn muốn xóa tất cả lịch sử đọc truyện?")) {
       return;
     }
-    
+
     try {
       setIsDeleting(true);
       await userApi.deleteAllReadingHistory();
       setHistories([]);
       setSuccess("Đã xóa tất cả lịch sử đọc thành công");
-      
+
       // Tự động ẩn thông báo thành công sau 3 giây
       setTimeout(() => {
         setSuccess("");
@@ -133,7 +133,7 @@ export default function HistoryPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-3xl font-bold text-white">Lịch sử đọc truyện</h2>
-          
+
           {histories.length > 0 && (
             <button
               onClick={handleDeleteAllHistory}
@@ -234,4 +234,4 @@ export default function HistoryPage() {
       </div>
     </div>
   );
-} 
+}

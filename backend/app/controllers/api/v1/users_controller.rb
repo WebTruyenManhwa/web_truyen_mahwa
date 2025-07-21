@@ -21,7 +21,7 @@ module Api
       end
 
       def update
-        if @user.id == current_user.id || current_user.admin?
+        if @user.id == current_user.id || current_user.admin? || current_user.super_admin?
           if @user.update(user_params)
             render json: @user, except: [:password_digest, :created_at, :updated_at]
           else
