@@ -75,7 +75,7 @@ class ChapterService
       # Use raw SQL to fetch only the first image for each chapter
       # This is much more efficient than loading all images and then filtering
       sql = <<-SQL
-        SELECT DISTINCT ON (chapter_id) chapter_id, 
+        SELECT DISTINCT ON (chapter_id) chapter_id,
                images->0 as first_image
         FROM chapter_image_collections
         WHERE chapter_id IN (#{chapter_ids.join(',')})

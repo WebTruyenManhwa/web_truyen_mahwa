@@ -10,7 +10,7 @@ module Api
         page = params[:page].to_i
         page = 1 if page <= 0
         per_page = params[:per_page].to_i
-        per_page = 50 if per_page <= 0 || per_page > 100 # Giới hạn tối đa 100 chapters mỗi trang
+        per_page = 2000 if per_page <= 0 || per_page > 2000 # Giới hạn tối đa 1000 chapters mỗi trang
 
         # Lấy tổng số lượng chapters để trả về metadata
         total_chapters = @manga.chapters.count
@@ -39,8 +39,8 @@ module Api
         chapter_data = @chapters.map { |chapter| ChapterPresenter.new(chapter).as_json(list_view: true) }
 
         # Return the data with pagination metadata
-        render json: { 
-          chapters: chapter_data || [], 
+        render json: {
+          chapters: chapter_data || [],
           pagination: {
             total: total_chapters,
             page: page,
@@ -95,7 +95,7 @@ module Api
 
           # # Clear any cached data in ChapterPresenterService
           # ChapterPresenterService.reset_request_cache if ChapterPresenterService.respond_to?(:reset_request_cache)
-          
+
           render json: ChapterPresenter.new(chapter).as_json, status: :created
         else
           render json: { errors: form.errors }, status: :unprocessable_entity
@@ -120,7 +120,7 @@ module Api
 
           # # Clear any cached data in ChapterPresenterService
           # ChapterPresenterService.reset_request_cache if ChapterPresenterService.respond_to?(:reset_request_cache)
-          
+
           render json: ChapterPresenter.new(chapter).as_json, status: :ok
         else
           render json: { errors: form.errors }, status: :unprocessable_entity
