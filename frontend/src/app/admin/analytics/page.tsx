@@ -189,7 +189,7 @@ export default function AnalyticsPage() {
         setAnalyticsData(prev =>
           Object.keys(prev).some(key =>
             Array.isArray(prev[key as keyof AnalyticsData])
-              ? (prev[key as keyof AnalyticsData] as any[]).length > 0
+              ? (prev[key as keyof AnalyticsData] as Array<unknown>).length > 0
               : prev[key as keyof AnalyticsData]
           )
             ? prev

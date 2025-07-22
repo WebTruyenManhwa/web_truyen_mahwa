@@ -22,10 +22,11 @@ const PieChart = dynamic(
 );
 
 // Import for Google Maps
-const Map = dynamic(
-  () => import("../../../../components/Map").then((mod) => mod.default),
-  { ssr: false }
-);
+// Xóa import Map vì không sử dụng
+// const Map = dynamic(
+//   () => import("../../../../components/Map").then((mod) => mod.default),
+//   { ssr: false }
+// );
 
 // Import Chart.js components
 import {
@@ -210,18 +211,56 @@ const defaultData: AdvancedAnalyticsData = {
   }
 };
 
+// Thêm định nghĩa cho hàm handleAiPrompt ở đầu file, trước export default function
+// Định nghĩa hàm handleAiPrompt để sử dụng trong component
+// Xóa hàm handleAiPrompt vì không được sử dụng
+
 // Tạo các thành phần biểu đồ tối ưu hóa với React.memo
-const LineChartMemo = React.memo(({ data, options }: { data: any, options: any }) => {
+const LineChartMemo = React.memo(({ data, options }: {
+  data: {
+    labels: string[];
+    datasets: {
+      label: string;
+      data: number[];
+      backgroundColor: string;
+      borderColor: string;
+      tension?: number;
+    }[];
+  },
+  options: Record<string, unknown>
+}) => {
   return <LineChart data={data} options={options} />;
 });
 LineChartMemo.displayName = 'LineChartMemo';
 
-const BarChartMemo = React.memo(({ data, options }: { data: any, options: any }) => {
+const BarChartMemo = React.memo(({ data, options }: {
+  data: {
+    labels: string[];
+    datasets: {
+      label: string;
+      data: number[];
+      backgroundColor: string | string[];
+      borderColor: string | string[];
+    }[];
+  },
+  options: Record<string, unknown>
+}) => {
   return <BarChart data={data} options={options} />;
 });
 BarChartMemo.displayName = 'BarChartMemo';
 
-const PieChartMemo = React.memo(({ data, options }: { data: any, options: any }) => {
+const PieChartMemo = React.memo(({ data, options }: {
+  data: {
+    labels: string[];
+    datasets: {
+      label: string;
+      data: number[];
+      backgroundColor: string[];
+      borderColor: string[];
+    }[];
+  },
+  options: Record<string, unknown>
+}) => {
   return <PieChart data={data} options={options} />;
 });
 PieChartMemo.displayName = 'PieChartMemo';
@@ -618,7 +657,12 @@ export default function AdvancedAnalyticsPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             <KpiCard title="Thời gian đọc trung bình" value={`${analyticsData.kpis.kpis.session.avg_length} phút`} />
             <KpiCard title="Chapter/phiên" value={analyticsData.kpis.kpis.session.avg_chapters} />
-            <KpiCard title="Tỷ lệ giữ chân" value={`${(analyticsData.kpis.retentionChart.datasets[0].data[0] * 100).toFixed(1)}%`} />
+            <KpiCard
+              title="Tỷ lệ giữ chân"
+              value={`${(
+                (analyticsData.kpis.retentionChart.datasets?.[0]?.data?.[0] || 0) * 100
+              ).toFixed(1)}%`}
+            />
           </div>
         </div>
 

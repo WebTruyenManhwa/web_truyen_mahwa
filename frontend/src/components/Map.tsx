@@ -22,7 +22,7 @@ const Map: React.FC<MapProps> = ({ regions, center }) => {
       <div className="text-center">
         <p className="text-gray-400 mb-2">Bản đồ nhiệt truy cập</p>
         <p className="text-sm text-gray-500">
-          (Trong môi trường thực tế, đây sẽ là Google Maps hoặc Mapbox với dữ liệu heatmap)
+          (Trong môi trường thực tế, đây sẽ là Google Maps với tọa độ trung tâm: {center.lat.toFixed(4)}, {center.lng.toFixed(4)})
         </p>
         <div className="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
           {regions.map((region, index) => (
