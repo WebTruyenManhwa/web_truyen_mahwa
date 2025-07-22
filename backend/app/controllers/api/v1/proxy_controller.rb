@@ -200,7 +200,7 @@ class Api::V1::ProxyController < Api::V1::BaseController
         Rails.logger.info "- Next run time: #{scheduled_crawl.next_run_at} (UTC: #{scheduled_crawl.next_run_at.utc})"
         Rails.logger.info "- Schedule time: #{scheduled_crawl.schedule_time} (#{scheduled_crawl.schedule_time.class.name})"
         Rails.logger.info "- Job scheduled for: #{scheduled_time} (UTC: #{scheduled_time.utc})"
-        
+
         job = ScheduledJob.create(
           job_type: 'scheduled_crawl_check',
           status: 'pending',
@@ -267,6 +267,122 @@ class Api::V1::ProxyController < Api::V1::BaseController
         url: url,
         error: e.message
       }, status: :unprocessable_entity
+    end
+  end
+
+  # POST /api/v1/proxy/crawl_novel
+  def crawl_novel
+    # Kiểm tra quyền admin
+    unless current_user&.admin? || current_user&.super_admin?
+      render json: { error: 'Unauthorized' }, status: :unauthorized
+      return
+    end
+
+    # Lấy URL từ tham số
+    url = params[:url]
+    if url.blank?
+      render json: { error: 'URL is required' }, status: :bad_request
+      return
+    end
+
+    # Tạo options cho crawl
+    options = {}
+    options[:max_chapters] = params[:max_chapters] if params[:max_chapters].present?
+    options[:auto_next_chapters] = params[:auto_next_chapters] if params[:auto_next_chapters].present?
+    options[:delay] = params[:delay] if params[:delay].present?
+
+    # Xử lý chapter range nếu có
+    if params[:chapter_range].present?
+      range_parts = params[:chapter_range].split('-')
+      if range_parts.size == 2
+        options[:chapter_range] = {
+          start: range_parts[0].to_i,
+          end: range_parts[1].to_i
+        }
+      end
+    end
+
+    # Kiểm tra xem có phải đặt lịch không
+    if params[:schedule] == 'true' || params[:schedule] == true
+      # Kiểm tra các tham số cần thiết cho việc đặt lịch
+      unless params[:schedule_type].present? && params[:schedule_time].present?
+        render json: { error: 'Schedule type and time are required for scheduling' }, status: :bad_request
+        return
+      end
+
+      # Kiểm tra schedule_days cho lịch hàng tuần
+      if params[:schedule_type] == 'weekly' && params[:schedule_days].blank?
+        render json: { error: 'Schedule days are required for weekly schedule' }, status: :bad_request
+        return
+      end
+
+      # Lấy thông tin novel
+      begin
+        # Sử dụng phương thức mới để lấy hoặc tạo novel từ URL
+        novel = NovelCrawlerService.get_or_create_novel_from_url(url)
+
+        # Tạo scheduled_crawl
+        schedule_params = {
+          url: url,
+          schedule_type: params[:schedule_type],
+          schedule_time: params[:schedule_time],
+          max_chapters: params[:max_chapters] || 'all',
+          delay: params[:delay] || '3..7'
+        }
+
+        # Thêm schedule_days nếu là lịch hàng tuần
+        if params[:schedule_type] == 'weekly'
+          schedule_params[:schedule_days] = params[:schedule_days]
+        end
+
+        # Thêm chapter_range nếu có
+        if options[:chapter_range].present?
+          schedule_params[:chapter_range] = "#{options[:chapter_range][:start]}-#{options[:chapter_range][:end]}"
+        end
+
+        # Tạo scheduled_crawl cho novel
+        scheduled_crawl = novel.scheduled_crawls.create(schedule_params)
+
+        # Tính toán thời gian chạy tiếp theo
+        scheduled_crawl.calculate_next_run
+        scheduled_crawl.save
+
+        render json: {
+          status: 'scheduled',
+          message: 'Novel crawl has been scheduled',
+          novel: {
+            id: novel.id,
+            title: novel.title
+          },
+          scheduled_crawl: {
+            id: scheduled_crawl.id,
+            schedule_type: scheduled_crawl.schedule_type,
+            schedule_time: scheduled_crawl.schedule_time,
+            next_run_at: scheduled_crawl.next_run_at
+          }
+        }
+      rescue => e
+        render json: { error: "Failed to schedule novel crawl: #{e.message}" }, status: :unprocessable_entity
+      end
+    else
+      # Thực hiện crawl ngay lập tức
+      begin
+        # Tạo job để crawl novel
+        job = SchedulerService.schedule_job('single_job', {
+          class_name: 'CrawlNovelJob',
+          method_name: 'perform',
+          arguments: [url, options]
+        })
+
+        # Trả về thông tin job
+        render json: {
+          status: 'processing',
+          message: 'Novel crawl job has been scheduled',
+          job_id: job.id
+        }
+      rescue => e
+        render json: { error: "Failed to start novel crawl: #{e.message}" }, status: :unprocessable_entity
+      end
     end
   end
 end

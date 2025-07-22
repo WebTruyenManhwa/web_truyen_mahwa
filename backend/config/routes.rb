@@ -51,6 +51,7 @@ Rails.application.routes.draw do
       get 'proxy/fetch', to: 'proxy#fetch_url'
       post 'proxy/batch_import_chapters', to: 'proxy#batch_import_chapters'
       post 'proxy/crawl_manga', to: 'proxy#crawl_manga'
+      post 'proxy/crawl_novel', to: 'proxy#crawl_novel'
       post 'proxy/test_extract_images', to: 'proxy#test_extract_images'
 
       # Scheduled crawls

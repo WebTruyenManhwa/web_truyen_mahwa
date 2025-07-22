@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_07_21_171013) do
+ActiveRecord::Schema[8.0].define(version: 2025_07_22_155713) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -123,6 +123,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_21_171013) do
     t.boolean "is_batch_chapter"
     t.integer "batch_start"
     t.integer "batch_end"
+    t.index ["chapter_number"], name: "index_novel_chapters_on_chapter_number"
+    t.index ["novel_series_id", "chapter_number"], name: "index_novel_chapters_on_novel_id_and_chapter_number", unique: true
     t.index ["novel_series_id"], name: "index_novel_chapters_on_novel_series_id"
   end
 
@@ -135,6 +137,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_21_171013) do
     t.string "slug"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index "lower((title)::text)", name: "index_novel_series_on_lower_title"
   end
 
   create_table "ratings", force: :cascade do |t|
@@ -195,7 +198,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_21_171013) do
     t.bigint "parent_job_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.jsonb "summary_result"
+    t.boolean "memory_optimized", default: false
     t.index ["job_type", "scheduled_at"], name: "index_scheduled_jobs_on_job_type_and_scheduled_at"
+    t.index ["job_type"], name: "index_scheduled_jobs_on_job_type"
     t.index ["parent_job_id"], name: "index_scheduled_jobs_on_parent_job_id"
     t.index ["scheduled_at"], name: "index_scheduled_jobs_on_scheduled_at"
     t.index ["status"], name: "index_scheduled_jobs_on_status"

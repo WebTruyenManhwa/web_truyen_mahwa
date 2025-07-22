@@ -3,20 +3,11 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AdminLayout from "../../../components/admin/AdminLayout";
-import { proxyApi, mangaApi } from "../../../services/api";
+import { proxyApi } from "../../../services/api";
 import React from "react";
 
-interface Manga {
-  id: number;
-  title: string;
-  slug: string;
-  coverImage?: string;
-}
-
-export default function AutoCrawlManga() {
+export default function AutoCrawlNovel() {
   const router = useRouter();
-  // Xóa biến không sử dụng _mangas
-  const [, setMangas] = useState<Manga[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -25,7 +16,6 @@ export default function AutoCrawlManga() {
   const [crawlStarted, setCrawlStarted] = useState<boolean>(false);
 
   // Form state
-  // Xóa biến không sử dụng _selectedMangaId và _setSelectedMangaId
   const [url, setUrl] = useState("");
   const [maxChapters, setMaxChapters] = useState<string>("all");
   const [customMaxChapters, setCustomMaxChapters] = useState<string>("");
@@ -42,24 +32,6 @@ export default function AutoCrawlManga() {
   // Determine if chapter range input should be disabled
   const isChapterRangeDisabled = maxChapters === "all" && !isCustomChapters;
 
-  // Fetch mangas for dropdown
-  useEffect(() => {
-    const fetchMangas = async () => {
-      try {
-        setLoading(true);
-        const response = await mangaApi.getMangas({ limit: 100 });
-        setMangas(response.mangas || []);
-      } catch (err) {
-        console.error("Error fetching mangas:", err);
-        setError("Không thể tải danh sách truyện. Vui lòng thử lại sau.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMangas();
-  }, []);
-
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,7 +46,14 @@ export default function AutoCrawlManga() {
 
       // Validate form
       if (!url) {
-        setError("Vui lòng nhập URL của manga");
+        setError("Vui lòng nhập URL của novel");
+        setLoading(false);
+        return;
+      }
+
+      // Kiểm tra URL hợp lệ
+      if (!url.includes('truyenfull') && !url.includes('webtruyen')) {
+        setError("URL không hợp lệ. Chỉ hỗ trợ TruyenFull và WebTruyen.");
         setLoading(false);
         return;
       }
@@ -136,24 +115,24 @@ export default function AutoCrawlManga() {
 
       // Hiển thị thông báo về cách hệ thống xử lý truyện đã tồn tại
       setInfoMessage(
-        "Hệ thống sẽ kiểm tra nếu truyện đã tồn tại dựa trên tên truyện. " +
-        "Nếu truyện đã tồn tại, hệ thống sẽ sử dụng truyện đó. " +
+        "Hệ thống sẽ kiểm tra nếu novel đã tồn tại dựa trên tên novel. " +
+        "Nếu novel đã tồn tại, hệ thống sẽ sử dụng novel đó. " +
         "Các chapter đã tồn tại sẽ được bỏ qua trong quá trình crawl."
       );
 
-      // Call API
-      const response = await proxyApi.crawlManga(url, options);
+      // Call API - Sử dụng crawlNovel thay vì crawlManga
+      const response = await proxyApi.crawlNovel(url, options);
 
       // Lưu job ID nếu có
       if (response?.job_id) {
         setJobId(response.job_id);
         setCrawlStarted(true);
-        setSuccess("Đã bắt đầu crawl manga. Quá trình này có thể mất vài phút. Bạn có thể theo dõi tiến trình ở trang Scheduled Jobs.");
+        setSuccess("Đã bắt đầu crawl novel. Quá trình này có thể mất vài phút. Bạn có thể theo dõi tiến trình ở trang Scheduled Jobs.");
       } else {
         // Show success message
         setSuccess(isScheduled
           ? "Đã lên lịch crawl thành công!"
-          : "Đã bắt đầu crawl manga. Quá trình này có thể mất vài phút. Bạn có thể theo dõi tiến trình ở trang Scheduled Jobs.");
+          : "Đã bắt đầu crawl novel. Quá trình này có thể mất vài phút. Bạn có thể theo dõi tiến trình ở trang Scheduled Jobs.");
       }
 
       // Redirect to scheduled crawls if scheduled
@@ -163,15 +142,10 @@ export default function AutoCrawlManga() {
         }, 2000);
       }
     } catch (err: unknown) {
-      console.error("Error crawling manga:", err);
+      console.error("Error crawling novel:", err);
 
-      // Xử lý lỗi source_url
       const errorResponse = err as { response?: { data?: { error?: string } } };
-      if (errorResponse.response?.data?.error?.includes('source_url')) {
-        setError("Lỗi: Thuộc tính 'source_url' không tồn tại trong model Manga. Vui lòng liên hệ developer để thêm trường này vào database.");
-      } else {
-        setError(errorResponse.response?.data?.error || "Có lỗi xảy ra khi crawl manga. Vui lòng thử lại sau.");
-      }
+      setError(errorResponse.response?.data?.error || "Có lỗi xảy ra khi crawl novel. Vui lòng thử lại sau.");
     } finally {
       setLoading(false);
     }
@@ -221,9 +195,9 @@ export default function AutoCrawlManga() {
   return (
     <AdminLayout>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Auto Crawl Manga</h1>
+        <h1 className="text-3xl font-bold mb-2">Auto Crawl Novel</h1>
         <p className="text-gray-400">
-          Tự động crawl manga từ các trang web nguồn
+          Tự động crawl novel từ các trang web nguồn
         </p>
       </div>
 
@@ -231,21 +205,6 @@ export default function AutoCrawlManga() {
         <div className="bg-red-900/50 border border-red-500 text-red-100 px-4 py-3 rounded-lg mb-6">
           <div className="font-bold mb-1">Lỗi:</div>
           <div>{error}</div>
-          {error.includes('source_url') && (
-            <div className="mt-2 text-sm">
-              <p className="font-semibold">Hướng dẫn khắc phục:</p>
-              <ol className="list-decimal pl-5 mt-1">
-                <li>Thêm trường source_url vào model Manga bằng cách chạy migration:</li>
-                <pre className="bg-red-950 p-2 mt-1 rounded">
-                  rails g migration AddSourceUrlToMangas source_url:string
-                </pre>
-                <li>Sau đó chạy migrate database:</li>
-                <pre className="bg-red-950 p-2 mt-1 rounded">
-                  rails db:migrate
-                </pre>
-              </ol>
-            </div>
-          )}
         </div>
       )}
 
@@ -281,19 +240,19 @@ export default function AutoCrawlManga() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-gray-300 mb-2">
-                URL Manga
+                URL Novel
                 <span className="text-red-500 ml-1">*</span>
               </label>
               <input
                 type="text"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://nettruyen1905.com/manga/ta-la-ta-de"
+                placeholder="https://truyenfull.vn/truyen-abc/"
                 className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               />
               <p className="text-gray-400 text-sm mt-1">
-                URL của trang manga cần crawl
+                URL của trang novel cần crawl (hỗ trợ TruyenFull và WebTruyen)
               </p>
             </div>
 
@@ -358,7 +317,7 @@ export default function AutoCrawlManga() {
                 type="text"
                 value={chapterRange}
                 onChange={(e) => setChapterRange(e.target.value)}
-                placeholder="1-10 hoặc 17.1-17.5"
+                placeholder="1-10"
                 className={`w-full bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${isChapterRangeDisabled ? 'opacity-50' : ''}`}
                 required={isChapterRangeRequired}
                 disabled={isChapterRangeDisabled}
@@ -368,7 +327,7 @@ export default function AutoCrawlManga() {
                   ? maxChapters === "all"
                     ? "Không cần nhập range khi chọn tất cả chapter"
                     : "Không cần nhập range khi chọn số lượng chapter cố định. Hệ thống sẽ tự động crawl từ chapter mới nhất tiếp theo."
-                  : 'Range chapter cần crawl, format: &quot;start-end&quot; (ví dụ: &quot;1-10&quot;, &quot;17.1-17.5&quot;)'}
+                  : 'Range chapter cần crawl, format: &quot;start-end&quot; (ví dụ: &quot;1-10&quot;)'}
               </p>
             </div>
 
@@ -449,68 +408,28 @@ export default function AutoCrawlManga() {
           <div className="mt-6 p-4 bg-gray-900/50 border border-gray-700 rounded-lg">
             <h3 className="text-lg font-medium text-gray-200 mb-2">Lưu ý quan trọng:</h3>
             <ul className="list-disc pl-5 text-gray-300 space-y-1">
-              <li>Hệ thống sẽ tự động kiểm tra truyện đã tồn tại dựa trên tên truyện.</li>
-              <li>Nếu truyện <strong>chưa tồn tại</strong> trong hệ thống, hệ thống sẽ tự động tạo mới truyện với đầy đủ thông tin:</li>
+              <li>Hệ thống sẽ tự động kiểm tra novel đã tồn tại dựa trên tên novel.</li>
+              <li>Nếu novel <strong>chưa tồn tại</strong> trong hệ thống, hệ thống sẽ tự động tạo mới novel với đầy đủ thông tin:</li>
               <ul className="list-circle pl-5 text-gray-300 space-y-1 mt-1 mb-2">
                 <li>Tiêu đề, mô tả, tác giả, trạng thái từ trang nguồn</li>
-                <li>Tự động tải và đính kèm ảnh bìa</li>
-                <li>Tự động thêm các thể loại liên quan</li>
               </ul>
-              <li>Nếu truyện <strong>đã tồn tại</strong> trong hệ thống, hệ thống sẽ sử dụng truyện đó thay vì tạo mới.</li>
+              <li>Nếu novel <strong>đã tồn tại</strong> trong hệ thống, hệ thống sẽ sử dụng novel đó thay vì tạo mới.</li>
               <li>Các chapter đã tồn tại sẽ được bỏ qua trong quá trình crawl.</li>
-              <li>Chỉ các chapter mới sẽ được thêm vào truyện.</li>
+              <li>Chỉ các chapter mới sẽ được thêm vào novel.</li>
               <li>Khi chọn số lượng chapter cố định (1, 5, 10, 20, 50, 100):</li>
               <ul className="list-circle pl-5 text-gray-300 space-y-1 mt-1 mb-2">
                 <li>Hệ thống sẽ <strong>tự động crawl từ chapter mới nhất</strong> trong hệ thống trở đi</li>
-                <li>Ví dụ: Nếu truyện đã có chapter 13 trong hệ thống và chapter tiếp theo từ nguồn là 14.1, hệ thống sẽ crawl từ chapter 14.1 trở đi</li>
+                <li>Ví dụ: Nếu novel đã có chapter 13 trong hệ thống và chapter tiếp theo từ nguồn là 14, hệ thống sẽ crawl từ chapter 14 trở đi</li>
                 <li>Không cần nhập range chapter trong trường hợp này</li>
               </ul>
             </ul>
           </div>
 
           <div className="mt-6 p-4 bg-gray-900/50 border border-amber-700 rounded-lg">
-            <h3 className="text-lg font-medium text-amber-200 mb-2">Xử lý lỗi khi crawl:</h3>
+            <h3 className="text-lg font-medium text-amber-200 mb-2">Nguồn hỗ trợ:</h3>
             <ul className="list-disc pl-5 text-gray-300 space-y-1">
-              <li>Hệ thống xử lý từng chapter một cách độc lập, nếu một chapter gặp lỗi:</li>
-              <ul className="list-circle pl-5 text-gray-300 space-y-1 mt-1 mb-2">
-                <li>Hệ thống sẽ <strong>bỏ qua chapter đó</strong> và tiếp tục crawl các chapter khác</li>
-                <li>Lỗi của chapter sẽ được ghi lại trong kết quả crawl</li>
-                <li>Quá trình crawl <strong>không bị dừng lại</strong> khi gặp lỗi ở một chapter</li>
-              </ul>
-              <li>Trong trường hợp lỗi nghiêm trọng (server bị tắt, mất kết nối...):</li>
-              <ul className="list-circle pl-5 text-gray-300 space-y-1 mt-1 mb-2">
-                <li>Hệ thống sẽ tự động thử lại job tối đa 3 lần</li>
-                <li>Mỗi lần thử lại sẽ cách nhau một khoảng thời gian tăng dần</li>
-                <li>Thông báo lỗi sẽ được gửi đến admin qua hệ thống thông báo</li>
-              </ul>
-              <li>Admin có thể xem chi tiết lỗi và trạng thái của các job crawl tại:</li>
-              <ul className="list-circle pl-5 text-gray-300 space-y-1 mt-1 mb-2">
-                <li>Trang <a href="/admin/scheduled-jobs" className="text-blue-400 hover:underline">Quản lý Scheduled Jobs</a></li>
-                <li>Trang này hiển thị đầy đủ thông tin về các job, bao gồm lỗi gặp phải và trạng thái</li>
-                <li>Admin có thể thử lại các job đã thất bại hoặc hủy các job đang chờ</li>
-              </ul>
-            </ul>
-          </div>
-
-          <div className="mt-6 p-4 bg-gray-900/50 border border-blue-700 rounded-lg">
-            <h3 className="text-lg font-medium text-blue-200 mb-2">Theo dõi tiến trình crawl:</h3>
-            <ul className="list-disc pl-5 text-gray-300 space-y-1">
-              <li>Sau khi bắt đầu crawl, hệ thống sẽ gửi thông báo khi:</li>
-              <ul className="list-circle pl-5 text-gray-300 space-y-1 mt-1 mb-2">
-
-                <li>Quá trình crawl hoàn tất thành công</li>
-                <li>Xảy ra lỗi trong quá trình crawl</li>
-              </ul>
-              <li>Bạn có thể xem thông báo tại:</li>
-              <ul className="list-circle pl-5 text-gray-300 space-y-1 mt-1 mb-2">
-                <li>Trang thông báo của admin</li>
-                <li>Email (nếu đã cấu hình)</li>
-              </ul>
-              <li>Để kiểm tra kết quả crawl:</li>
-              <ul className="list-circle pl-5 text-gray-300 space-y-1 mt-1 mb-2">
-                <li>Truy cập trang quản lý manga để xem truyện đã được tạo/cập nhật</li>
-                <li>Truy cập trang chi tiết manga để xem các chapter đã được thêm vào</li>
-              </ul>
+              <li>TruyenFull: <code className="bg-gray-900 px-2 py-1 rounded">https://truyenfull.vn/</code></li>
+              <li>WebTruyen: <code className="bg-gray-900 px-2 py-1 rounded">https://webtruyen.com/</code></li>
             </ul>
           </div>
 

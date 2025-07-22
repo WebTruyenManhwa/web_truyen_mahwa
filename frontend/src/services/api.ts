@@ -399,6 +399,23 @@ export const proxyApi = {
     return response.data;
   },
 
+  // Crawl novel from URL
+  crawlNovel: async (url: string, options?: {
+    max_chapters?: number | string,
+    chapter_range?: string,
+    delay?: string,
+    schedule?: boolean,
+    schedule_type?: 'daily' | 'weekly' | 'monthly',
+    schedule_time?: string,
+    schedule_days?: string
+  }) => {
+    const response = await api.post(`/v1/proxy/crawl_novel`, {
+      url,
+      ...options
+    });
+    return response.data;
+  },
+
   // Test extract images from URL
   testExtractImages: async (url: string) => {
     const response = await api.post(`/v1/proxy/test_extract_images`, { url });
