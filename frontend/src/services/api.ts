@@ -643,6 +643,46 @@ export const adminApi = {
     }
   },
 
+  // Lấy dữ liệu phân tích
+  getAnalytics: async (timeRange = 'week') => {
+    try {
+      const response = await api.get('/v1/admin/analytics', {
+        params: { time_range: timeRange }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching analytics data:', error);
+      throw error; // Re-throw to let the component handle the error
+    }
+  },
+
+  // Lấy dữ liệu phân tích nâng cao
+  getAdvancedAnalytics: async (timeRange = 'week') => {
+    try {
+      const response = await api.get('/v1/admin/analytics/advanced', {
+        params: { time_range: timeRange }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching advanced analytics data:', error);
+      throw error; // Re-throw to let the component handle the error
+    }
+  },
+
+  // Lấy prompt cho AI phân tích
+  getAIPrompt: async (dataType = 'general', userPrompt = '') => {
+    try {
+      const response = await api.post('/v1/admin/analytics/ai_prompt', {
+        data_type: dataType,
+        user_prompt: userPrompt
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching AI prompt:', error);
+      throw error; // Re-throw to let the component handle the error
+    }
+  },
+
   // Lấy danh sách người dùng (cần quyền admin)
   getUsers: async (params?: { page?: number; limit?: number; search?: string }) => {
     const response = await api.get('/v1/admin/users', { params });

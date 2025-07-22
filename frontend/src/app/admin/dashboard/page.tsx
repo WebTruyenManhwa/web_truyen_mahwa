@@ -218,42 +218,50 @@ export default function AdminDashboard() {
         </div>
 
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-gray-800 rounded-lg p-6">
-            <h3 className="text-gray-400 mb-2">Tổng số truyện</h3>
-            <div className="flex items-center">
-              <span className="text-3xl font-bold">{dashboardStats.totalMangas.toLocaleString()}</span>
-              <span className="ml-2 text-green-500 text-sm">
-                +{dashboardStats.newMangasToday} hôm nay
-              </span>
-            </div>
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">Thống kê tổng quan</h2>
+            <Link href="/admin/analytics" className="text-blue-500 hover:underline">
+              Xem tất cả
+            </Link>
           </div>
-
-          <div className="bg-gray-800 rounded-lg p-6">
-            <h3 className="text-gray-400 mb-2">Tổng số người dùng</h3>
-            <div className="flex items-center">
-              <span className="text-3xl font-bold">{dashboardStats.totalUsers.toLocaleString()}</span>
-              <span className="ml-2 text-green-500 text-sm">
-                +{dashboardStats.newUsersToday} hôm nay
-              </span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-gray-800 rounded-lg p-6">
+              <h3 className="text-gray-400 mb-2">Tổng số truyện</h3>
+              <div className="flex items-center">
+                <span className="text-3xl font-bold">{dashboardStats.totalMangas.toLocaleString()}</span>
+                <span className="ml-2 text-green-500 text-sm">
+                  +{dashboardStats.newMangasToday} hôm nay
+                </span>
+              </div>
             </div>
-          </div>
 
-          <div className="bg-gray-800 rounded-lg p-6">
-            <h3 className="text-gray-400 mb-2">Tổng lượt xem</h3>
-            <div className="flex items-center">
-              <span className="text-3xl font-bold">
-                {dashboardStats.totalViews >= 1000000
-                  ? `${(dashboardStats.totalViews / 1000000).toFixed(2)}M`
-                  : dashboardStats.totalViews >= 1000
-                  ? `${(dashboardStats.totalViews / 1000).toFixed(0)}K`
-                  : dashboardStats.totalViews}
-              </span>
-              <span className="ml-2 text-green-500 text-sm">
-                +{dashboardStats.viewsToday >= 1000
-                  ? `${(dashboardStats.viewsToday / 1000).toFixed(0)}K`
-                  : dashboardStats.viewsToday} hôm nay
-              </span>
+            <div className="bg-gray-800 rounded-lg p-6">
+              <h3 className="text-gray-400 mb-2">Tổng số người dùng</h3>
+              <div className="flex items-center">
+                <span className="text-3xl font-bold">{dashboardStats.totalUsers.toLocaleString()}</span>
+                <span className="ml-2 text-green-500 text-sm">
+                  +{dashboardStats.newUsersToday} hôm nay
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-gray-800 rounded-lg p-6">
+              <h3 className="text-gray-400 mb-2">Tổng lượt xem</h3>
+              <div className="flex items-center">
+                <span className="text-3xl font-bold">
+                  {dashboardStats.totalViews >= 1000000
+                    ? `${(dashboardStats.totalViews / 1000000).toFixed(2)}M`
+                    : dashboardStats.totalViews >= 1000
+                    ? `${(dashboardStats.totalViews / 1000).toFixed(0)}K`
+                    : dashboardStats.totalViews}
+                </span>
+                <span className="ml-2 text-green-500 text-sm">
+                  +{dashboardStats.viewsToday >= 1000
+                    ? `${(dashboardStats.viewsToday / 1000).toFixed(0)}K`
+                    : dashboardStats.viewsToday} hôm nay
+                </span>
+              </div>
             </div>
           </div>
         </div>

@@ -10,9 +10,11 @@ Tài liệu này mô tả chi tiết về hệ thống tự động crawl dữ l
    - [Crawl một manga](#crawl-một-manga)
    - [Crawl nhiều chapter](#crawl-nhiều-chapter)
    - [Tùy chọn chapter range](#tùy-chọn-chapter-range)
+   - [Lên lịch crawl tự động](#lên-lịch-crawl-tự-động)
 4. [Hệ thống Job Scheduling](#hệ-thống-job-scheduling)
    - [Scheduled Crawls](#scheduled-crawls)
    - [Scheduled Jobs](#scheduled-jobs)
+   - [SchedulerService](#schedulerservice)
 5. [API Reference](#api-reference)
    - [Proxy API](#proxy-api)
    - [Scheduled Crawls API](#scheduled-crawls-api)
@@ -116,7 +118,7 @@ Hệ thống sẽ crawl 5 chapter đầu tiên trong range từ chapter 10 đế
 ### Lên lịch crawl tự động
 
 Để lên lịch crawl tự động cho một manga:
-
+ - Đặt lịch crawl hàng ngày
 ```bash
 curl -X POST http://localhost:3001/api/v1/proxy/crawl_manga \
   -H "Authorization: Bearer YOUR_TOKEN" \
@@ -127,6 +129,36 @@ curl -X POST http://localhost:3001/api/v1/proxy/crawl_manga \
     "delay": "3..7",
     "schedule": true,
     "schedule_type": "daily",
+    "schedule_time": "03:00"
+  }'
+```
+- Đặt lịch crawl hàng tuần  (thứ 2, 4, 6)
+```bash
+curl -X POST http://localhost:3001/api/v1/proxy/crawl_manga \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://nettruyen1905.com/manga/ta-la-ta-de",
+    "max_chapters": 10,
+    "chapter_range": "7-20",
+    "delay": "3..7",
+    "schedule": true,
+    "schedule_type": "weekly",
+    "schedule_time": "03:00",
+    "schedule_days": "1,3,5"
+  }'
+```
+- Đặt lịch crawl hàng tháng
+```bash
+curl -X POST http://localhost:3001/api/v1/proxy/crawl_manga \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://nettruyen1905.com/manga/ta-la-ta-de",
+    "max_chapters": "all",
+    "delay": "3..7",
+    "schedule": true,
+    "schedule_type": "monthly",
     "schedule_time": "03:00"
   }'
 ```
@@ -163,6 +195,41 @@ Tham số lên lịch:
 - Tùy chọn (dưới dạng JSON)
 - Kết quả và thông báo lỗi
 - Thông tin về retry
+
+### SchedulerService
+
+`SchedulerService` là service chịu trách nhiệm quản lý và thực thi các job được lên lịch. Service này cung cấp các phương thức chính:
+
+```ruby
+# Lên lịch một job mới
+SchedulerService.schedule_job(job_type, options = {}, scheduled_at = Time.current)
+
+# Thực thi một job
+SchedulerService.execute_job(job)
+
+# Kiểm tra và thực thi các job đang chờ
+SchedulerService.check_pending_jobs
+
+# Giải phóng các lock bị treo
+SchedulerService.release_stale_locks
+```
+
+Các loại job được hỗ trợ:
+- `single_job`: Job đơn lẻ, thực thi một lần
+- `scheduled_crawl_check`: Job kiểm tra và thực thi các scheduled crawl
+- `analytics_report`: Job tạo báo cáo phân tích
+- `system_maintenance`: Job bảo trì hệ thống
+
+Để sử dụng SchedulerService trong controller, thay vì gọi `perform_later`, hãy sử dụng:
+
+```ruby
+SchedulerService.schedule_job('single_job', {
+  class_name: 'YourJobClass',
+  method_name: 'perform',
+  arguments: [arg1, arg2, ...],
+  priority: 'high' # tùy chọn
+})
+```
 
 ## API Reference
 
@@ -315,7 +382,7 @@ GET /api/v1/scheduled_jobs/stats
 | Column | Type | Description |
 |--------|------|-------------|
 | id | integer | Primary key |
-| job_type | string | Type of job (scheduled_crawl_check, single_job) |
+| job_type | string | Type of job (scheduled_crawl_check, single_job, analytics_report, system_maintenance) |
 | status | string | Status (pending, running, completed, failed) |
 | scheduled_at | datetime | Time when the job is scheduled to run |
 | started_at | datetime | Time when the job started running |
@@ -327,6 +394,7 @@ GET /api/v1/scheduled_jobs/stats
 | retry_count | integer | Number of retries attempted |
 | max_retries | integer | Maximum number of retries allowed |
 | parent_job_id | integer | Foreign key to parent job (for retries) |
+| priority | string | Priority of the job (high, normal, low) |
 | created_at | datetime | Creation timestamp |
 | updated_at | datetime | Last update timestamp |
 
@@ -355,3 +423,7 @@ Hệ thống cung cấp các công cụ để theo dõi và debug:
 3. **Lên lịch**: Nên lên lịch crawl vào thời điểm ít người truy cập (ví dụ: 3:00 AM)
 4. **Monitoring**: Thường xuyên kiểm tra thống kê và log để phát hiện và xử lý sớm các vấn đề
 5. **Backup**: Nên backup database định kỳ để tránh mất dữ liệu job khi có sự cố
+6. **Ưu tiên**: Sử dụng trường `priority` để đảm bảo các job quan trọng được xử lý trước
+
+Kiểm tra xem trang web có đc crawl ko
+curl -s https://nettruyen1905.com/robots.txt

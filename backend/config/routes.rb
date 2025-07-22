@@ -29,6 +29,11 @@ Rails.application.routes.draw do
         get 'dashboard/stats', to: 'dashboard#stats'
         get 'dashboard/backup_database', to: 'dashboard#backup_database'
 
+        # Analytics
+        get 'analytics', to: 'analytics#index'
+        get 'analytics/advanced', to: 'analytics#advanced'
+        post 'analytics/ai_prompt', to: 'analytics#ai_prompt'
+
         # Admin routes for novel series
         resources :novel_series do
           resources :novel_chapters, shallow: true
