@@ -290,6 +290,12 @@ class Api::V1::ProxyController < Api::V1::BaseController
     options[:max_chapters] = params[:max_chapters] if params[:max_chapters].present?
     options[:auto_next_chapters] = params[:auto_next_chapters] if params[:auto_next_chapters].present?
     options[:delay] = params[:delay] if params[:delay].present?
+    
+    # Thêm xử lý batch_chapters và batch_size
+    if params[:batch_chapters] == 'true' || params[:batch_chapters] == true
+      options[:batch_chapters] = true
+      options[:batch_size] = params[:batch_size].to_i if params[:batch_size].present?
+    end
 
     # Xử lý chapter range nếu có
     if params[:chapter_range].present?

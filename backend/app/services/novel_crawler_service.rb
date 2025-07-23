@@ -41,14 +41,22 @@ class NovelCrawlerService
       existing_chapter_numbers = novel.novel_chapters.pluck(:chapter_number)
       Rails.logger.info "Preloaded #{existing_chapter_numbers.size} existing chapter numbers"
 
-      # Xử lý auto_next_chapters nếu được bật
+      # Xác định chương cao nhất hiện có trong database
+      latest_chapter = existing_chapter_numbers.max || 0
+      
+      # Xử lý auto_next_chapters nếu được bật hoặc khi max_chapters là "all" và novel đã có chapter
       auto_next_chapters = [true, 'true'].include?(options[:auto_next_chapters])
+      
+      # Nếu max_chapters là "all" và novel đã có chapter, tự động bật auto_next_chapters
+      if options[:max_chapters].to_s.downcase == "all" && latest_chapter > 0
+        auto_next_chapters = true
+        Rails.logger.info "Auto next chapters automatically enabled because max_chapters is 'all' and novel already has chapters (latest: #{latest_chapter})"
+      end
+      
       Rails.logger.info "Auto next chapters is: #{auto_next_chapters} (original value: #{options[:auto_next_chapters].inspect})"
 
-      if auto_next_chapters && options[:max_chapters].present?
+      if auto_next_chapters
         # Lấy số chapter lớn nhất hiện tại trong database
-        latest_chapter = existing_chapter_numbers.max || 0
-
         Rails.logger.info "Auto next chapters is enabled and max_chapters is present: #{options[:max_chapters]}"
 
         if latest_chapter > 0
@@ -147,6 +155,16 @@ class NovelCrawlerService
       # Đảm bảo chỉ lấy đúng số lượng chapter được chỉ định
       chapters_to_crawl = chapters.take(max_chapters)
 
+      # Kiểm tra xem có cần gộp chương không
+      batch_chapters = [true, 'true'].include?(options[:batch_chapters])
+      batch_size = options[:batch_size].to_i
+      batch_size = 5 if batch_size < 2 # Đảm bảo batch_size ít nhất là 2
+
+      # Log thông tin về batch chapters
+      if batch_chapters
+        Rails.logger.info "Batch chapters enabled with batch size: #{batch_size}"
+      end
+
       # Kết quả crawl
       results = {
         novel: {
@@ -162,103 +180,216 @@ class NovelCrawlerService
       chapters_to_create = []
       chapters_results = []
 
-      # Crawl từng chương và xử lý theo batch để tiết kiệm bộ nhớ
-      chapters_to_crawl.each_slice(BATCH_SIZE).each_with_index do |batch_chapters, batch_index|
-        batch_to_create = []
-        batch_results = []
-
-        batch_chapters.each_with_index do |chapter_data, index|
-          # Nếu job_id được truyền vào, kiểm tra trạng thái của job
-          if options[:job_id].present?
-            job = ScheduledJob.find_by(id: options[:job_id])
-            if job && job.status != 'running'
-              Rails.logger.info "Job ##{options[:job_id]} is no longer running (status: #{job.status}). Stopping crawl."
-              break
-            end
-          end
-
-          # Xử lý delay
-          delay = options[:delay] || DEFAULT_DELAY
-          if delay.is_a?(String) && delay.include?('..')
-            # Chuyển đổi chuỗi "3..7" thành range 3..7
-            start_delay, end_delay = delay.split('..').map(&:to_i)
-            sleep_time = rand(start_delay..end_delay)
-            Rails.logger.info "Sleeping for #{sleep_time} seconds (delay: #{delay})"
-            sleep(sleep_time)
-          else
-            # Sử dụng delay như bình thường
-            sleep(rand(delay))
-          end
-
-          # Kiểm tra xem chapter đã tồn tại chưa (sử dụng preloaded data)
-          if existing_chapter_numbers.include?(chapter_data[:number])
-            chapter_result = {
+      # Xử lý gộp chương nếu được bật
+      if batch_chapters && chapters_to_crawl.size > 1
+        Rails.logger.info "Processing chapters in batches of #{batch_size}"
+        
+        # Chia chapters thành các nhóm theo batch_size
+        chapters_to_crawl.each_slice(batch_size).each_with_index do |batch_chapters, batch_index|
+          # Bỏ qua nếu không có chapter nào trong batch
+          next if batch_chapters.empty?
+          
+          # Lấy thông tin chapter đầu và cuối trong batch
+          first_chapter = batch_chapters.first
+          last_chapter = batch_chapters.last
+          
+          # Tạo tiêu đề cho chương gộp
+          batch_title = "Chương #{first_chapter[:number]}-#{last_chapter[:number]}"
+          
+          # Tạo slug cho chương gộp
+          batch_slug = "chuong-#{first_chapter[:number]}-#{last_chapter[:number]}"
+          
+          # Kiểm tra xem chương gộp đã tồn tại chưa hoặc có chương nào trong batch đã tồn tại chưa
+          if novel.novel_chapters.exists?(chapter_number: first_chapter[:number]) || 
+             batch_chapters.any? { |ch| existing_chapter_numbers.include?(ch[:number].to_i) }
+            batch_result = {
               status: 'skipped',
-              url: chapter_data[:url],
-              title: chapter_data[:title],
-              number: chapter_data[:number],
-              message: 'Chapter already exists'
+              title: batch_title,
+              message: 'Batch chapter already exists or contains existing chapters'
             }
-            batch_results << chapter_result
+            chapters_results << batch_result
             next
           end
-
-          # Crawl chương
-          chapter_result = crawl_chapter_for_bulk_insert(novel, chapter_data)
-
-          if chapter_result[:status] == 'success'
-            # Xử lý Markdown thành HTML
-            rendered_html = NovelChapter.render_markdown_content(chapter_result[:content])
+          
+          # Nội dung gộp
+          batch_content = "**Chương gộp từ #{first_chapter[:number]} đến #{last_chapter[:number]}**\n\n"
+          
+          # Crawl từng chương trong batch và gộp nội dung
+          batch_chapters.each do |chapter_data|
+            # Xử lý delay
+            delay = options[:delay] || DEFAULT_DELAY
+            if delay.is_a?(String) && delay.include?('..')
+              start_delay, end_delay = delay.split('..').map(&:to_i)
+              sleep_time = rand(start_delay..end_delay)
+              Rails.logger.info "Sleeping for #{sleep_time} seconds (delay: #{delay})"
+              sleep(sleep_time)
+            else
+              sleep(rand(delay))
+            end
             
-            # Tạo slug từ title
-            slug = generate_slug_for_chapter(chapter_data[:title], novel.id, chapter_data[:number])
+            # Crawl chương
+            chapter_result = crawl_chapter_for_bulk_insert(novel, chapter_data)
             
-            # Thêm vào danh sách cần tạo hàng loạt
-            batch_to_create << {
-              novel_series_id: novel.id,
-              title: chapter_data[:title],
-              chapter_number: chapter_data[:number],
-              content: chapter_result[:content],
-              rendered_html: rendered_html,
-              slug: slug,
-              created_at: Time.current,
-              updated_at: Time.current
-            }
+            if chapter_result[:status] == 'success'
+              # Thêm tiêu đề chương vào nội dung
+              batch_content += "## #{chapter_data[:title]}\n\n"
+              batch_content += chapter_result[:content]
+              batch_content += "\n\n---\n\n" # Thêm dấu phân cách giữa các chương
+            else
+              # Ghi log lỗi nếu không crawl được chương
+              Rails.logger.error "Failed to crawl chapter #{chapter_data[:number]} for batch: #{chapter_result[:message]}"
+              batch_content += "## #{chapter_data[:title]}\n\n"
+              batch_content += "*Không thể tải nội dung chương này.*\n\n"
+              batch_content += "\n\n---\n\n"
+            end
+          end
+          
+          # Xử lý Markdown thành HTML
+          rendered_html = NovelChapter.render_markdown_content(batch_content)
+          
+          # Thêm vào danh sách cần tạo hàng loạt
+          chapters_to_create << {
+            novel_series_id: novel.id,
+            title: batch_title,
+            chapter_number: first_chapter[:number],
+            content: batch_content,
+            rendered_html: rendered_html,
+            slug: batch_slug,
+            is_batch_chapter: true,
+            batch_start: first_chapter[:number],
+            batch_end: last_chapter[:number],
+            created_at: Time.current,
+            updated_at: Time.current
+          }
+          
+          # Thêm kết quả batch vào kết quả
+          chapters_results << {
+            status: 'success',
+            title: batch_title,
+            number: first_chapter[:number],
+            is_batch: true,
+            batch_start: first_chapter[:number],
+            batch_end: last_chapter[:number]
+          }
+          
+          # Log tiến trình
+          Rails.logger.info "Created batch chapter #{batch_index + 1} from chapters #{first_chapter[:number]}-#{last_chapter[:number]}"
+        end
+        
+        # Bulk insert các chapters gộp
+        if chapters_to_create.present?
+          Rails.logger.info "Bulk inserting #{chapters_to_create.size} batch chapters"
+          NovelChapter.insert_all(chapters_to_create)
+          
+          # Cập nhật số chương đã crawl
+          results[:novel][:crawled_chapters] = chapters_to_create.size
+        end
+        
+        # Thêm kết quả chapters vào results
+        results[:chapters] = chapters_results
+        
+        # Trả về kết quả
+        return results.merge(status: 'success')
+      else
+        # Crawl từng chương riêng lẻ nếu không gộp chương
+        # Crawl từng chương và xử lý theo batch để tiết kiệm bộ nhớ
+        chapters_to_crawl.each_slice(BATCH_SIZE).each_with_index do |batch_chapters, batch_index|
+          batch_to_create = []
+          batch_results = []
+
+          batch_chapters.each_with_index do |chapter_data, index|
+            # Nếu job_id được truyền vào, kiểm tra trạng thái của job
+            if options[:job_id].present?
+              job = ScheduledJob.find_by(id: options[:job_id])
+              if job && job.status != 'running'
+                Rails.logger.info "Job ##{options[:job_id]} is no longer running (status: #{job.status}). Stopping crawl."
+                break
+              end
+            end
+
+            # Xử lý delay
+            delay = options[:delay] || DEFAULT_DELAY
+            if delay.is_a?(String) && delay.include?('..')
+              # Chuyển đổi chuỗi "3..7" thành range 3..7
+              start_delay, end_delay = delay.split('..').map(&:to_i)
+              sleep_time = rand(start_delay..end_delay)
+              Rails.logger.info "Sleeping for #{sleep_time} seconds (delay: #{delay})"
+              sleep(sleep_time)
+            else
+              # Sử dụng delay như bình thường
+              sleep(rand(delay))
+            end
+
+            # Kiểm tra xem chapter đã tồn tại chưa (sử dụng preloaded data)
+            if existing_chapter_numbers.include?(chapter_data[:number])
+              chapter_result = {
+                status: 'skipped',
+                url: chapter_data[:url],
+                title: chapter_data[:title],
+                number: chapter_data[:number],
+                message: 'Chapter already exists'
+              }
+              batch_results << chapter_result
+              next
+            end
+
+            # Crawl chương
+            chapter_result = crawl_chapter_for_bulk_insert(novel, chapter_data)
+
+            if chapter_result[:status] == 'success'
+              # Xử lý Markdown thành HTML
+              rendered_html = NovelChapter.render_markdown_content(chapter_result[:content])
+
+              # Tạo slug từ title
+              slug = generate_slug_for_chapter(chapter_data[:title], novel.id, chapter_data[:number])
+
+              # Thêm vào danh sách cần tạo hàng loạt
+              batch_to_create << {
+                novel_series_id: novel.id,
+                title: chapter_data[:title],
+                chapter_number: chapter_data[:number],
+                content: chapter_result[:content],
+                rendered_html: rendered_html,
+                slug: slug,
+                created_at: Time.current,
+                updated_at: Time.current
+              }
+            end
+
+            batch_results << chapter_result
+
+            # Log tiến trình
+            Rails.logger.info "Crawled chapter #{batch_index * BATCH_SIZE + index + 1}/#{chapters_to_crawl.size} for novel '#{novel.title}'"
           end
 
-          batch_results << chapter_result
+          # Bulk insert các chapters mới trong batch hiện tại
+          if batch_to_create.present?
+            Rails.logger.info "Bulk inserting #{batch_to_create.size} new chapters for batch #{batch_index + 1}"
+            NovelChapter.insert_all(batch_to_create)
 
-          # Log tiến trình
-          Rails.logger.info "Crawled chapter #{batch_index * BATCH_SIZE + index + 1}/#{chapters_to_crawl.size} for novel '#{novel.title}'"
+            # Cập nhật existing_chapter_numbers để phản ánh các chapters mới
+            new_chapter_numbers = batch_to_create.map { |c| c[:chapter_number] }
+            existing_chapter_numbers.concat(new_chapter_numbers)
+
+            # Cập nhật số chương đã crawl
+            results[:novel][:crawled_chapters] += batch_to_create.size
+          end
+
+          # Thêm kết quả batch vào kết quả tổng
+          chapters_results.concat(batch_results)
+
+          # Giải phóng bộ nhớ
+          batch_to_create = nil
+          batch_results = nil
+          GC.start if batch_index % 5 == 0 # Chạy GC sau mỗi 5 batch
         end
 
-        # Bulk insert các chapters mới trong batch hiện tại
-        if batch_to_create.present?
-          Rails.logger.info "Bulk inserting #{batch_to_create.size} new chapters for batch #{batch_index + 1}"
-          NovelChapter.insert_all(batch_to_create)
+        # Thêm kết quả chapters vào results
+        results[:chapters] = chapters_results
 
-          # Cập nhật existing_chapter_numbers để phản ánh các chapters mới
-          new_chapter_numbers = batch_to_create.map { |c| c[:chapter_number] }
-          existing_chapter_numbers.concat(new_chapter_numbers)
-
-          # Cập nhật số chương đã crawl
-          results[:novel][:crawled_chapters] += batch_to_create.size
-        end
-
-        # Thêm kết quả batch vào kết quả tổng
-        chapters_results.concat(batch_results)
-
-        # Giải phóng bộ nhớ
-        batch_to_create = nil
-        batch_results = nil
-        GC.start if batch_index % 5 == 0 # Chạy GC sau mỗi 5 batch
+        # Trả về kết quả
+        results.merge(status: 'success')
       end
-
-      # Thêm kết quả chapters vào results
-      results[:chapters] = chapters_results
-
-      # Trả về kết quả
-      results.merge(status: 'success')
     rescue => e
       Rails.logger.error "Error crawling novel: #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
@@ -278,7 +409,20 @@ class NovelCrawlerService
       description = doc.at_css('#truyen .desc-text')&.text&.strip
       author = doc.at_css('.info a[itemprop="author"]')&.text&.strip
       genres = doc.css('.info a[itemprop="genre"]').map { |a| a.text.strip }
+      
+      # Cải thiện selector cho cover_image
       cover_image = doc.at_css('#truyen img.cover')&.attr('src')
+      # Nếu không tìm thấy, thử selector khác cho truyenfull.vision
+      if cover_image.blank?
+        cover_image = doc.at_css('.books img')&.attr('src')
+      end
+      if cover_image.blank?
+        cover_image = doc.at_css('.book img')&.attr('src')
+      end
+      if cover_image.blank?
+        cover_image = doc.css('img').find { |img| img['alt']&.include?(title.to_s) }&.attr('src')
+      end
+      
       status = doc.at_css('.info .text-success')&.text&.strip
     elsif novel_url.include?('webtruyen')
       # Selector cho WebTruyen
@@ -320,6 +464,48 @@ class NovelCrawlerService
 
       # Log URL ảnh bìa sau khi xử lý
       Rails.logger.info "Cover image URL after processing: #{cover_image}"
+
+      # Thử tải ảnh bìa để kiểm tra URL có hoạt động không
+      begin
+        uri = URI.parse(cover_image)
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl = (uri.scheme == 'https')
+        http.verify_mode = OpenSSL::SSL::VERIFY_NONE # Bỏ qua xác thực SSL để tránh lỗi
+        
+        # Thêm timeout để tránh treo
+        http.open_timeout = 5
+        http.read_timeout = 5
+        
+        # Chỉ kiểm tra header, không tải toàn bộ ảnh
+        request = Net::HTTP::Head.new(uri.request_uri)
+        request['User-Agent'] = random_user_agent # Thêm User-Agent để tránh bị chặn
+        
+        # Thử GET request nếu HEAD không được hỗ trợ
+        begin
+          response = http.request(request)
+        rescue => e
+          Rails.logger.warn "HEAD request failed: #{e.message}, trying GET request"
+          request = Net::HTTP::Get.new(uri.request_uri)
+          request['User-Agent'] = random_user_agent
+          response = http.request(request)
+        end
+        
+        unless response.code.to_i.between?(200, 299)
+          Rails.logger.warn "Cover image URL returned non-success status code: #{response.code} - #{cover_image}"
+          cover_image = "https://via.placeholder.com/300x400?text=#{URI.encode_www_form_component(title || 'Novel')}"
+        end
+      rescue => e
+        Rails.logger.error "Error checking cover image URL: #{e.message}"
+        # Nếu có lỗi SSL hoặc timeout, vẫn giữ nguyên URL ảnh bìa vì có thể lỗi chỉ xảy ra ở server
+        # Chỉ sử dụng ảnh placeholder nếu URL rõ ràng không hợp lệ
+        if e.message.include?('getaddrinfo') || e.message.include?('SocketError') || e.message.include?('Invalid URI')
+          cover_image = "https://via.placeholder.com/300x400?text=#{URI.encode_www_form_component(title || 'Novel')}"
+        end
+      end
+    else
+      # Nếu không tìm thấy ảnh bìa, sử dụng ảnh mặc định
+      cover_image = "https://via.placeholder.com/300x400?text=#{URI.encode_www_form_component(title || 'Novel')}"
+      Rails.logger.warn "No cover image found for novel, using placeholder: #{cover_image}"
     end
 
     {
@@ -594,6 +780,9 @@ class NovelCrawlerService
 
   # Tìm hoặc tạo novel từ thông tin crawl được
   def self.find_or_create_novel(novel_info)
+    # Tạo slug thân thiện với tiếng Việt
+    slug = create_vietnamese_friendly_slug(novel_info[:title])
+
     # Tìm novel theo tiêu đề
     novel = NovelSeries.find_by("lower(title) = ?", novel_info[:title].downcase)
 
@@ -605,7 +794,8 @@ class NovelCrawlerService
         author: novel_info[:author],
         status: map_status(novel_info[:status]),
         cover_image: novel_info[:cover_image],
-        source_url: novel_info[:source_url]
+        source_url: novel_info[:source_url],
+        slug: slug
       )
 
       # Lưu novel
@@ -710,18 +900,59 @@ class NovelCrawlerService
 
   # Tạo slug cho chapter
   def self.generate_slug_for_chapter(title, novel_id, chapter_number = nil)
-    # Loại bỏ các ký tự không phải chữ cái, số, dấu gạch ngang và dấu gạch dưới
-    slug = title.parameterize
-    
-    # Thêm chapter number nếu có
-    if chapter_number
-      slug = "#{slug}-#{chapter_number}"
-    end
+    # Tạo slug với định dạng "chuong-X"
+    slug = "chuong-#{chapter_number}"
     
     # Đảm bảo slug không trùng lặp
     base_slug = slug
     counter = 1
     while NovelChapter.exists?(novel_series_id: novel_id, slug: slug)
+      slug = "#{base_slug}-#{counter}"
+      counter += 1
+    end
+    
+    slug
+  end
+
+  # Tạo slug thân thiện với tiếng Việt
+  def self.create_vietnamese_friendly_slug(text)
+    return "" if text.blank?
+    
+    # Bảng chuyển đổi tiếng Việt sang không dấu
+    vietnamese_chars = {
+      'à' => 'a', 'á' => 'a', 'ạ' => 'a', 'ả' => 'a', 'ã' => 'a', 'â' => 'a', 'ầ' => 'a', 'ấ' => 'a', 'ậ' => 'a', 'ẩ' => 'a', 'ẫ' => 'a', 'ă' => 'a', 'ằ' => 'a', 'ắ' => 'a', 'ặ' => 'a', 'ẳ' => 'a', 'ẵ' => 'a',
+      'è' => 'e', 'é' => 'e', 'ẹ' => 'e', 'ẻ' => 'e', 'ẽ' => 'e', 'ê' => 'e', 'ề' => 'e', 'ế' => 'e', 'ệ' => 'e', 'ể' => 'e', 'ễ' => 'e',
+      'ì' => 'i', 'í' => 'i', 'ị' => 'i', 'ỉ' => 'i', 'ĩ' => 'i',
+      'ò' => 'o', 'ó' => 'o', 'ọ' => 'o', 'ỏ' => 'o', 'õ' => 'o', 'ô' => 'o', 'ồ' => 'o', 'ố' => 'o', 'ộ' => 'o', 'ổ' => 'o', 'ỗ' => 'o', 'ơ' => 'o', 'ờ' => 'o', 'ớ' => 'o', 'ợ' => 'o', 'ở' => 'o', 'ỡ' => 'o',
+      'ù' => 'u', 'ú' => 'u', 'ụ' => 'u', 'ủ' => 'u', 'ũ' => 'u', 'ư' => 'u', 'ừ' => 'u', 'ứ' => 'u', 'ự' => 'u', 'ử' => 'u', 'ữ' => 'u',
+      'ỳ' => 'y', 'ý' => 'y', 'ỵ' => 'y', 'ỷ' => 'y', 'ỹ' => 'y',
+      'đ' => 'd',
+      'À' => 'A', 'Á' => 'A', 'Ạ' => 'A', 'Ả' => 'A', 'Ã' => 'A', 'Â' => 'A', 'Ầ' => 'A', 'Ấ' => 'A', 'Ậ' => 'A', 'Ẩ' => 'A', 'Ẫ' => 'A', 'Ă' => 'A', 'Ằ' => 'A', 'Ắ' => 'A', 'Ặ' => 'A', 'Ẳ' => 'A', 'Ẵ' => 'A',
+      'È' => 'E', 'É' => 'E', 'Ẹ' => 'E', 'Ẻ' => 'E', 'Ẽ' => 'E', 'Ê' => 'E', 'Ề' => 'E', 'Ế' => 'E', 'Ệ' => 'E', 'Ể' => 'E', 'Ễ' => 'E',
+      'Ì' => 'I', 'Í' => 'I', 'Ị' => 'I', 'Ỉ' => 'I', 'Ĩ' => 'I',
+      'Ò' => 'O', 'Ó' => 'O', 'Ọ' => 'O', 'Ỏ' => 'O', 'Õ' => 'O', 'Ô' => 'O', 'Ồ' => 'O', 'Ố' => 'O', 'Ộ' => 'O', 'Ổ' => 'O', 'Ỗ' => 'O', 'Ơ' => 'O', 'Ờ' => 'O', 'Ớ' => 'O', 'Ợ' => 'O', 'Ở' => 'O', 'Ỡ' => 'O',
+      'Ù' => 'U', 'Ú' => 'U', 'Ụ' => 'U', 'Ủ' => 'U', 'Ũ' => 'U', 'Ư' => 'U', 'Ừ' => 'U', 'Ứ' => 'U', 'Ự' => 'U', 'Ử' => 'U', 'Ữ' => 'U',
+      'Ỳ' => 'Y', 'Ý' => 'Y', 'Ỵ' => 'Y', 'Ỷ' => 'Y', 'Ỹ' => 'Y',
+      'Đ' => 'D'
+    }
+    
+    # Chuyển đổi tiếng Việt sang không dấu
+    normalized_text = text.dup
+    vietnamese_chars.each do |vi_char, latin_char|
+      normalized_text.gsub!(vi_char, latin_char)
+    end
+    
+    # Tạo slug
+    slug = normalized_text.downcase
+                        .gsub(/[^a-z0-9\s-]/, '') # Loại bỏ ký tự đặc biệt
+                        .gsub(/\s+/, '-')         # Thay khoảng trắng bằng dấu gạch ngang
+                        .gsub(/-+/, '-')          # Loại bỏ nhiều dấu gạch ngang liên tiếp
+                        .gsub(/^-|-$/, '')        # Loại bỏ dấu gạch ngang ở đầu và cuối
+    
+    # Đảm bảo slug không trùng lặp
+    base_slug = slug
+    counter = 1
+    while NovelSeries.where(slug: slug).exists?
       slug = "#{base_slug}-#{counter}"
       counter += 1
     end

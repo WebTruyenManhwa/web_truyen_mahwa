@@ -26,6 +26,8 @@ export default function AutoCrawlNovel() {
   const [scheduleType, setScheduleType] = useState<string>("daily");
   const [scheduleTime, setScheduleTime] = useState<string>("03:00");
   const [scheduleDays, setScheduleDays] = useState<string[]>(["1"]);
+  const [enableBatchChapters, setEnableBatchChapters] = useState<boolean>(false);
+  const [batchSize, setBatchSize] = useState<number>(5);
 
   // Determine if chapter range is required
   const isChapterRangeRequired = isCustomChapters || maxChapters === "custom";
@@ -101,6 +103,12 @@ export default function AutoCrawlNovel() {
       } else if (finalMaxChapters !== "all" && !isCustomChapters && maxChapters !== "custom") {
         // Khi chọn số lượng chapter cố định (1, 5, 10, 20, 50, 100)
         options.auto_next_chapters = true;
+      }
+
+      // Thêm thông tin về chương gộp nếu được bật
+      if (enableBatchChapters) {
+        options.batch_chapters = true;
+        options.batch_size = batchSize;
       }
 
       if (isScheduled) {
@@ -431,6 +439,41 @@ export default function AutoCrawlNovel() {
               <li>TruyenFull: <code className="bg-gray-900 px-2 py-1 rounded">https://truyenfull.vn/</code></li>
               <li>WebTruyen: <code className="bg-gray-900 px-2 py-1 rounded">https://webtruyen.com/</code></li>
             </ul>
+          </div>
+
+          <div className="mt-6 p-4 bg-gray-900/50 border border-blue-700 rounded-lg">
+            <h3 className="text-lg font-medium text-blue-200 mb-2">Tùy chọn nâng cao:</h3>
+            
+            <div className="mt-4">
+              <label className="flex items-center space-x-2 mb-4">
+                <input
+                  type="checkbox"
+                  checked={enableBatchChapters}
+                  onChange={(e) => setEnableBatchChapters(e.target.checked)}
+                  className="rounded border-gray-600 text-blue-600 focus:ring-blue-500 bg-gray-700"
+                />
+                <span className="text-gray-300">Gộp chương khi crawl</span>
+              </label>
+              
+              {enableBatchChapters && (
+                <div className="pl-6 mt-2">
+                  <label className="block text-gray-300 mb-2">
+                    Số chương mỗi lần gộp
+                  </label>
+                  <input
+                    type="number"
+                    value={batchSize}
+                    onChange={(e) => setBatchSize(parseInt(e.target.value) || 5)}
+                    min="2"
+                    max="20"
+                    className="w-full md:w-1/3 bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-gray-400 text-sm mt-1">
+                    Hệ thống sẽ gộp các chương liên tiếp thành một chương lớn. Ví dụ: nếu chọn 5, các chương 1-5, 6-10, 11-15... sẽ được gộp lại.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="mt-8 flex justify-end">
