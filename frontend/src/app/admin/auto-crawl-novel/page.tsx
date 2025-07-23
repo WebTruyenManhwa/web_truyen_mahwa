@@ -30,7 +30,7 @@ export default function AutoCrawlNovel() {
   // Determine if chapter range is required
   const isChapterRangeRequired = isCustomChapters || maxChapters === "custom";
   // Determine if chapter range input should be disabled
-  const isChapterRangeDisabled = maxChapters === "all" && !isCustomChapters;
+  const isChapterRangeDisabled = maxChapters === "all" || (!isCustomChapters && maxChapters !== "custom");
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {

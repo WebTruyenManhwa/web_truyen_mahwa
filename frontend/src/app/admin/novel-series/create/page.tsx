@@ -33,7 +33,7 @@ export default function CreateNovelSeriesPage() {
     return null;
   }
 
-  if (!authLoading && isAuthenticated && user?.role !== "admin") {
+  if (!authLoading && isAuthenticated && (!["admin", "super_admin"].includes(user?.role ?? ""))) {
     router.push("/");
     return null;
   }

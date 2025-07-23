@@ -22,6 +22,38 @@ class NovelChapter < ApplicationRecord
     (batch_start..batch_end)
   end
 
+  # Phương thức public để render Markdown thành HTML
+  def self.render_markdown_content(content)
+    begin
+      renderer = Redcarpet::Render::HTML.new(
+        hard_wrap: true,
+        filter_html: false,
+        no_images: false,
+        no_links: false,
+        no_styles: false,
+        safe_links_only: true
+      )
+
+      markdown = Redcarpet::Markdown.new(renderer,
+        autolink: true,
+        tables: true,
+        fenced_code_blocks: true,
+        strikethrough: true,
+        superscript: true,
+        underline: true,
+        highlight: true,
+        quote: true,
+        footnotes: true
+      )
+
+      markdown.render(content.to_s)
+    rescue => e
+      Rails.logger.error("Markdown rendering error: #{e.message}")
+      # Fallback to plain text if rendering fails
+      content.to_s
+    end
+  end
+
   private
 
   def render_markdown_to_html

@@ -137,6 +137,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_22_155713) do
     t.string "slug"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "source_url"
     t.index "lower((title)::text)", name: "index_novel_series_on_lower_title"
   end
 

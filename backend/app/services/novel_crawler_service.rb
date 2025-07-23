@@ -1,6 +1,7 @@
 require 'nokogiri'
 require 'net/http'
 require 'uri'
+require 'cgi'
 
 class NovelCrawlerService
   # Thời gian delay giữa các request để tránh bị chặn
@@ -206,12 +207,20 @@ class NovelCrawlerService
           chapter_result = crawl_chapter_for_bulk_insert(novel, chapter_data)
 
           if chapter_result[:status] == 'success'
+            # Xử lý Markdown thành HTML
+            rendered_html = NovelChapter.render_markdown_content(chapter_result[:content])
+            
+            # Tạo slug từ title
+            slug = generate_slug_for_chapter(chapter_data[:title], novel.id, chapter_data[:number])
+            
             # Thêm vào danh sách cần tạo hàng loạt
             batch_to_create << {
               novel_series_id: novel.id,
               title: chapter_data[:title],
               chapter_number: chapter_data[:number],
               content: chapter_result[:content],
+              rendered_html: rendered_html,
+              slug: slug,
               created_at: Time.current,
               updated_at: Time.current
             }
@@ -553,6 +562,13 @@ class NovelCrawlerService
     content = content.gsub(/Truyện\s+Full\s+.*?<\/div>/im, '')
     content = content.gsub(/Đọc\s+Truyện\s+.*?<\/div>/im, '')
 
+    # Chuyển đổi các thẻ HTML thành Markdown hoặc text thuần túy
+    # Chuyển <br>, <p> thành dòng mới
+    content = content.gsub(/<br\s*\/?>/i, "\n")
+    content = content.gsub(/<\/p>\s*<p>/im, "\n\n")
+    content = content.gsub(/<p[^>]*>/i, '')
+    content = content.gsub(/<\/p>/i, "\n\n")
+
     # Loại bỏ các liên kết không cần thiết
     content = content.gsub(/<a.*?>(.*?)<\/a>/im, '\1')
 
@@ -563,6 +579,12 @@ class NovelCrawlerService
 
     # Loại bỏ các thẻ div không cần thiết nhưng giữ lại nội dung
     content = content.gsub(/<div[^>]*>(.*?)<\/div>/im, '\1')
+    
+    # Loại bỏ tất cả các thẻ HTML còn lại nhưng giữ lại nội dung
+    content = content.gsub(/<[^>]*>/m, '')
+    
+    # Decode HTML entities
+    content = CGI.unescapeHTML(content) rescue content
 
     # Thêm các định dạng cơ bản
     content = content.gsub(/\n{3,}/m, "\n\n") # Giảm số dòng trống
@@ -582,8 +604,8 @@ class NovelCrawlerService
         description: novel_info[:description],
         author: novel_info[:author],
         status: map_status(novel_info[:status]),
-        source_url: novel_info[:source_url],
-        cover_image: novel_info[:cover_image]
+        cover_image: novel_info[:cover_image],
+        source_url: novel_info[:source_url]
       )
 
       # Lưu novel
@@ -666,9 +688,44 @@ class NovelCrawlerService
     user_agents.sample
   end
 
+
+  # Tạo User-Agent ngẫu nhiên
+  def self.random_user_agent
+    user_agents = [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0',
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Mobile/15E148 Safari/604.1'
+    ]
+    user_agents.sample
+  end
+
   # Hàm đệ quy để chuyển đổi các key của hash thành symbol
   def self.deep_symbolize_keys(hash)
     return hash unless hash.is_a?(Hash)
     hash.transform_keys { |key| key.is_a?(String) ? key.to_sym : key }.transform_values { |value| deep_symbolize_keys(value) }
+  end
+
+  # Tạo slug cho chapter
+  def self.generate_slug_for_chapter(title, novel_id, chapter_number = nil)
+    # Loại bỏ các ký tự không phải chữ cái, số, dấu gạch ngang và dấu gạch dưới
+    slug = title.parameterize
+    
+    # Thêm chapter number nếu có
+    if chapter_number
+      slug = "#{slug}-#{chapter_number}"
+    end
+    
+    # Đảm bảo slug không trùng lặp
+    base_slug = slug
+    counter = 1
+    while NovelChapter.exists?(novel_series_id: novel_id, slug: slug)
+      slug = "#{base_slug}-#{counter}"
+      counter += 1
+    end
+    
+    slug
   end
 end

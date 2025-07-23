@@ -48,12 +48,12 @@ export default function AdminNovelSeriesPage() {
       return;
     }
 
-    if (!authLoading && isAuthenticated && user?.role !== "admin") {
+    if (!authLoading && isAuthenticated && (!["admin", "super_admin"].includes(user?.role ?? ""))) {
       router.push("/");
       return;
     }
 
-    if (!authLoading && isAuthenticated && user?.role === "admin") {
+    if (!authLoading && isAuthenticated && (user?.role === "admin" || user?.role === "super_admin")) {
       fetchNovels(1);
     }
   }, [authLoading, isAuthenticated, user]);
@@ -155,7 +155,7 @@ export default function AdminNovelSeriesPage() {
     );
   }
 
-  if (!isAuthenticated || user?.role !== "admin") {
+  if (!isAuthenticated || (!["admin", "super_admin"].includes(user?.role ?? ""))) {
     return null;
   }
 

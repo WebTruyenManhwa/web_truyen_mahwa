@@ -54,12 +54,12 @@ export default function NovelChaptersPage() {
       return;
     }
 
-    if (!authLoading && isAuthenticated && user?.role !== "admin") {
+    if (!authLoading && isAuthenticated && (!["admin", "super_admin"].includes(user?.role ?? ""))) {
       router.push("/");
       return;
     }
 
-    if (!authLoading && isAuthenticated && user?.role === "admin") {
+    if (!authLoading && isAuthenticated && (user?.role === "admin" || user?.role === "super_admin")) {
       fetchChapters(1);
     }
   }, [authLoading, isAuthenticated, user, slug]);
@@ -135,7 +135,7 @@ export default function NovelChaptersPage() {
     );
   }
 
-  if (!isAuthenticated || user?.role !== "admin") {
+  if (!isAuthenticated || (!["admin", "super_admin"].includes(user?.role ?? ""))) {
     return null;
   }
 

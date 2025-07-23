@@ -63,12 +63,12 @@ export default function CreateNovelChapterPage() {
       return;
     }
 
-    if (!authLoading && isAuthenticated && user?.role !== "admin") {
+    if (!authLoading && isAuthenticated && (!["admin", "super_admin"].includes(user?.role ?? ""))) {
       router.push("/");
       return;
     }
 
-    if (!authLoading && isAuthenticated && user?.role === "admin") {
+    if (!authLoading && isAuthenticated && (user?.role === "admin" || user?.role === "super_admin")) {
       fetchNovelSeries();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -154,7 +154,7 @@ export default function CreateNovelChapterPage() {
     );
   }
 
-  if (!isAuthenticated || user?.role !== "admin" || !series) {
+  if (!isAuthenticated || (!["admin", "super_admin"].includes(user?.role ?? "")) || !series) {
     return null;
   }
 

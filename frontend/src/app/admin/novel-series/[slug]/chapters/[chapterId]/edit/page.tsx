@@ -17,6 +17,7 @@ interface NovelChapter {
   id: number;
   title: string;
   content: string;
+  rendered_html: string;
   chapter_number: number;
   slug: string;
 }
@@ -41,6 +42,7 @@ export default function EditNovelChapterPage() {
     id: 0,
     title: "",
     content: "",
+    rendered_html: "",
     chapter_number: 0,
     slug: "",
   });
@@ -50,13 +52,13 @@ export default function EditNovelChapterPage() {
       router.push("/auth/login");
       return;
     }
-
-    if (!authLoading && isAuthenticated && user?.role !== "admin") {
+    
+    if (!authLoading && isAuthenticated && (!["admin", "super_admin"].includes(user?.role ?? ""))) {
       router.push("/");
       return;
     }
 
-    if (!authLoading && isAuthenticated && user?.role === "admin") {
+    if (!authLoading && isAuthenticated && (user?.role === "admin" || user?.role === "super_admin")) {
       fetchChapterDetails();
     }
   }, [authLoading, isAuthenticated, user, seriesSlug, chapterSlug]);
@@ -128,7 +130,7 @@ export default function EditNovelChapterPage() {
     );
   }
 
-  if (!isAuthenticated || user?.role !== "admin" || !series) {
+  if (!isAuthenticated || (!["admin", "super_admin"].includes(user?.role ?? "")) || !series) {
     return null;
   }
 
@@ -200,6 +202,14 @@ export default function EditNovelChapterPage() {
               required
               className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             ></textarea>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-gray-300 mb-2">Xem trước nội dung</label>
+            <div 
+              className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg min-h-[200px] prose prose-invert max-w-none" 
+              dangerouslySetInnerHTML={{ __html: formData.rendered_html }}
+            ></div>
           </div>
 
           <div className="flex justify-end">

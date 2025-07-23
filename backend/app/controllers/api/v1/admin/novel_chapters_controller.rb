@@ -36,7 +36,7 @@ module Api
         def show
           render json: {
             novel_chapter: @novel_chapter.as_json(
-              only: [:id, :title, :content, :chapter_number, :slug, :created_at, :updated_at]
+              only: [:id, :title, :content, :rendered_html, :chapter_number, :slug, :created_at, :updated_at]
             ),
             novel_series: @novel_chapter.novel_series.as_json(
               only: [:id, :title, :slug]
@@ -99,7 +99,7 @@ module Api
           if @novel_chapter.update(novel_chapter_params)
             render json: {
               novel_chapter: @novel_chapter.as_json(
-                only: [:id, :title, :content, :chapter_number, :slug, :created_at, :updated_at]
+                only: [:id, :title, :content, :rendered_html, :chapter_number, :slug, :created_at, :updated_at]
               ),
               message: 'Novel chapter updated successfully'
             }

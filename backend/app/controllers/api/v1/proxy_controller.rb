@@ -367,12 +367,8 @@ class Api::V1::ProxyController < Api::V1::BaseController
     else
       # Thực hiện crawl ngay lập tức
       begin
-        # Tạo job để crawl novel
-        job = SchedulerService.schedule_job('single_job', {
-          class_name: 'CrawlNovelJob',
-          method_name: 'perform',
-          arguments: [url, options]
-        })
+        # Tạo job để crawl novel - sử dụng đúng định dạng job_class và job_args
+        job = SchedulerService.schedule_job('CrawlNovelJob', [url, options])
 
         # Trả về thông tin job
         render json: {

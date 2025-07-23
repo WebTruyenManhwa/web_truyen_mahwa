@@ -40,7 +40,7 @@ export default function AutoCrawlManga() {
   // Determine if chapter range is required
   const isChapterRangeRequired = isCustomChapters || maxChapters === "custom";
   // Determine if chapter range input should be disabled
-  const isChapterRangeDisabled = maxChapters === "all" && !isCustomChapters;
+  const isChapterRangeDisabled = maxChapters === "all" || (!isCustomChapters && maxChapters !== "custom");
 
   // Fetch mangas for dropdown
   useEffect(() => {
