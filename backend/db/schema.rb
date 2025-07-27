@@ -10,9 +10,23 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_07_22_155713) do
+ActiveRecord::Schema[8.0].define(version: 2025_07_27_103924) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "chapter_error_reports", force: :cascade do |t|
+    t.bigint "chapter_id", null: false
+    t.bigint "user_id"
+    t.string "error_type", null: false
+    t.text "description"
+    t.boolean "resolved", default: false
+    t.datetime "resolved_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["chapter_id"], name: "index_chapter_error_reports_on_chapter_id"
+    t.index ["resolved"], name: "index_chapter_error_reports_on_resolved"
+    t.index ["user_id"], name: "index_chapter_error_reports_on_user_id"
+  end
 
   create_table "chapter_image_collections", force: :cascade do |t|
     t.bigint "chapter_id", null: false
@@ -111,6 +125,22 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_22_155713) do
     t.index ["slug"], name: "index_mangas_on_slug", unique: true
   end
 
+  create_table "notifications", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "title", null: false
+    t.text "content"
+    t.boolean "read", default: false, null: false
+    t.string "notification_type", null: false
+    t.integer "reference_id"
+    t.string "reference_type"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["notification_type"], name: "index_notifications_on_notification_type"
+    t.index ["read"], name: "index_notifications_on_read"
+    t.index ["reference_type", "reference_id"], name: "index_notifications_on_reference_type_and_reference_id"
+    t.index ["user_id"], name: "index_notifications_on_user_id"
+  end
+
   create_table "novel_chapters", force: :cascade do |t|
     t.string "title"
     t.text "content"
@@ -137,7 +167,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_22_155713) do
     t.string "slug"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.string "source_url"
     t.index "lower((title)::text)", name: "index_novel_series_on_lower_title"
   end
 
@@ -365,6 +394,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_22_155713) do
     t.index ["username"], name: "index_users_on_username", unique: true
   end
 
+  add_foreign_key "chapter_error_reports", "chapters"
+  add_foreign_key "chapter_error_reports", "users"
   add_foreign_key "chapter_image_collections", "chapters"
   add_foreign_key "chapters", "mangas"
   add_foreign_key "comments", "users"
@@ -373,6 +404,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_22_155713) do
   add_foreign_key "manga_genres", "genres"
   add_foreign_key "manga_genres", "mangas"
   add_foreign_key "manga_views", "mangas"
+  add_foreign_key "notifications", "users"
   add_foreign_key "novel_chapters", "novel_series"
   add_foreign_key "ratings", "mangas"
   add_foreign_key "ratings", "users"

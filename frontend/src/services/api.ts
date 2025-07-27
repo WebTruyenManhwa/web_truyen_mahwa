@@ -774,5 +774,61 @@ export const errorReportApi = {
   },
 };
 
+// API cho notifications
+export const notificationApi = {
+  // Lấy danh sách thông báo
+  getNotifications: async (params?: {
+    page?: number;
+    per_page?: number;
+    read?: boolean;
+    type?: string;
+  }) => {
+    const response = await api.get('/v1/notifications', { params });
+    return response.data;
+  },
+
+  // Lấy chi tiết một thông báo
+  getNotification: async (id: string | number) => {
+    const response = await api.get(`/v1/notifications/${id}`);
+    return response.data;
+  },
+
+  // Đánh dấu thông báo đã đọc
+  markAsRead: async (id: string | number) => {
+    const response = await api.post(`/v1/notifications/${id}/mark_as_read`);
+    return response.data;
+  },
+
+  // Đánh dấu thông báo chưa đọc
+  markAsUnread: async (id: string | number) => {
+    const response = await api.post(`/v1/notifications/${id}/mark_as_unread`);
+    return response.data;
+  },
+
+  // Đánh dấu tất cả thông báo đã đọc
+  markAllAsRead: async () => {
+    const response = await api.post('/v1/notifications/mark_all_as_read');
+    return response.data;
+  },
+
+  // Xóa một thông báo
+  deleteNotification: async (id: string | number) => {
+    const response = await api.delete(`/v1/notifications/${id}`);
+    return response.data;
+  },
+
+  // Xóa tất cả thông báo
+  clearAllNotifications: async () => {
+    const response = await api.delete('/v1/notifications/clear_all');
+    return response.data;
+  },
+
+  // Lấy số lượng thông báo chưa đọc
+  getUnreadCount: async () => {
+    const response = await api.get('/v1/notifications/unread_count');
+    return response.data.count;
+  }
+};
+
 export default api;
 

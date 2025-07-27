@@ -6,6 +6,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../hooks/useTheme";
 import { mangaApi } from "../services/api";
 import React from "react";
+import NotificationBell from "./NotificationBell";
 
 interface SearchResult {
   id: number;
@@ -457,7 +458,10 @@ export default function Header() {
               </div>
 
               {/* Authentication */}
-              {renderUserDropdown()}
+              <div className="flex items-center space-x-2">
+                {isAuthenticated && <NotificationBell />}
+                {renderUserDropdown()}
+              </div>
 
               {/* Mobile Menu Button */}
               <button

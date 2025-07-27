@@ -108,12 +108,17 @@ module Api
       end
 
       def notify_admin(error_report)
-        # In a real application, you would send notifications via email, websocket, etc.
-        # For now, we'll just log it
+        # Log thông báo
         Rails.logger.info("New error report ##{error_report.id} for Chapter #{error_report.chapter.number} of manga '#{error_report.chapter.manga.title}'")
 
-        # Example of background job for sending email notifications:
-        # AdminNotificationJob.perform_later(error_report.id, :new_error_report)
+        # Sử dụng NotificationService để gửi thông báo cho admin
+        NotificationService.notify_admins(
+          title: "Báo cáo lỗi mới",
+          content: "Chapter #{error_report.chapter.number} của truyện '#{error_report.chapter.manga.title}' có báo cáo lỗi mới: #{error_report.error_type}",
+          notification_type: Notification::TYPES[:chapter_error_report],
+          reference_id: error_report.id,
+          reference_type: 'ChapterErrorReport'
+        )
       end
     end
   end

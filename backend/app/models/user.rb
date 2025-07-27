@@ -7,7 +7,7 @@ class User < ApplicationRecord
 
   # Cấu hình JWT
   self.jwt_revocation_strategy = JwtDenylist
-  
+
   # OmniAuth providers
   def self.omniauth_providers
     [:google_oauth2]
@@ -25,6 +25,7 @@ class User < ApplicationRecord
   has_many :read_mangas, through: :reading_histories, source: :manga
   has_many :ratings, dependent: :destroy
   has_many :rated_mangas, through: :ratings, source: :manga
+  has_many :notifications, dependent: :destroy
 
   # Validations
   validates :email, presence: true, uniqueness: { case_sensitive: false }
@@ -37,7 +38,7 @@ class User < ApplicationRecord
     where(provider: auth.provider, uid: auth.uid).first_or_create do |user|
       user.email = auth.info.email
       user.password = Devise.friendly_token[0, 20]
-      
+
       # Tạo username hợp lệ từ tên Google
       raw_name = auth.info.name || "user"
       sanitized_name = raw_name.gsub(/[^\w\s]/, '').gsub(/\s+/, '_')
@@ -56,15 +57,15 @@ class User < ApplicationRecord
       id_token,
       aud: ENV.fetch('GOOGLE_CLIENT_ID')
     )
-  
+
     # Nếu đã có user theo email thì cập nhật provider/uid
     user = find_by(email: payload['email'])
-    
+
     if user
       user.update(provider: 'google', uid: payload['sub']) if user.provider.blank? || user.uid.blank?
       return user
     end
-  
+
     # Nếu chưa có, tạo mới user với provider+uid
     create!(
       provider: 'google',
@@ -80,5 +81,5 @@ class User < ApplicationRecord
     Rails.logger.error "[from_id_token] Auth token invalid: #{e.message}"
     nil
   end
-  
+
 end

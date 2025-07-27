@@ -43,48 +43,26 @@ class CrawlMangaJob < ApplicationJob
 
   # Tạo thông báo khi crawl thành công
   def create_notification(result)
-    # Tìm tất cả admin users
-    admin_users = User.where(role: :admin)
-
-    # Tạo thông báo cho mỗi admin
-    admin_users.each do |admin|
-      # Giả sử bạn có một model Notification
-      # Nếu không có, bạn có thể bỏ qua phần này
-      if defined?(Notification)
-        Notification.create(
-          user: admin,
-          title: "Manga Crawl Completed",
-          content: "Successfully crawled '#{result[:manga][:title]}'. " \
-                  "Total: #{result[:manga][:total_chapters]} chapters, " \
-                  "Crawled: #{result[:manga][:crawled_chapters]} chapters.",
-          read: false,
-          notification_type: 'manga_crawl',
-          reference_id: result[:manga][:id],
-          reference_type: 'Manga'
-        )
-      end
-    end
+    # Sử dụng NotificationService để gửi thông báo cho admin
+    NotificationService.notify_admins(
+      title: "Manga Crawl Hoàn thành",
+      content: "Đã crawl thành công truyện '#{result[:manga][:title]}'. " \
+              "Tổng: #{result[:manga][:total_chapters]} chapter, " \
+              "Đã crawl: #{result[:manga][:crawled_chapters]} chapter.",
+      notification_type: Notification::TYPES[:manga_crawl],
+      reference_id: result[:manga][:id],
+      reference_type: 'Manga'
+    )
   end
 
   # Tạo thông báo khi crawl thất bại
   def create_error_notification(url, error_message)
-    # Tìm tất cả admin users
-    admin_users = User.where(role: :admin)
-
-    # Tạo thông báo lỗi cho mỗi admin
-    admin_users.each do |admin|
-      # Giả sử bạn có một model Notification
-      # Nếu không có, bạn có thể bỏ qua phần này
-      if defined?(Notification)
-        Notification.create(
-          user: admin,
-          title: "Manga Crawl Failed",
-          content: "Failed to crawl manga from URL: #{url}. Error: #{error_message}",
-          read: false,
-          notification_type: 'manga_crawl_error',
-          reference_type: 'Error'
-        )
-      end
-    end
+    # Sử dụng NotificationService để gửi thông báo cho admin
+    NotificationService.notify_admins(
+      title: "Manga Crawl Thất bại",
+      content: "Không thể crawl truyện từ URL: #{url}. Lỗi: #{error_message}",
+      notification_type: Notification::TYPES[:manga_crawl_error],
+      reference_type: 'Error'
+    )
   end
 end

@@ -54,7 +54,7 @@ export default function ErrorReportsPage() {
     // Redirect if not authenticated or not an admin
     if (isAuthenticated === false) {
       router.push('/auth/login');
-    } else if (user && !user.is_admin && !user.is_super_admin) {
+    } else if (user && user.role !== 'admin' && user.role !== 'super_admin') {
       router.push('/');
     } else {
       fetchErrorReports();
@@ -109,7 +109,7 @@ export default function ErrorReportsPage() {
     }
   };
 
-  if (isAuthenticated === false || (user && !user.is_admin && !user.is_super_admin)) {
+  if (isAuthenticated === false || (user && user.role !== 'admin' && user.role !== 'super_admin')) {
     return null; // Prevent flash of content before redirect
   }
 

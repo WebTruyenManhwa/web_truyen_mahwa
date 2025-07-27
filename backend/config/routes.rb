@@ -148,6 +148,20 @@ Rails.application.routes.draw do
         end
       end
       resources :comments, only: [:index, :create, :destroy]
+
+      # Notifications routes
+      resources :notifications, only: [:index, :show, :destroy] do
+        member do
+          post :mark_as_read
+          post :mark_as_unread
+        end
+
+        collection do
+          post :mark_all_as_read
+          delete :clear_all
+          get :unread_count
+        end
+      end
     end
   end
 
