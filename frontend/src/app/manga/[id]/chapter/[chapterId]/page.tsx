@@ -11,6 +11,7 @@ import { useAuth } from "../../../../../hooks/useAuth";
 import { useParams } from "next/navigation";
 import { useTheme } from "../../../../../hooks/useTheme";
 import ThemeToggle from "../../../../../components/ThemeToggle";
+import ErrorReportDialog from "../../../../../components/ErrorReportDialog";
 
 interface ChapterImage {
   position: number;
@@ -96,6 +97,7 @@ export default function ChapterReader() {
   // Thêm state để kiểm soát việc hiển thị thanh điều hướng
   const [showTopNav, setShowTopNav] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+  const [isErrorReportOpen, setIsErrorReportOpen] = useState(false);
 
   // Add click outside handler
   useEffect(() => {
@@ -561,7 +563,23 @@ export default function ChapterReader() {
                 <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} truncate`}>Chapter {chapter.number || ""} {chapter.title ? `- ${chapter.title}` : ""}</p>
               </div>
             </div>
-            <ThemeToggle className="w-8 h-8" />
+            <div className="flex items-center gap-2">
+              {/* Báo lỗi button */}
+              <button
+                onClick={() => setIsErrorReportOpen(true)}
+                className={`px-2 py-1 rounded text-xs ${
+                  theme === 'dark'
+                    ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                } flex items-center`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Báo lỗi
+              </button>
+              <ThemeToggle className="w-8 h-8" />
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2 items-center">
@@ -1024,6 +1042,15 @@ export default function ChapterReader() {
             )}
         </div>
       </div>
+
+      {/* Error Report Dialog */}
+      <ErrorReportDialog
+        isOpen={isErrorReportOpen}
+        onClose={() => setIsErrorReportOpen(false)}
+        mangaId={mangaId}
+        chapterId={chapterId}
+        chapterNumber={chapter?.number}
+      />
     </div>
   );
 }

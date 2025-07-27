@@ -5,6 +5,7 @@ class Chapter < ApplicationRecord
   has_one :chapter_image_collection, dependent: :destroy
   has_many :reading_histories, dependent: :destroy
   has_many :comments, as: :commentable, dependent: :destroy
+  has_many :error_reports, class_name: 'ChapterErrorReport', dependent: :destroy
 
   # Validations
   validates :number, presence: true, uniqueness: { scope: :manga_id }

@@ -719,5 +719,60 @@ export const adminApi = {
   }
 };
 
+// API cho error reports
+export const errorReportApi = {
+  // Tạo báo lỗi mới cho chapter
+  createErrorReport: async (
+    mangaId: string | number,
+    chapterId: string | number,
+    data: { error_type: string; description: string }
+  ) => {
+    const response = await api.post(
+      `/v1/mangas/${mangaId}/chapters/${chapterId}/error_reports`,
+      { error_report: data }
+    );
+    return response.data;
+  },
+
+  // Lấy danh sách báo lỗi của một chapter (cần quyền admin)
+  getChapterErrorReports: async (mangaId: string | number, chapterId: string | number) => {
+    const response = await api.get(`/v1/mangas/${mangaId}/chapters/${chapterId}/error_reports`);
+    return response.data;
+  },
+
+  // Lấy tất cả báo lỗi (cần quyền admin)
+  getAllErrorReports: async (params?: { unresolved?: boolean }) => {
+    const response = await api.get('/v1/admin/error_reports', { params });
+    return response.data;
+  },
+
+  // Lấy chi tiết một báo lỗi (cần quyền admin)
+  getErrorReport: async (id: string | number) => {
+    const response = await api.get(`/v1/error_reports/${id}`);
+    return response.data;
+  },
+
+  // Đánh dấu báo lỗi đã được giải quyết (cần quyền admin)
+  resolveErrorReport: async (id: string | number) => {
+    const response = await api.patch(`/v1/error_reports/${id}/resolve`);
+    return response.data;
+  },
+
+  // Cập nhật báo lỗi (cần quyền admin)
+  updateErrorReport: async (
+    id: string | number,
+    data: { error_type?: string; description?: string }
+  ) => {
+    const response = await api.put(`/v1/error_reports/${id}`, { error_report: data });
+    return response.data;
+  },
+
+  // Xóa báo lỗi (cần quyền admin)
+  deleteErrorReport: async (id: string | number) => {
+    const response = await api.delete(`/v1/error_reports/${id}`);
+    return response.data;
+  },
+};
+
 export default api;
 

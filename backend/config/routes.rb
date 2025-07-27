@@ -78,6 +78,8 @@ Rails.application.routes.draw do
         resources :chapters, shallow: true do
           # Add nested routes for chapter comments
           resources :comments, only: [:index, :create], module: :chapters
+          # Add nested routes for chapter error reports
+          resources :error_reports, only: [:index, :create], controller: 'chapter_error_reports'
         end
         resources :ratings, only: [:create, :update, :destroy], module: :mangas
         resources :comments, only: [:index, :create], module: :mangas
@@ -93,6 +95,14 @@ Rails.application.routes.draw do
 
         # Add route for getting user's rating for a manga
         get 'ratings/user', to: 'mangas/ratings#show_user_rating'
+      end
+
+      # Add admin routes for error reports
+      get 'admin/error_reports', to: 'chapter_error_reports#index_all'
+      resources :error_reports, controller: 'chapter_error_reports', only: [:show, :update, :destroy] do
+        member do
+          patch :resolve
+        end
       end
 
       # Novel series routes
