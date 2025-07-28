@@ -185,7 +185,7 @@ export default function Home() {
 
   // Thiết lập auto scroll cho mỗi dòng
   React.useEffect(() => {
-    if (activeTab !== "latest") return;
+    if (activeTab !== "latest" || latestUpdates.length === 0) return;
 
     const intervals: NodeJS.Timeout[] = [];
 
@@ -229,7 +229,7 @@ export default function Home() {
     return () => {
       intervals.forEach(interval => clearInterval(interval));
     };
-  }, [activeTab, latestRowRefs, rowScrollDirections]);
+  }, [activeTab, latestUpdates.length, latestRowRefs.length, rowScrollDirections]);
 
   // Hàm xử lý phân trang
   const goToPage = (page: number) => {

@@ -185,27 +185,37 @@ export default function ChapterReader() {
     const fetchChapter = async () => {
       try {
         setIsLoading(true);
-        const data = await chapterApi.getChapter(mangaId, chapterId);
+        // Kiểm tra xem mangaId có phải là slug hay không
+        // Nếu mangaId không phải là số, sẽ cố gắng lấy manga bằng slug trước
+        let actualMangaId = mangaId;
+        let mangaData: any = null;
+        
+        try {
+          // Luôn lấy thông tin manga trước để có ID chính xác
+          mangaData = await mangaApi.getManga(mangaId);
+          if (mangaData && mangaData.id) {
+            // Đảm bảo actualMangaId luôn là số
+            actualMangaId = mangaData.id.toString();
+            console.log("Using actual manga ID:", actualMangaId);
+          }
+        } catch (err) {
+          console.error("Failed to fetch manga:", err);
+        }
+        
+        // Đảm bảo actualMangaId là số
+        if (isNaN(Number(actualMangaId))) {
+          console.error("Could not determine numeric manga ID");
+          throw new Error("Could not determine manga ID");
+        }
+        
+        const data = await chapterApi.getChapter(actualMangaId, chapterId);
         console.log("Chapter data:", data);
-
-        // Debug image data
-        // if (data && data.images) {
-        //   console.log("Image data:", data.images);
-        //   data.images.forEach((img, index) => {
-        //     console.log(`Image ${index}:`, {
-        //       position: img.position,
-        //       url: img.url,
-        //       external_url: img.external_url,
-        //       is_external: img.is_external
-        //     });
-        //   });
-        // }
 
         setChapter(data);
 
         // Fetch tất cả chapters của manga
         try {
-          const chaptersData = await chapterApi.getMangaChapters(mangaId);
+          const chaptersData = await chapterApi.getMangaChapters(actualMangaId);
           // Sắp xếp chapters theo số thứ tự
           const sortedChapters = chaptersData && chaptersData.chapters && Array.isArray(chaptersData.chapters)
             ? [...chaptersData.chapters].sort((a, b) => b.number - a.number)
@@ -218,10 +228,13 @@ export default function ChapterReader() {
         // Thêm vào lịch sử đọc nếu đã đăng nhập
         if (isAuthenticated) {
           try {
-            await userApi.addToReadingHistory(mangaId, chapterId);
-            // Refresh manga data after adding to reading history
-            const mangaData = await mangaApi.getManga(mangaId);
-            console.log("mangaData", mangaData)
+            await userApi.addToReadingHistory(actualMangaId, chapterId);
+            // Sử dụng mangaData đã lấy ở trên nếu có
+            if (!mangaData) {
+              mangaData = await mangaApi.getManga(actualMangaId);
+            }
+            console.log("mangaData", mangaData);
+            
             // Cập nhật chapter với manga data mới
             setChapter(prev => {
               if (!prev) return null;
@@ -229,7 +242,7 @@ export default function ChapterReader() {
                 ...prev,
                 manga: {
                   ...prev.manga,
-                  id: prev.manga?.id || parseInt(mangaId),
+                  id: prev.manga?.id || parseInt(actualMangaId),
                   title: prev.manga?.title || mangaData.title,
                   view_count: mangaData.view_count
                 }
@@ -242,7 +255,7 @@ export default function ChapterReader() {
 
         // Fetch comments
         try {
-          const commentsData = await commentApi.getChapterComments(mangaId, chapterId);
+          const commentsData = await commentApi.getChapterComments(actualMangaId, chapterId);
           setComments(commentsData);
         } catch (err) {
           console.error("Failed to fetch comments:", err);
