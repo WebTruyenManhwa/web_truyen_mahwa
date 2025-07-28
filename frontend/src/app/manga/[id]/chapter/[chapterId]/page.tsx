@@ -62,11 +62,12 @@ interface Comment {
   createdAt: string;
   has_replies?: boolean;
   replies?: Comment[];
-  user: {
+  user?: {
     id: number;
     username: string;
     avatar?: string;
   };
+  user_id?: number;
 }
 
 export default function ChapterReader() {
@@ -89,7 +90,6 @@ export default function ChapterReader() {
   const [gifSearchTerm, setGifSearchTerm] = useState("");
   const [gifResults, setGifResults] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("trending");
-  // const [readingMode, setReadingMode] = useState<"vertical" | "horizontal">("vertical");
   const [showBottomNav, setShowBottomNav] = useState(false);
   const [allChapters, setAllChapters] = useState<ChapterSummary[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
@@ -100,18 +100,16 @@ export default function ChapterReader() {
   const commentInputRef = useRef<HTMLDivElement>(null);
   const [isMainCommentFocused, setIsMainCommentFocused] = useState(false);
   const [isReplyFocused, setIsReplyFocused] = useState(false);
-  // Thêm state để kiểm soát việc hiển thị thanh điều hướng
   const [showTopNav, setShowTopNav] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isErrorReportOpen, setIsErrorReportOpen] = useState(false);
+  const [replyingToReply, setReplyingToReply] = useState<{commentId: number, replyId: number} | null>(null);
 
-  // Thêm hàm formatTimeAgo để hiển thị thời gian tương đối
   const formatTimeAgo = (dateString: string) => {
     const now = new Date();
     const date = new Date(dateString);
     const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-    // Các khoảng thời gian tính bằng giây
     const intervals = {
       năm: 31536000,
       tháng: 2592000,
@@ -122,7 +120,6 @@ export default function ChapterReader() {
       giây: 1
     };
 
-    // Tìm khoảng thời gian phù hợp
     for (const [unit, secondsInUnit] of Object.entries(intervals)) {
       const interval = Math.floor(seconds / secondsInUnit);
       if (interval >= 1) {
@@ -133,7 +130,6 @@ export default function ChapterReader() {
     return 'vừa xong';
   };
 
-  // Add click outside handler
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -153,28 +149,21 @@ export default function ChapterReader() {
     };
   }, []);
 
-  // Thêm effect để theo dõi scroll
   useEffect(() => {
     const handleScroll = () => {
       const scrollPosition = window.scrollY;
       const windowHeight = window.innerHeight;
 
-      // Xác định hướng cuộn
       if (scrollPosition > lastScrollY) {
-        // Cuộn xuống - ẩn thanh điều hướng
         setShowTopNav(false);
       } else {
-        // Cuộn lên - hiện thanh điều hướng
         setShowTopNav(true);
       }
 
-      // Lưu vị trí cuộn hiện tại
       setLastScrollY(scrollPosition);
 
-      // Hiển thị navigation khi scroll xuống 20% trang
       setShowBottomNav(scrollPosition > windowHeight * 0.2);
 
-      // Tính toán trang hiện tại dựa trên scroll position
       const images = document.querySelectorAll('.chapter-image');
       let currentImageIndex = 0;
 
@@ -192,10 +181,8 @@ export default function ChapterReader() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [lastScrollY]);
 
-  // Thêm xử lý phím mũi tên để chuyển chương
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Kiểm tra nếu đang focus vào input hoặc textarea thì không xử lý
       if (document.activeElement?.tagName === 'INPUT' ||
           document.activeElement?.tagName === 'TEXTAREA' ||
           document.activeElement?.getAttribute('contenteditable') === 'true') {
@@ -203,13 +190,10 @@ export default function ChapterReader() {
       }
 
       if (e.key === 'ArrowLeft' && chapter?.prev_chapter) {
-        // Chuyển đến chapter trước
         window.location.href = `/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.prev_chapter?.slug || chapter.prev_chapter?.id}`;
       } else if (e.key === 'ArrowRight' && chapter?.next_chapter) {
-        // Chuyển đến chapter sau
         window.location.href = `/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.next_chapter?.slug || chapter.next_chapter?.id}`;
       } else if (e.key === 'Escape' && chapter) {
-        // Quay lại trang manga
         window.location.href = `/manga/${chapter.manga?.slug || mangaId}`;
       }
     };
@@ -222,16 +206,12 @@ export default function ChapterReader() {
     const fetchChapter = async () => {
       try {
         setIsLoading(true);
-        // Kiểm tra xem mangaId có phải là slug hay không
-        // Nếu mangaId không phải là số, sẽ cố gắng lấy manga bằng slug trước
         let actualMangaId = mangaId;
         let mangaData: any = null;
 
         try {
-          // Luôn lấy thông tin manga trước để có ID chính xác
           mangaData = await mangaApi.getManga(mangaId);
           if (mangaData && mangaData.id) {
-            // Đảm bảo actualMangaId luôn là số
             actualMangaId = mangaData.id.toString();
             console.log("Using actual manga ID:", actualMangaId);
           }
@@ -239,7 +219,6 @@ export default function ChapterReader() {
           console.error("Failed to fetch manga:", err);
         }
 
-        // Đảm bảo actualMangaId là số
         if (isNaN(Number(actualMangaId))) {
           console.error("Could not determine numeric manga ID");
           throw new Error("Could not determine manga ID");
@@ -250,10 +229,8 @@ export default function ChapterReader() {
 
         setChapter(data);
 
-        // Fetch tất cả chapters của manga
         try {
           const chaptersData = await chapterApi.getMangaChapters(actualMangaId);
-          // Sắp xếp chapters theo số thứ tự
           const sortedChapters = chaptersData && chaptersData.chapters && Array.isArray(chaptersData.chapters)
             ? [...chaptersData.chapters].sort((a, b) => b.number - a.number)
             : [];
@@ -262,17 +239,14 @@ export default function ChapterReader() {
           console.error("Failed to fetch manga chapters:", err);
         }
 
-        // Thêm vào lịch sử đọc nếu đã đăng nhập
         if (isAuthenticated) {
           try {
             await userApi.addToReadingHistory(actualMangaId, chapterId);
-            // Sử dụng mangaData đã lấy ở trên nếu có
             if (!mangaData) {
               mangaData = await mangaApi.getManga(actualMangaId);
             }
             console.log("mangaData", mangaData);
 
-            // Cập nhật chapter với manga data mới
             setChapter(prev => {
               if (!prev) return null;
               return {
@@ -290,12 +264,10 @@ export default function ChapterReader() {
           }
         }
 
-        // Fetch comments
         try {
           const commentsData = await commentApi.getChapterComments(actualMangaId, chapterId);
           setComments(commentsData);
 
-          // Lấy tổng số comment của manga
           try {
             const totalCommentsData = await commentApi.getMangaComments(actualMangaId);
             setTotalComments(totalCommentsData.length || 0);
@@ -307,13 +279,11 @@ export default function ChapterReader() {
           console.error("Failed to fetch comments:", err);
         }
 
-        // Khởi tạo GIFs
         fetchGifs("trending");
       } catch (err) {
         console.error("Failed to fetch chapter:", err);
         setError("Không thể tải chapter. Vui lòng thử lại sau.");
 
-        // Fallback to mock data
         setChapter({
           id: parseInt(chapterId),
           number: 1088,
@@ -356,34 +326,15 @@ export default function ChapterReader() {
     fetchChapter();
   }, [mangaId, chapterId, isAuthenticated]);
 
-  // Hàm debug để kiểm tra cấu trúc dữ liệu chapter
-  // Xóa useEffect này để tránh gọi API hai lần
-  /*
-  useEffect(() => {
-    if (chapter) {
-      console.log("Chapter structure:", {
-        id: chapter.id,
-        number: chapter.number,
-        title: chapter.title,
-        manga: chapter.manga,
-        images: chapter.images,
-      });
-    }
-  }, [chapter]);
-  */
-
   const insertStickerAtCursor = (stickerUrl: string) => {
     const el = commentInputRef.current;
     if (!el) return;
     el.focus();
 
-    // Special handling for mobile devices
     if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
       try {
-        // Force focus for mobile
         setTimeout(() => {
           el.focus();
-          // Create a range at the end of the content
           const range = document.createRange();
           range.selectNodeContents(el);
           range.collapse(false);
@@ -406,23 +357,19 @@ export default function ChapterReader() {
     img.alt = "Sticker";
     img.className = "inline h-8 w-8 align-middle mx-1";
     range.insertNode(img);
-    // Di chuyển con trỏ sau ảnh
     range.setStartAfter(img);
     range.collapse(true);
     selection.removeAllRanges();
     selection.addRange(range);
-    // Cập nhật state
     setCommentHtml(el.innerHTML);
     setShowStickerPicker(false);
   };
 
-  // Helper function for mobile focus
   const focusContentEditableForMobile = (el: HTMLElement | null) => {
     if (!el) return;
 
     el.focus();
     try {
-      // Create a range at the end of the content
       const range = document.createRange();
       range.selectNodeContents(el);
       range.collapse(false);
@@ -449,10 +396,8 @@ export default function ChapterReader() {
     div.innerHTML = html;
     const stickers: string[] = [];
 
-    // Lọc bỏ placeholder text nếu có
     const placeholders = ["Viết bình luận của bạn...", "Viết trả lời của bạn..."];
 
-    // Lấy text, thay img bằng placeholder nếu muốn
     const walker = document.createTreeWalker(div, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, null);
     let text = "";
     let node: Node | null;
@@ -465,7 +410,7 @@ export default function ChapterReader() {
       } else if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === "IMG") {
         const url = (node as HTMLImageElement).src;
         stickers.push(url);
-        text += ` [sticker:${url}] `; // hoặc chỉ để trống nếu không muốn placeholder
+        text += ` [sticker:${url}] `;
       }
     }
     return { text: text.trim(), stickers };
@@ -484,38 +429,111 @@ export default function ChapterReader() {
     try {
       setIsSubmitting(true);
       let newComment: any;
-      if (replyingTo) {
-        newComment = await commentApi.replyToComment(
+
+      // Lấy thông tin user từ localStorage để đảm bảo hiển thị đúng
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+      // Trường hợp 1: Đang trả lời một reply (replyingToReply có giá trị)
+      if (replyingToReply) {
+        // Tìm comment gốc dựa vào commentId trong replyingToReply
+        const parentComment = comments.find(c => c.id === replyingToReply.commentId);
+
+        if (parentComment) {
+          // Tạo reply comment với parent_id là ID của comment gốc (không phải ID của reply)
+          newComment = await commentApi.addChapterComment(
+            mangaId,
+            chapterId,
+            hasRealText ? text : "",
+            stickers.length > 0 ? stickers : undefined,
+            parentComment.id // Truyền parent_id là ID của comment gốc
+          );
+
+          // Đảm bảo reply mới có đầy đủ thông tin
+          const formattedReply = {
+            ...newComment,
+            createdAt: newComment.createdAt || new Date().toISOString(),
+            user: newComment.user || currentUser, // Đảm bảo có thông tin user
+            user_id: currentUser.id // Thêm user_id để đảm bảo có thể lấy thông tin user khi reload
+          };
+
+          // Cập nhật state để hiển thị reply mới
+          setComments(prevComments => {
+            return prevComments.map(comment => {
+              if (comment.id === parentComment.id) {
+                // Đảm bảo replies là một mảng và có cấu trúc đúng
+                const currentReplies = Array.isArray(comment.replies) ? comment.replies : [];
+                return {
+                  ...comment,
+                  has_replies: true,
+                  replies: [...currentReplies, formattedReply]
+                };
+              }
+              return comment;
+            });
+          });
+        }
+      }
+      // Trường hợp 2: Đang trả lời comment gốc (replyingTo có giá trị)
+      else if (replyingTo) {
+        // Tạo reply comment
+        newComment = await commentApi.addChapterComment(
+          mangaId,
           chapterId,
-          replyingTo.id,
-          hasRealText ? text : "",  // Chỉ gửi text nếu có nội dung thực sự
+          hasRealText ? text : "",
           stickers.length > 0 ? stickers : undefined,
-          mangaId
+          replyingTo.id // Truyền parent_id trực tiếp qua tham số
         );
+
+        // Đảm bảo reply có thông tin user đầy đủ từ localStorage
+        const formattedReply = {
+          ...newComment,
+          createdAt: newComment.createdAt || new Date().toISOString(),
+          user: newComment.user || currentUser, // Đảm bảo có thông tin user
+          user_id: currentUser.id // Thêm user_id để đảm bảo có thể lấy thông tin user khi reload
+        };
+
+        // Cập nhật state để hiển thị reply mới
         setComments(prevComments => {
           return prevComments.map(comment => {
             if (comment.id === replyingTo.id) {
+              // Đảm bảo replies là một mảng và có cấu trúc đúng
+              const currentReplies = Array.isArray(comment.replies) ? comment.replies : [];
               return {
                 ...comment,
                 has_replies: true,
-                replies: [...(comment.replies || []), newComment]
+                replies: [...currentReplies, formattedReply]
               };
             }
             return comment;
           });
         });
-      } else {
+      }
+      // Trường hợp 3: Tạo comment mới (không phải reply)
+      else {
+        // Tạo comment mới
         newComment = await commentApi.addChapterComment(
           mangaId,
           chapterId,
-          hasRealText ? text : "",  // Chỉ gửi text nếu có nội dung thực sự
+          hasRealText ? text : "",
           stickers.length > 0 ? stickers : undefined
         );
-        setComments([newComment, ...comments]);
+
+        // Đảm bảo comment mới có thông tin user đầy đủ
+        const formattedComment = {
+          ...newComment,
+          user: newComment.user || currentUser,
+          user_id: currentUser.id // Thêm user_id để đảm bảo có thể lấy thông tin user khi reload
+        };
+
+        // Thêm comment mới vào đầu danh sách
+        setComments([formattedComment, ...comments]);
       }
+
+      // Reset form
       setCommentHtml("");
       if (commentInputRef.current) commentInputRef.current.innerHTML = "";
       setReplyingTo(null);
+      setReplyingToReply(null);
       setShowStickerPicker(false);
       setShowGifPicker(false);
     } catch (err) {
@@ -529,7 +547,6 @@ export default function ChapterReader() {
   const renderCommentContent = (content: string) => {
     if (!content || content.trim() === "") return null;
 
-    // Kiểm tra nếu nội dung chỉ chứa placeholder
     const placeholders = ["Viết bình luận của bạn...", "Viết trả lời của bạn..."];
     if (placeholders.includes(content.trim())) return null;
 
@@ -559,12 +576,16 @@ export default function ChapterReader() {
     return parts.length > 0 ? parts : null;
   };
 
-  const handleReplyToComment = (comment: Comment) => {
-    setReplyingTo(comment);
-    // Scroll to comment form
-    document.getElementById('comment-form')?.scrollIntoView({ behavior: 'smooth' });
+  const handleReplyToComment = (comment: Comment, replyId?: number) => {
+    if (replyId) {
+      setReplyingToReply({commentId: comment.id, replyId: replyId});
+      setReplyingTo(null);
+    } else {
+      setReplyingTo(comment);
+      setReplyingToReply(null);
+      document.getElementById('comment-form')?.scrollIntoView({ behavior: 'smooth' });
+    }
 
-    // Force focus for mobile devices after a short delay
     setTimeout(() => {
       if (commentInputRef.current && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
         focusContentEditableForMobile(commentInputRef.current);
@@ -574,43 +595,25 @@ export default function ChapterReader() {
 
   const cancelReply = () => {
     setReplyingTo(null);
+    setReplyingToReply(null);
   };
 
-  // const toggleReadingMode = () => {
-  //   setReadingMode(readingMode === "vertical" ? "horizontal" : "vertical");
-  // };
-
-  // Helper function to get the image URL from different possible sources
   const getImageUrl = (image: ChapterImage): string => {
     let finalUrl = '';
 
-    // For external images, use external_url
     if (image.is_external && image.external_url) {
       finalUrl = image.external_url;
     } else {
-      // For non-external images, try url or image
       finalUrl = image.url || image.image || '';
     }
 
-    // Use a placeholder image when URL is empty or undefined
     const result = finalUrl && finalUrl.trim() !== ''
       ? finalUrl
       : 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="1200" viewBox="0 0 800 1200" fill="none"%3E%3Crect width="800" height="1200" fill="%23f0f0f0"/%3E%3Ctext x="400" y="600" font-family="Arial" font-size="24" text-anchor="middle" fill="%23999999"%3EImage not available%3C/text%3E%3C/svg%3E';
 
-    // console.log('Image data:', {
-    //   original: image,
-    //   is_external: image.is_external,
-    //   external_url: image.external_url,
-    //   url: image.url,
-    //   image: image.image,
-    //   finalUrl: finalUrl,
-    //   result: result
-    // });
-
     return result;
   };
 
-  // Hàm để lấy GIFs từ API
   const fetchGifs = async (category: string = "trending", search: string = "") => {
     try {
       const apiKey = process.env.NEXT_PUBLIC_API_KEY_TENOR;
@@ -622,7 +625,6 @@ export default function ChapterReader() {
       } else if (category === "trending") {
         url = `https://tenor.googleapis.com/v2/featured?key=${apiKey}&limit=${limit}`;
       } else {
-        // Các category đặc biệt
         let searchTerm = "";
         switch(category) {
           case "qoobee":
@@ -654,7 +656,6 @@ export default function ChapterReader() {
 
       if (data && data.results) {
         const gifs = data.results.map((item: any) => {
-          // Lấy URL của GIF từ kết quả API
           return item.media_formats.gif.url;
         });
         setGifResults(gifs);
@@ -667,18 +668,34 @@ export default function ChapterReader() {
     }
   };
 
-  // Hàm xử lý khi chọn GIF
   const handleSelectGif = (gifUrl: string) => {
     insertStickerAtCursor(gifUrl);
     setShowGifPicker(false);
   };
 
-  // Khởi tạo GIFs khi component mount
   useEffect(() => {
     if (gifResults.length === 0) {
       fetchGifs("trending");
     }
   }, [gifResults.length]);
+
+  const getUserInfo = (userId: number) => {
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+    if (currentUser && currentUser.id === userId) {
+      return {
+        id: currentUser.id,
+        username: currentUser.username || 'User',
+        avatar: currentUser.avatar
+      };
+    }
+
+    return {
+      id: userId,
+      username: 'User',
+      avatar: undefined
+    };
+  };
 
   if (isLoading) {
     return (
@@ -1141,7 +1158,7 @@ export default function ChapterReader() {
                           className="rounded-full w-full h-full object-cover"
                         />
                       ) : (
-                        <span className="text-center font-medium">{comment.user && comment.user.username ? comment.user.username.charAt(0).toUpperCase() : '?'}</span>
+                        <span className="text-center font-medium">{comment.user && comment.user.username ? comment.user.username.charAt(0).toUpperCase() : (comment.user_id ? getUserInfo(comment.user_id).username.charAt(0).toUpperCase() : '?')}</span>
                       )}
                     </div>
                   </div>
@@ -1151,7 +1168,7 @@ export default function ChapterReader() {
                     <div className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} rounded p-3 ${theme === 'dark' ? '' : 'border border-gray-300'}`}>
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-medium text-sm">{comment.user ? comment.user.username : 'Unknown User'} <span className="text-blue-500 text-xs">Chapter {chapter?.number}</span></p>
+                          <p className="font-medium text-sm">{comment.user ? comment.user.username : (comment.user_id ? getUserInfo(comment.user_id).username : 'Unknown User')} <span className="text-blue-500 text-xs">Chapter {chapter?.number}</span></p>
                           <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                             {formatTimeAgo(comment.createdAt)}
                           </p>
@@ -1188,7 +1205,7 @@ export default function ChapterReader() {
                         <form id="comment-form" onSubmit={handleSubmitComment}>
                           <div className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'} p-2 mb-2 rounded flex justify-between items-center`}>
                             <div className="text-sm">
-                              Đang trả lời <span className="font-semibold text-blue-500">{replyingTo.user?.username || 'Unknown'}</span>
+                              Đang trả lời <span className="font-semibold text-blue-500">{replyingTo.user ? replyingTo.user.username : (replyingTo.user_id ? getUserInfo(replyingTo.user_id).username : 'Unknown')}</span>
                             </div>
                             <button
                               type="button"
@@ -1456,19 +1473,41 @@ export default function ChapterReader() {
                                     className="rounded-full w-full h-full object-cover"
                                   />
                                 ) : (
-                                  <span className="text-xs">{reply.user && reply.user.username ? reply.user.username.charAt(0).toUpperCase() : '?'}</span>
+                                  reply.user_id && getUserInfo(reply.user_id).avatar ? (
+                                    <Image
+                                      src={getUserInfo(reply.user_id).avatar}
+                                      alt={getUserInfo(reply.user_id).username || 'User'}
+                                      width={32}
+                                      height={32}
+                                      className="rounded-full w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <span className="text-xs">{reply.user && reply.user.username ? reply.user.username.charAt(0).toUpperCase() : (reply.user_id ? getUserInfo(reply.user_id).username.charAt(0).toUpperCase() : '?')}</span>
+                                  )
                                 )}
                               </div>
                             </div>
 
                             {/* Nội dung reply */}
                             <div className="flex-1">
-                              <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'} rounded p-2 ${theme === 'dark' ? '' : 'border border-gray-300'}`}>
-                                <div>
-                                  <p className="font-medium text-xs">{reply.user ? reply.user.username : 'Unknown User'} <span className="text-blue-500 text-xs">Chapter {chapter?.number}</span></p>
-                                  <p className="text-xs text-gray-400">
-                                    {formatTimeAgo(reply.createdAt)}
-                                  </p>
+                              <div className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'} rounded p-2 border ${theme === 'dark' ? 'border-gray-700' : 'border-gray-300'}`}>
+                                <div className="flex justify-between">
+                                  <div>
+                                    <p className="font-medium text-xs">{reply.user ? reply.user.username : (reply.user_id ? getUserInfo(reply.user_id).username : 'Unknown User')} <span className="text-blue-500 text-xs">Chapter {chapter?.number}</span></p>
+                                    <p className="text-xs text-gray-400">
+                                      {formatTimeAgo(reply.createdAt)}
+                                    </p>
+                                  </div>
+
+                                  {/* Thêm nút trả lời cho reply */}
+                                  {isAuthenticated && (
+                                    <button
+                                      onClick={() => handleReplyToComment(comment, reply.id)}
+                                      className={`text-sm ${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}
+                                    >
+                                      Trả lời
+                                    </button>
+                                  )}
                                 </div>
 
                                 {/* Hiển thị tên user cha màu xanh dương ở đầu reply */}
@@ -1488,6 +1527,59 @@ export default function ChapterReader() {
                                   )}
                                 </div>
                               </div>
+
+                          {/* Hiển thị form trả lời dưới reply comment nếu đang trả lời reply này */}
+                          {isAuthenticated && replyingToReply && replyingToReply.commentId === comment.id && replyingToReply.replyId === reply.id && (
+                            <div className="mt-3 ml-10">
+                              <form onSubmit={handleSubmitComment}>
+                                <div className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-200"} p-2 mb-2 rounded flex justify-between items-center`}>
+                                  <div className="text-sm">
+                                    Đang trả lời <span className="font-semibold text-blue-500">{reply.user ? reply.user.username : (reply.user_id ? getUserInfo(reply.user_id).username : "Unknown")}</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={cancelReply}
+                                    className={`${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                    </svg>
+                                  </button>
+                                </div>
+                                <div
+                                  className={`w-full ${theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-100 text-gray-800"} rounded p-3 focus:outline-none focus:ring-1 focus:ring-red-500 min-h-[60px] relative ${theme === "dark" ? "" : "border border-gray-300"}`}
+                                  contentEditable
+                                  onInput={handleInput}
+                                  suppressContentEditableWarning={true}
+                                  onFocus={() => {
+                                    setIsReplyFocused(true);
+                                  }}
+                                  onBlur={() => {
+                                    if (!commentHtml.trim()) {
+                                      setIsReplyFocused(false);
+                                    }
+                                  }}
+                                >
+                                  {commentHtml === "" && !isReplyFocused && <span className={`${theme === "dark" ? "text-gray-400" : "text-gray-500"} absolute left-3 top-3 opacity-70 pointer-events-none`}>Viết trả lời của bạn...</span>}
+                                </div>
+                                <div className="mt-2 flex justify-between items-center">
+                                  <button
+                                    type="submit"
+                                    disabled={isSubmitting || (!commentHtml.trim() && selectedStickers.length === 0)}
+                                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    {isSubmitting && (
+                                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                      </svg>
+                                    )}
+                                    {"Gửi bình luận"}
+                                  </button>
+                                </div>
+                              </form>
+                            </div>
+                          )}
                             </div>
                           </div>
                         ))}
