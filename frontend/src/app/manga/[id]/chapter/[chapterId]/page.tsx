@@ -750,7 +750,7 @@ export default function ChapterReader() {
                 )}
                 <div
                   ref={commentInputRef}
-                  className={`w-full ${theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-800'} rounded p-3 focus:outline-none focus:ring-1 focus:ring-red-500 min-h-[60px] relative`}
+                  className={`w-full ${theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-800'} rounded p-3 focus:outline-none focus:ring-1 focus:ring-red-500 min-h-[60px] relative ${theme === 'dark' ? '' : 'border border-gray-300'}`}
                   contentEditable
                   onInput={handleInput}
                   suppressContentEditableWarning={true}
@@ -832,14 +832,14 @@ export default function ChapterReader() {
               </form>
             </div>
           ) : (
-            <div className={`mb-4 p-3 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} rounded text-center`}>
+            <div className={`mb-4 p-3 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} rounded text-center ${theme === 'dark' ? '' : 'border border-gray-300'}`}>
               <p>Vui lòng <Link href="/auth/login" className="text-red-400 hover:underline">đăng nhập</Link> để bình luận</p>
             </div>
           )}
           {/* Danh sách bình luận và form trả lời dưới từng comment */}
             {comments.length > 0 ? (
               comments.map((comment) => (
-              <div key={comment.id} className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} rounded p-3 mb-4`}>
+              <div key={comment.id} className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} rounded p-3 mb-4 ${theme === 'dark' ? '' : 'border border-gray-300'}`}>
                   <div className="flex justify-between items-start">
                     <div className="flex items-center">
                       <div className={`w-8 h-8 rounded-full ${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'} flex items-center justify-center mr-2`}>
@@ -889,14 +889,14 @@ export default function ChapterReader() {
                 {isAuthenticated && replyingTo && replyingTo.id === comment.id && (
                   <div className="mt-3">
                     <form id="comment-form" onSubmit={handleSubmitComment}>
-                      <div className="bg-gray-700 p-2 mb-2 rounded flex justify-between items-center">
+                      <div className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'} p-2 mb-2 rounded flex justify-between items-center`}>
                         <div className="text-sm">
                           Đang trả lời <span className="font-semibold text-blue-500">{replyingTo.user?.username || 'Unknown'}</span>
                         </div>
                         <button
                           type="button"
                           onClick={cancelReply}
-                          className="text-gray-400 hover:text-white"
+                          className={`${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -904,11 +904,11 @@ export default function ChapterReader() {
                         </button>
                       </div>
                       {selectedStickers.length > 0 && (
-                        <div className="mb-2 p-2 bg-gray-700 rounded flex flex-wrap gap-2 items-center">
+                        <div className={`mb-2 p-2 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'} rounded flex flex-wrap gap-2 items-center`}>
                           {selectedStickers.map((sticker) => (
                             <div key={sticker} className="flex items-center mr-2 mb-1">
                               <img src={sticker} alt="Selected sticker" className="h-10 w-10 mr-1" />
-                              <button type="button" onClick={() => setSelectedStickers(selectedStickers.filter((s) => s !== sticker))} className="text-gray-400 hover:text-white">
+                              <button type="button" onClick={() => setSelectedStickers(selectedStickers.filter((s) => s !== sticker))} className={`${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                                 </svg>
@@ -920,7 +920,7 @@ export default function ChapterReader() {
                       )}
                       <div
                         ref={commentInputRef}
-                        className="w-full bg-gray-700 text-white rounded p-3 focus:outline-none focus:ring-1 focus:ring-red-500 min-h-[60px] relative"
+                        className={`w-full ${theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-800'} rounded p-3 focus:outline-none focus:ring-1 focus:ring-red-500 min-h-[60px] relative ${theme === 'dark' ? '' : 'border border-gray-300'}`}
                         contentEditable
                         onInput={handleInput}
                         suppressContentEditableWarning={true}
@@ -936,23 +936,23 @@ export default function ChapterReader() {
                           }
                         }}
                       >
-                        {commentHtml === "" && !isReplyFocused && <span className="text-gray-400 absolute left-3 top-3 opacity-70 pointer-events-none">Viết trả lời của bạn...</span>}
+                        {commentHtml === "" && !isReplyFocused && <span className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} absolute left-3 top-3 opacity-70 pointer-events-none`}>Viết trả lời của bạn...</span>}
                       </div>
                       <div className="mt-2 flex justify-between items-center">
                         <div className="relative" ref={stickerPickerRef}>
                           <button
                             type="button"
                             onClick={() => setShowStickerPicker(!showStickerPicker)}
-                            className="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded"
+                            className={`${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} ${theme === 'dark' ? 'text-white' : 'text-gray-800'} p-2 rounded`}
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-7.536 5.879a1 1 0 001.414 0 3 3 0 014.242 0 1 1 0 001.414-1.414 5 5 0 00-7.07 0 1 1 0 000 1.414z" clipRule="evenodd" />
                             </svg>
                           </button>
                           {showStickerPicker && (
-                            <div className="block p-2 bg-gray-700 rounded shadow-lg grid grid-cols-4 gap-2">
+                            <div className={`block p-2 ${theme === 'dark' ? 'bg-gray-700' : 'bg-white border border-gray-200'} rounded shadow-lg grid grid-cols-4 gap-2`}>
                               {/* Stickers */}
-                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742760.png')} className="p-1 hover:bg-gray-600 rounded">
+                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742760.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
                                 <Image
                                   src="https://cdn-icons-png.flaticon.com/128/742/742760.png"
                                   alt="Sticker 1"
@@ -961,25 +961,25 @@ export default function ChapterReader() {
                                   className="w-8 h-8"
                                 />
                               </button>
-                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742751.png')} className="p-1 hover:bg-gray-600 rounded">
+                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742751.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
                                 <img src="https://cdn-icons-png.flaticon.com/128/742/742751.png" alt="Sticker 2" className="w-8 h-8" />
                               </button>
-                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742784.png')} className="p-1 hover:bg-gray-600 rounded">
+                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742784.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
                                 <img src="https://cdn-icons-png.flaticon.com/128/742/742784.png" alt="Sticker 3" className="w-8 h-8" />
                               </button>
-                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742750.png')} className="p-1 hover:bg-gray-600 rounded">
+                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742750.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
                                 <img src="https://cdn-icons-png.flaticon.com/128/742/742750.png" alt="Sticker 4" className="w-8 h-8" />
                               </button>
-                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742745.png')} className="p-1 hover:bg-gray-600 rounded">
+                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742745.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
                                 <img src="https://cdn-icons-png.flaticon.com/128/742/742745.png" alt="Sticker 5" className="w-8 h-8" />
                               </button>
-                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742821.png')} className="p-1 hover:bg-gray-600 rounded">
+                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742821.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
                                 <img src="https://cdn-icons-png.flaticon.com/128/742/742821.png" alt="Sticker 6" className="w-8 h-8" />
                               </button>
-                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742752.png')} className="p-1 hover:bg-gray-600 rounded">
+                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742752.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
                                 <img src="https://cdn-icons-png.flaticon.com/128/742/742752.png" alt="Sticker 7" className="w-8 h-8" />
                               </button>
-                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742920.png')} className="p-1 hover:bg-gray-600 rounded">
+                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742920.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
                                 <img src="https://cdn-icons-png.flaticon.com/128/742/742920.png" alt="Sticker 8" className="w-8 h-8" />
                               </button>
                             </div>
@@ -1006,7 +1006,7 @@ export default function ChapterReader() {
                   {comment.has_replies && comment.replies && comment.replies.length > 0 && (
                     <div className="mt-3 pl-4 border-l-2 border-gray-600 space-y-3">
                       {comment.replies.map((reply) => (
-                        <div key={reply.id} className="bg-gray-800 rounded p-2">
+                        <div key={reply.id} className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'} rounded p-2 ${theme === 'dark' ? '' : 'border border-gray-300'}`}>
                           <div className="flex items-center">
                             <div className="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center mr-2">
                               {reply.user && reply.user.avatar ? (
