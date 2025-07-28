@@ -79,11 +79,16 @@ export default function ChapterReader() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [comments, setComments] = useState<Comment[]>([]);
+  const [totalComments, setTotalComments] = useState(0);
   const [commentHtml, setCommentHtml] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedStickers, setSelectedStickers] = useState<string[]>([]);
   const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [gifSearchTerm, setGifSearchTerm] = useState("");
+  const [gifResults, setGifResults] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState("trending");
   // const [readingMode, setReadingMode] = useState<"vertical" | "horizontal">("vertical");
   const [showBottomNav, setShowBottomNav] = useState(false);
   const [allChapters, setAllChapters] = useState<ChapterSummary[]>([]);
@@ -91,6 +96,7 @@ export default function ChapterReader() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const stickerPickerRef = useRef<HTMLDivElement>(null);
+  const gifPickerRef = useRef<HTMLDivElement>(null);
   const commentInputRef = useRef<HTMLDivElement>(null);
   const [isMainCommentFocused, setIsMainCommentFocused] = useState(false);
   const [isReplyFocused, setIsReplyFocused] = useState(false);
@@ -107,6 +113,9 @@ export default function ChapterReader() {
       }
       if (stickerPickerRef.current && !stickerPickerRef.current.contains(event.target as Node)) {
         setShowStickerPicker(false);
+      }
+      if (gifPickerRef.current && !gifPickerRef.current.contains(event.target as Node)) {
+        setShowGifPicker(false);
       }
     }
 
@@ -257,9 +266,21 @@ export default function ChapterReader() {
         try {
           const commentsData = await commentApi.getChapterComments(actualMangaId, chapterId);
           setComments(commentsData);
+          
+          // Lấy tổng số comment của manga
+          try {
+            const totalCommentsData = await commentApi.getMangaComments(actualMangaId);
+            setTotalComments(totalCommentsData.length || 0);
+          } catch (err) {
+            console.error("Failed to fetch total comments:", err);
+            setTotalComments(commentsData.length || 0);
+          }
         } catch (err) {
           console.error("Failed to fetch comments:", err);
         }
+        
+        // Khởi tạo GIFs
+        fetchGifs("trending");
       } catch (err) {
         console.error("Failed to fetch chapter:", err);
         setError("Không thể tải chapter. Vui lòng thử lại sau.");
@@ -399,13 +420,20 @@ export default function ChapterReader() {
     const div = document.createElement("div");
     div.innerHTML = html;
     const stickers: string[] = [];
+    
+    // Lọc bỏ placeholder text nếu có
+    const placeholders = ["Viết bình luận của bạn...", "Viết trả lời của bạn..."];
+    
     // Lấy text, thay img bằng placeholder nếu muốn
     const walker = document.createTreeWalker(div, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, null);
     let text = "";
     let node: Node | null;
     while ((node = walker.nextNode())) {
       if (node.nodeType === Node.TEXT_NODE) {
-        text += node.textContent;
+        const content = node.textContent?.trim() || "";
+        if (!placeholders.includes(content)) {
+          text += node.textContent;
+        }
       } else if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === "IMG") {
         const url = (node as HTMLImageElement).src;
         stickers.push(url);
@@ -418,7 +446,13 @@ export default function ChapterReader() {
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     const { text, stickers } = extractStickersAndTextFromHtml(commentHtml);
-    if (!text && stickers.length === 0) return;
+    
+    // Kiểm tra nếu không có nội dung thực sự hoặc sticker
+    const placeholders = ["Viết bình luận của bạn...", "Viết trả lời của bạn..."];
+    const hasRealText = text && !placeholders.includes(text.trim());
+    
+    if (!hasRealText && stickers.length === 0) return;
+    
     try {
       setIsSubmitting(true);
       let newComment: any;
@@ -426,7 +460,7 @@ export default function ChapterReader() {
         newComment = await commentApi.replyToComment(
           chapterId,
           replyingTo.id,
-          text,
+          hasRealText ? text : "",  // Chỉ gửi text nếu có nội dung thực sự
           stickers.length > 0 ? stickers : undefined,
           mangaId
         );
@@ -446,7 +480,7 @@ export default function ChapterReader() {
         newComment = await commentApi.addChapterComment(
           mangaId,
           chapterId,
-          text,
+          hasRealText ? text : "",  // Chỉ gửi text nếu có nội dung thực sự
           stickers.length > 0 ? stickers : undefined
         );
         setComments([newComment, ...comments]);
@@ -455,6 +489,7 @@ export default function ChapterReader() {
       if (commentInputRef.current) commentInputRef.current.innerHTML = "";
       setReplyingTo(null);
       setShowStickerPicker(false);
+      setShowGifPicker(false);
     } catch (err) {
       console.error("Failed to submit comment:", err);
       alert("Không thể gửi bình luận. Vui lòng thử lại sau.");
@@ -464,7 +499,12 @@ export default function ChapterReader() {
   };
 
   const renderCommentContent = (content: string) => {
-    if (!content) return null;
+    if (!content || content.trim() === "") return null;
+    
+    // Kiểm tra nếu nội dung chỉ chứa placeholder
+    const placeholders = ["Viết bình luận của bạn...", "Viết trả lời của bạn..."];
+    if (placeholders.includes(content.trim())) return null;
+    
     const regex = /\[sticker:(.*?)\]/g;
     const parts: (JSX.Element | string)[] = [];
     let lastIndex = 0;
@@ -472,7 +512,10 @@ export default function ChapterReader() {
     let key = 0;
     while ((match = regex.exec(content)) !== null) {
       if (match.index > lastIndex) {
-        parts.push(<span key={key++}>{content.substring(lastIndex, match.index)}</span>);
+        const textPart = content.substring(lastIndex, match.index).trim();
+        if (textPart && !placeholders.includes(textPart)) {
+          parts.push(<span key={key++}>{textPart}</span>);
+        }
       }
       if (match[1]) {
         parts.push(<img key={key++} src={match[1]} alt="Sticker" className="inline h-8 w-8 align-middle mx-1" />);
@@ -480,9 +523,12 @@ export default function ChapterReader() {
       lastIndex = regex.lastIndex;
     }
     if (lastIndex < content.length) {
-      parts.push(<span key={key++}>{content.substring(lastIndex)}</span>);
+      const remainingText = content.substring(lastIndex).trim();
+      if (remainingText && !placeholders.includes(remainingText)) {
+        parts.push(<span key={key++}>{remainingText}</span>);
+      }
     }
-    return parts;
+    return parts.length > 0 ? parts : null;
   };
 
   const handleReplyToComment = (comment: Comment) => {
@@ -535,6 +581,76 @@ export default function ChapterReader() {
 
     return result;
   };
+
+  // Hàm để lấy GIFs từ API
+  const fetchGifs = async (category: string = "trending", search: string = "") => {
+    try {
+      const apiKey = process.env.API_KEY_TENOR;
+      const limit = 15;
+      let url = "";
+      
+      if (search) {
+        url = `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(search)}&key=${apiKey}&limit=${limit}`;
+      } else if (category === "trending") {
+        url = `https://tenor.googleapis.com/v2/featured?key=${apiKey}&limit=${limit}`;
+      } else {
+        // Các category đặc biệt
+        let searchTerm = "";
+        switch(category) {
+          case "qoobee":
+            searchTerm = "qoobee agapi";
+            break;
+          case "capoo":
+            searchTerm = "capoo cat";
+            break;
+          case "pepe":
+            searchTerm = "pepe frog funny";
+            break;
+          case "onion":
+            searchTerm = "onion head";
+            break;
+          case "anime":
+            searchTerm = "anime reaction";
+            break;
+          case "reactions":
+            searchTerm = "reaction gif";
+            break;
+          default:
+            searchTerm = category;
+        }
+        url = `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(searchTerm)}&key=${apiKey}&limit=${limit}`;
+      }
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data && data.results) {
+        const gifs = data.results.map((item: any) => {
+          // Lấy URL của GIF từ kết quả API
+          return item.media_formats.gif.url;
+        });
+        setGifResults(gifs);
+      } else {
+        setGifResults([]);
+      }
+    } catch (error) {
+      console.error("Error fetching GIFs:", error);
+      setGifResults([]);
+    }
+  };
+
+  // Hàm xử lý khi chọn GIF
+  const handleSelectGif = (gifUrl: string) => {
+    insertStickerAtCursor(gifUrl);
+    setShowGifPicker(false);
+  };
+
+  // Khởi tạo GIFs khi component mount
+  useEffect(() => {
+    if (gifResults.length === 0) {
+      fetchGifs("trending");
+    }
+  }, [gifResults.length]);
 
   if (isLoading) {
     return (
@@ -727,7 +843,12 @@ export default function ChapterReader() {
 
       {/* Comments Section */}
       <div className="mt-8">
-        <h2 className={`text-xl font-bold mb-4 pb-2 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-300'}`}>Bình luận</h2>
+        <h2 className={`text-xl font-bold mb-4 pb-2 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-300'} flex items-center justify-between`}>
+          <div>
+            Bình luận 
+            <span className="ml-2 text-sm font-normal text-gray-500">({totalComments})</span>
+          </div>
+        </h2>
         <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white border border-gray-200'} rounded p-4`}>
           {/* Form bình luận tổng luôn ở đầu */}
           {isAuthenticated ? (
@@ -769,52 +890,192 @@ export default function ChapterReader() {
                   {commentHtml === "" && !isMainCommentFocused && <span className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} absolute left-3 top-3 opacity-70`}>Viết bình luận của bạn...</span>}
                 </div>
                 <div className="mt-2 flex justify-between items-center">
-                  <div className="relative" ref={stickerPickerRef}>
-                    <button
-                      type="button"
-                      onClick={() => setShowStickerPicker(!showStickerPicker)}
-                      className={`${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'} p-2 rounded`}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-7.536 5.879a1 1 0 001.414 0 3 3 0 014.242 0 1 1 0 001.414-1.414 5 5 0 00-7.07 0 1 1 0 000 1.414z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                    {showStickerPicker && !replyingTo && (
-                      <div className={`block p-2 ${theme === 'dark' ? 'bg-gray-700' : 'bg-white border border-gray-200'} rounded shadow-lg grid grid-cols-4 gap-2`}>
-                        {/* Stickers */}
-                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742760.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
-                          <Image
-                            src="https://cdn-icons-png.flaticon.com/128/742/742760.png"
-                            alt="Sticker 1"
-                            width={32}
-                            height={32}
-                            className="w-8 h-8"
-                          />
-                        </button>
-                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742751.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
-                          <img src="https://cdn-icons-png.flaticon.com/128/742/742751.png" alt="Sticker 2" className="w-8 h-8" />
-                        </button>
-                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742784.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
-                          <img src="https://cdn-icons-png.flaticon.com/128/742/742784.png" alt="Sticker 3" className="w-8 h-8" />
-                        </button>
-                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742750.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
-                          <img src="https://cdn-icons-png.flaticon.com/128/742/742750.png" alt="Sticker 4" className="w-8 h-8" />
-                        </button>
-                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742745.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
-                          <img src="https://cdn-icons-png.flaticon.com/128/742/742745.png" alt="Sticker 5" className="w-8 h-8" />
-                        </button>
-                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742821.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
-                          <img src="https://cdn-icons-png.flaticon.com/128/742/742821.png" alt="Sticker 6" className="w-8 h-8" />
-                        </button>
-                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742752.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
-                          <img src="https://cdn-icons-png.flaticon.com/128/742/742752.png" alt="Sticker 7" className="w-8 h-8" />
-                        </button>
-                        <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742920.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
-                          <img src="https://cdn-icons-png.flaticon.com/128/742/742920.png" alt="Sticker 8" className="w-8 h-8" />
-                        </button>
-                      </div>
-                    )}
+                  <div className="flex space-x-2">
+                    <div className="relative" ref={stickerPickerRef}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowStickerPicker(!showStickerPicker);
+                          setShowGifPicker(false);
+                        }}
+                        className={`${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'} p-2 rounded`}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-7.536 5.879a1 1 0 001.414 0 3 3 0 014.242 0 1 1 0 001.414-1.414 5 5 0 00-7.07 0 1 1 0 000 1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                      {showStickerPicker && !replyingTo && (
+                        <div className={`block p-2 ${theme === 'dark' ? 'bg-gray-700' : 'bg-white border border-gray-200'} rounded shadow-lg grid grid-cols-4 gap-2`}>
+                          {/* Stickers */}
+                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742760.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                            <Image
+                              src="https://cdn-icons-png.flaticon.com/128/742/742760.png"
+                              alt="Sticker 1"
+                              width={32}
+                              height={32}
+                              className="w-8 h-8"
+                            />
+                          </button>
+                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742751.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                            <img src="https://cdn-icons-png.flaticon.com/128/742/742751.png" alt="Sticker 2" className="w-8 h-8" />
+                          </button>
+                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742784.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                            <img src="https://cdn-icons-png.flaticon.com/128/742/742784.png" alt="Sticker 3" className="w-8 h-8" />
+                          </button>
+                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742750.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                            <img src="https://cdn-icons-png.flaticon.com/128/742/742750.png" alt="Sticker 4" className="w-8 h-8" />
+                          </button>
+                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742745.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                            <img src="https://cdn-icons-png.flaticon.com/128/742/742745.png" alt="Sticker 5" className="w-8 h-8" />
+                          </button>
+                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742821.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                            <img src="https://cdn-icons-png.flaticon.com/128/742/742821.png" alt="Sticker 6" className="w-8 h-8" />
+                          </button>
+                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742752.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                            <img src="https://cdn-icons-png.flaticon.com/128/742/742752.png" alt="Sticker 7" className="w-8 h-8" />
+                          </button>
+                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742920.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                            <img src="https://cdn-icons-png.flaticon.com/128/742/742920.png" alt="Sticker 8" className="w-8 h-8" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* GIF Picker Button */}
+                    <div className="relative" ref={gifPickerRef}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowGifPicker(!showGifPicker);
+                          setShowStickerPicker(false);
+                        }}
+                        className={`${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'} p-2 rounded`}
+                      >
+                        <span className="font-bold">GIF</span>
+                      </button>
+                      
+                      {showGifPicker && !replyingTo && (
+                        <div className={`block p-2 ${theme === 'dark' ? 'bg-gray-700' : 'bg-white border border-gray-200'} rounded shadow-lg absolute z-10 left-0 w-[300px]`}>
+                          {/* GIF Search */}
+                          <div className="mb-2">
+                            <input 
+                              type="text" 
+                              placeholder="Tìm kiếm GIF..."
+                              value={gifSearchTerm}
+                              onChange={(e) => setGifSearchTerm(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  fetchGifs(selectedCategory, gifSearchTerm);
+                                }
+                              }}
+                              className={`w-full p-2 rounded ${theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-800'} mb-2`}
+                            />
+                          </div>
+                          
+                          {/* GIF Categories */}
+                          <div className="flex mb-2 space-x-2 flex-wrap gap-y-2">
+                            <button 
+                              onClick={() => {
+                                setSelectedCategory("trending");
+                                fetchGifs("trending", gifSearchTerm);
+                              }}
+                              className={`px-2 py-1 rounded text-xs ${selectedCategory === "trending" 
+                                ? 'bg-red-600 text-white' 
+                                : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                            >
+                              Xu hướng
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setSelectedCategory("qoobee");
+                                fetchGifs("qoobee", gifSearchTerm);
+                              }}
+                              className={`px-2 py-1 rounded text-xs ${selectedCategory === "qoobee" 
+                                ? 'bg-red-600 text-white' 
+                                : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                            >
+                              Qoobee
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setSelectedCategory("capoo");
+                                fetchGifs("capoo", gifSearchTerm);
+                              }}
+                              className={`px-2 py-1 rounded text-xs ${selectedCategory === "capoo" 
+                                ? 'bg-red-600 text-white' 
+                                : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                            >
+                              Capoo
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setSelectedCategory("pepe");
+                                fetchGifs("pepe", gifSearchTerm);
+                              }}
+                              className={`px-2 py-1 rounded text-xs ${selectedCategory === "pepe" 
+                                ? 'bg-red-600 text-white' 
+                                : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                            >
+                              Pepe
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setSelectedCategory("onion");
+                                fetchGifs("onion", gifSearchTerm);
+                              }}
+                              className={`px-2 py-1 rounded text-xs ${selectedCategory === "onion" 
+                                ? 'bg-red-600 text-white' 
+                                : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                            >
+                              Onion Head
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setSelectedCategory("anime");
+                                fetchGifs("anime", gifSearchTerm);
+                              }}
+                              className={`px-2 py-1 rounded text-xs ${selectedCategory === "anime" 
+                                ? 'bg-red-600 text-white' 
+                                : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                            >
+                              Anime
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setSelectedCategory("reactions");
+                                fetchGifs("reactions", gifSearchTerm);
+                              }}
+                              className={`px-2 py-1 rounded text-xs ${selectedCategory === "reactions" 
+                                ? 'bg-red-600 text-white' 
+                                : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                            >
+                              Biểu cảm
+                            </button>
+                          </div>
+                          
+                          {/* GIF Results */}
+                          <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
+                            {gifResults.map((gif, index) => (
+                              <div 
+                                key={index} 
+                                className="cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => handleSelectGif(gif)}
+                              >
+                                <img src={gif} alt={`GIF ${index}`} className="w-full h-auto rounded" />
+                              </div>
+                            ))}
+                            {gifResults.length === 0 && (
+                              <div className="col-span-2 text-center py-4 text-sm text-gray-500">
+                                Không tìm thấy GIF nào
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                  
                   <button
                     type="submit"
                     disabled={isSubmitting || (!commentHtml.trim() && selectedStickers.length === 0)}
@@ -856,7 +1117,7 @@ export default function ChapterReader() {
                         )}
                       </div>
                       <div>
-                        <p className="font-medium text-sm">{comment.user ? comment.user.username : 'Unknown User'}</p>
+                        <p className="font-medium text-sm">{comment.user ? comment.user.username : 'Unknown User'} <span className="text-blue-500 text-xs">Chapter {chapter?.number}</span></p>
                         <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                           {new Date(comment.createdAt).toLocaleDateString()}
                         </p>
@@ -939,52 +1200,191 @@ export default function ChapterReader() {
                         {commentHtml === "" && !isReplyFocused && <span className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} absolute left-3 top-3 opacity-70 pointer-events-none`}>Viết trả lời của bạn...</span>}
                       </div>
                       <div className="mt-2 flex justify-between items-center">
-                        <div className="relative" ref={stickerPickerRef}>
-                          <button
-                            type="button"
-                            onClick={() => setShowStickerPicker(!showStickerPicker)}
-                            className={`${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} ${theme === 'dark' ? 'text-white' : 'text-gray-800'} p-2 rounded`}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-7.536 5.879a1 1 0 001.414 0 3 3 0 014.242 0 1 1 0 001.414-1.414 5 5 0 00-7.07 0 1 1 0 000 1.414z" clipRule="evenodd" />
-                            </svg>
-                          </button>
-                          {showStickerPicker && (
-                            <div className={`block p-2 ${theme === 'dark' ? 'bg-gray-700' : 'bg-white border border-gray-200'} rounded shadow-lg grid grid-cols-4 gap-2`}>
-                              {/* Stickers */}
-                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742760.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
-                                <Image
-                                  src="https://cdn-icons-png.flaticon.com/128/742/742760.png"
-                                  alt="Sticker 1"
-                                  width={32}
-                                  height={32}
-                                  className="w-8 h-8"
-                                />
-                              </button>
-                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742751.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
-                                <img src="https://cdn-icons-png.flaticon.com/128/742/742751.png" alt="Sticker 2" className="w-8 h-8" />
-                              </button>
-                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742784.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
-                                <img src="https://cdn-icons-png.flaticon.com/128/742/742784.png" alt="Sticker 3" className="w-8 h-8" />
-                              </button>
-                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742750.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
-                                <img src="https://cdn-icons-png.flaticon.com/128/742/742750.png" alt="Sticker 4" className="w-8 h-8" />
-                              </button>
-                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742745.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
-                                <img src="https://cdn-icons-png.flaticon.com/128/742/742745.png" alt="Sticker 5" className="w-8 h-8" />
-                              </button>
-                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742821.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
-                                <img src="https://cdn-icons-png.flaticon.com/128/742/742821.png" alt="Sticker 6" className="w-8 h-8" />
-                              </button>
-                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742752.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
-                                <img src="https://cdn-icons-png.flaticon.com/128/742/742752.png" alt="Sticker 7" className="w-8 h-8" />
-                              </button>
-                              <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742920.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
-                                <img src="https://cdn-icons-png.flaticon.com/128/742/742920.png" alt="Sticker 8" className="w-8 h-8" />
-                              </button>
-                            </div>
-                          )}
+                        <div className="flex space-x-2">
+                          <div className="relative" ref={stickerPickerRef}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowStickerPicker(!showStickerPicker);
+                                setShowGifPicker(false);
+                              }}
+                              className={`${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} ${theme === 'dark' ? 'text-white' : 'text-gray-800'} p-2 rounded`}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-7.536 5.879a1 1 0 001.414 0 3 3 0 014.242 0 1 1 0 001.414-1.414 5 5 0 00-7.07 0 1 1 0 000 1.414z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                            {showStickerPicker && (
+                              <div className={`block p-2 ${theme === 'dark' ? 'bg-gray-700' : 'bg-white border border-gray-200'} rounded shadow-lg grid grid-cols-4 gap-2`}>
+                                {/* Stickers */}
+                                <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742760.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                                  <Image
+                                    src="https://cdn-icons-png.flaticon.com/128/742/742760.png"
+                                    alt="Sticker 1"
+                                    width={32}
+                                    height={32}
+                                    className="w-8 h-8"
+                                  />
+                                </button>
+                                <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742751.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                                  <img src="https://cdn-icons-png.flaticon.com/128/742/742751.png" alt="Sticker 2" className="w-8 h-8" />
+                                </button>
+                                <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742784.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                                  <img src="https://cdn-icons-png.flaticon.com/128/742/742784.png" alt="Sticker 3" className="w-8 h-8" />
+                                </button>
+                                <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742750.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                                  <img src="https://cdn-icons-png.flaticon.com/128/742/742750.png" alt="Sticker 4" className="w-8 h-8" />
+                                </button>
+                                <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742745.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                                  <img src="https://cdn-icons-png.flaticon.com/128/742/742745.png" alt="Sticker 5" className="w-8 h-8" />
+                                </button>
+                                <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742821.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                                  <img src="https://cdn-icons-png.flaticon.com/128/742/742821.png" alt="Sticker 6" className="w-8 h-8" />
+                                </button>
+                                <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742752.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                                  <img src="https://cdn-icons-png.flaticon.com/128/742/742752.png" alt="Sticker 7" className="w-8 h-8" />
+                                </button>
+                                <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742920.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                                  <img src="https://cdn-icons-png.flaticon.com/128/742/742920.png" alt="Sticker 8" className="w-8 h-8" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {/* GIF Picker Button for Reply */}
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowGifPicker(!showGifPicker);
+                                setShowStickerPicker(false);
+                              }}
+                              className={`${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} ${theme === 'dark' ? 'text-white' : 'text-gray-800'} p-2 rounded`}
+                            >
+                              <span className="font-bold">GIF</span>
+                            </button>
+                            
+                            {showGifPicker && (
+                              <div className={`block p-2 ${theme === 'dark' ? 'bg-gray-700' : 'bg-white border border-gray-200'} rounded shadow-lg absolute z-10 left-0 w-[300px]`}>
+                                {/* GIF Search */}
+                                <div className="mb-2">
+                                  <input 
+                                    type="text" 
+                                    placeholder="Tìm kiếm GIF..."
+                                    value={gifSearchTerm}
+                                    onChange={(e) => setGifSearchTerm(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        fetchGifs(selectedCategory, gifSearchTerm);
+                                      }
+                                    }}
+                                    className={`w-full p-2 rounded ${theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-800'} mb-2`}
+                                  />
+                                </div>
+                                
+                                {/* GIF Categories */}
+                                <div className="flex mb-2 space-x-2 flex-wrap gap-y-2">
+                                  <button 
+                                    onClick={() => {
+                                      setSelectedCategory("trending");
+                                      fetchGifs("trending", gifSearchTerm);
+                                    }}
+                                    className={`px-2 py-1 rounded text-xs ${selectedCategory === "trending" 
+                                      ? 'bg-red-600 text-white' 
+                                      : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                                  >
+                                    Xu hướng
+                                  </button>
+                                  <button 
+                                    onClick={() => {
+                                      setSelectedCategory("qoobee");
+                                      fetchGifs("qoobee", gifSearchTerm);
+                                    }}
+                                    className={`px-2 py-1 rounded text-xs ${selectedCategory === "qoobee" 
+                                      ? 'bg-red-600 text-white' 
+                                      : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                                  >
+                                    Qoobee
+                                  </button>
+                                  <button 
+                                    onClick={() => {
+                                      setSelectedCategory("capoo");
+                                      fetchGifs("capoo", gifSearchTerm);
+                                    }}
+                                    className={`px-2 py-1 rounded text-xs ${selectedCategory === "capoo" 
+                                      ? 'bg-red-600 text-white' 
+                                      : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                                  >
+                                    Capoo
+                                  </button>
+                                  <button 
+                                    onClick={() => {
+                                      setSelectedCategory("pepe");
+                                      fetchGifs("pepe", gifSearchTerm);
+                                    }}
+                                    className={`px-2 py-1 rounded text-xs ${selectedCategory === "pepe" 
+                                      ? 'bg-red-600 text-white' 
+                                      : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                                  >
+                                    Pepe
+                                  </button>
+                                  <button 
+                                    onClick={() => {
+                                      setSelectedCategory("onion");
+                                      fetchGifs("onion", gifSearchTerm);
+                                    }}
+                                    className={`px-2 py-1 rounded text-xs ${selectedCategory === "onion" 
+                                      ? 'bg-red-600 text-white' 
+                                      : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                                  >
+                                    Onion Head
+                                  </button>
+                                  <button 
+                                    onClick={() => {
+                                      setSelectedCategory("anime");
+                                      fetchGifs("anime", gifSearchTerm);
+                                    }}
+                                    className={`px-2 py-1 rounded text-xs ${selectedCategory === "anime" 
+                                      ? 'bg-red-600 text-white' 
+                                      : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                                  >
+                                    Anime
+                                  </button>
+                                  <button 
+                                    onClick={() => {
+                                      setSelectedCategory("reactions");
+                                      fetchGifs("reactions", gifSearchTerm);
+                                    }}
+                                    className={`px-2 py-1 rounded text-xs ${selectedCategory === "reactions" 
+                                      ? 'bg-red-600 text-white' 
+                                      : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                                  >
+                                    Biểu cảm
+                                  </button>
+                                </div>
+                                
+                                {/* GIF Results */}
+                                <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
+                                  {gifResults.map((gif, index) => (
+                                    <div 
+                                      key={index} 
+                                      className="cursor-pointer hover:opacity-80 transition-opacity"
+                                      onClick={() => handleSelectGif(gif)}
+                                    >
+                                      <img src={gif} alt={`GIF ${index}`} className="w-full h-auto rounded" />
+                                    </div>
+                                  ))}
+                                  {gifResults.length === 0 && (
+                                    <div className="col-span-2 text-center py-4 text-sm text-gray-500">
+                                      Không tìm thấy GIF nào
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
+                        
                         <button
                           type="submit"
                           disabled={isSubmitting || (!commentHtml.trim() && selectedStickers.length === 0)}
@@ -1022,7 +1422,7 @@ export default function ChapterReader() {
                               )}
                             </div>
                             <div>
-                              <p className="font-medium text-xs">{reply.user ? reply.user.username : 'Unknown User'}</p>
+                              <p className="font-medium text-xs">{reply.user ? reply.user.username : 'Unknown User'} <span className="text-blue-500 text-xs">Chapter {chapter?.number}</span></p>
                               <p className="text-xs text-gray-400">
                                 {new Date(reply.createdAt).toLocaleDateString()}
                               </p>
