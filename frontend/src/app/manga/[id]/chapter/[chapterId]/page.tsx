@@ -98,6 +98,8 @@ export default function ChapterReader() {
   const stickerPickerRef = useRef<HTMLDivElement>(null);
   const gifPickerRef = useRef<HTMLDivElement>(null);
   const commentInputRef = useRef<HTMLDivElement>(null);
+  const replyCommentInputRef = useRef<HTMLDivElement>(null);
+  const replyToReplyCommentInputRef = useRef<HTMLDivElement>(null);
   const [isMainCommentFocused, setIsMainCommentFocused] = useState(false);
   const [isReplyFocused, setIsReplyFocused] = useState(false);
   const [showTopNav, setShowTopNav] = useState(true);
@@ -327,7 +329,14 @@ export default function ChapterReader() {
   }, [mangaId, chapterId, isAuthenticated]);
 
   const insertStickerAtCursor = (stickerUrl: string) => {
-    const el = commentInputRef.current;
+    // Xác định input nào đang được sử dụng dựa vào trạng thái reply
+    let el = commentInputRef.current;
+    if (replyingTo && !replyingToReply) {
+      el = replyCommentInputRef.current;
+    } else if (replyingToReply) {
+      el = replyToReplyCommentInputRef.current;
+    }
+    
     if (!el) return;
     el.focus();
 
@@ -389,6 +398,10 @@ export default function ChapterReader() {
 
   const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
     setCommentHtml(e.currentTarget.innerHTML);
+    // Kiểm tra nếu nội dung rỗng hoặc chỉ có khoảng trắng
+    if (!e.currentTarget.textContent?.trim()) {
+      setIsReplyFocused(false); // Đặt lại trạng thái focus khi nội dung rỗng
+    }
   };
 
   const extractStickersAndTextFromHtml = (html: string): {text: string, stickers: string[]} => {
@@ -437,13 +450,17 @@ export default function ChapterReader() {
       if (replyingToReply) {
         // Tìm comment gốc dựa vào commentId trong replyingToReply
         const parentComment = comments.find(c => c.id === replyingToReply.commentId);
+        // Tìm reply được trả lời
+        const targetReply = parentComment?.replies?.find(r => r.id === replyingToReply.replyId);
+        const replyToUsername = targetReply?.user?.username || 
+                               (targetReply?.user_id ? getUserInfo(targetReply.user_id).username : "Unknown");
 
         if (parentComment) {
           // Tạo reply comment với parent_id là ID của comment gốc (không phải ID của reply)
           newComment = await commentApi.addChapterComment(
             mangaId,
             chapterId,
-            hasRealText ? text : "",
+            hasRealText ? `@${replyToUsername} ${text}` : `@${replyToUsername}`,
             stickers.length > 0 ? stickers : undefined,
             parentComment.id // Truyền parent_id là ID của comment gốc
           );
@@ -475,11 +492,15 @@ export default function ChapterReader() {
       }
       // Trường hợp 2: Đang trả lời comment gốc (replyingTo có giá trị)
       else if (replyingTo) {
+        // Lấy username của người được trả lời
+        const replyToUsername = replyingTo.user?.username || 
+                               (replyingTo.user_id ? getUserInfo(replyingTo.user_id).username : "Unknown");
+        
         // Tạo reply comment
         newComment = await commentApi.addChapterComment(
           mangaId,
           chapterId,
-          hasRealText ? text : "",
+          hasRealText ? `@${replyToUsername} ${text}` : `@${replyToUsername}`,
           stickers.length > 0 ? stickers : undefined,
           replyingTo.id // Truyền parent_id trực tiếp qua tham số
         );
@@ -532,6 +553,8 @@ export default function ChapterReader() {
       // Reset form
       setCommentHtml("");
       if (commentInputRef.current) commentInputRef.current.innerHTML = "";
+      if (replyCommentInputRef.current) replyCommentInputRef.current.innerHTML = "";
+      if (replyToReplyCommentInputRef.current) replyToReplyCommentInputRef.current.innerHTML = "";
       setReplyingTo(null);
       setReplyingToReply(null);
       setShowStickerPicker(false);
@@ -544,20 +567,26 @@ export default function ChapterReader() {
     }
   };
 
-  const renderCommentContent = (content: string) => {
+  const renderCommentContent = (content: string, isReply: boolean = false) => {
     if (!content || content.trim() === "") return null;
 
     const placeholders = ["Viết bình luận của bạn...", "Viết trả lời của bạn..."];
     if (placeholders.includes(content.trim())) return null;
+
+    // Nếu là reply, xóa @mention từ nội dung
+    let processedContent = content;
+    if (isReply) {
+      processedContent = content.replace(/@[a-zA-Z0-9_]+ /, '');
+    }
 
     const regex = /\[sticker:(.*?)\]/g;
     const parts: (JSX.Element | string)[] = [];
     let lastIndex = 0;
     let match;
     let key = 0;
-    while ((match = regex.exec(content)) !== null) {
+    while ((match = regex.exec(processedContent)) !== null) {
       if (match.index > lastIndex) {
-        const textPart = content.substring(lastIndex, match.index).trim();
+        const textPart = processedContent.substring(lastIndex, match.index).trim();
         if (textPart && !placeholders.includes(textPart)) {
           parts.push(<span key={key++}>{textPart}</span>);
         }
@@ -567,8 +596,8 @@ export default function ChapterReader() {
       }
       lastIndex = regex.lastIndex;
     }
-    if (lastIndex < content.length) {
-      const remainingText = content.substring(lastIndex).trim();
+    if (lastIndex < processedContent.length) {
+      const remainingText = processedContent.substring(lastIndex).trim();
       if (remainingText && !placeholders.includes(remainingText)) {
         parts.push(<span key={key++}>{remainingText}</span>);
       }
@@ -690,11 +719,53 @@ export default function ChapterReader() {
       };
     }
 
+    // Tìm user trong danh sách comments
+    for (const comment of comments) {
+      if (comment.user && comment.user.id === userId) {
+        return {
+          id: comment.user.id,
+          username: comment.user.username || 'User',
+          avatar: comment.user.avatar
+        };
+      }
+      
+      // Tìm trong replies
+      if (comment.replies) {
+        for (const reply of comment.replies) {
+          if (reply.user && reply.user.id === userId) {
+            return {
+              id: reply.user.id,
+              username: reply.user.username || 'User',
+              avatar: reply.user.avatar
+            };
+          }
+        }
+      }
+    }
+
     return {
       id: userId,
       username: 'User',
       avatar: undefined
     };
+  };
+
+  const onBlurHandler = () => {
+    // Kiểm tra nếu nội dung rỗng hoặc chỉ có khoảng trắng
+    if (!commentHtml.trim() || 
+        (commentInputRef.current && !commentInputRef.current.textContent?.trim()) ||
+        (replyCommentInputRef.current && !replyCommentInputRef.current.textContent?.trim()) ||
+        (replyToReplyCommentInputRef.current && !replyToReplyCommentInputRef.current.textContent?.trim())) {
+      
+      // Xác định input nào đang được sử dụng dựa vào trạng thái reply
+      if (replyingTo && !replyingToReply) {
+        setIsReplyFocused(false);
+      } else if (replyingToReply) {
+        setIsReplyFocused(false);
+      } else {
+        setIsMainCommentFocused(false);
+      }
+    }
   };
 
   if (isLoading) {
@@ -926,11 +997,7 @@ export default function ChapterReader() {
                       focusContentEditableForMobile(commentInputRef.current);
                     }
                   }}
-                  onBlur={() => {
-                    if (!commentHtml.trim()) {
-                      setIsMainCommentFocused(false);
-                    }
-                  }}
+                  onBlur={onBlurHandler}
                 >
                   {commentHtml === "" && !isMainCommentFocused && <span className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} absolute left-3 top-3 opacity-70`}>Viết bình luận của bạn...</span>}
                 </div>
@@ -1123,7 +1190,7 @@ export default function ChapterReader() {
 
                   <button
                     type="submit"
-                    disabled={isSubmitting || (!commentHtml.trim() && selectedStickers.length === 0)}
+                    disabled={isSubmitting || ((!commentHtml.trim() || !commentInputRef.current?.textContent?.trim()) && selectedStickers.length === 0)}
                     className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSubmitting && (
@@ -1148,19 +1215,30 @@ export default function ChapterReader() {
                 <div key={comment.id} className="mb-4 flex">
                   {/* Avatar nằm ngoài khung comment */}
                   <div className="mr-3 flex-shrink-0">
-                    <div className={`w-10 h-10 rounded-full ${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'} flex items-center justify-center overflow-hidden`}>
-                      {comment.user && comment.user.avatar ? (
-                        <Image
-                          src={comment.user.avatar}
-                          alt={comment.user.username || 'User'}
-                          width={40}
-                          height={40}
-                          className="rounded-full w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-center font-medium">{comment.user && comment.user.username ? comment.user.username.charAt(0).toUpperCase() : (comment.user_id ? getUserInfo(comment.user_id).username.charAt(0).toUpperCase() : '?')}</span>
-                      )}
-                    </div>
+                    {(() => {
+                      const username = comment.user ? comment.user.username : (comment.user_id ? getUserInfo(comment.user_id).username : 'User');
+                      const firstChar = username.charAt(0).toUpperCase();
+                      // Tạo màu ngẫu nhiên nhưng nhất quán dựa trên tên người dùng
+                      const colors = ['bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-red-500', 'bg-purple-500', 'bg-pink-500', 'bg-indigo-500'];
+                      const colorIndex = username.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0) % colors.length;
+                      const bgColor = colors[colorIndex];
+                      
+                      return (
+                        <div className={`w-10 h-10 rounded-full ${bgColor} flex items-center justify-center overflow-hidden`}>
+                          {comment.user && comment.user.avatar ? (
+                            <Image
+                              src={comment.user.avatar}
+                              alt={comment.user.username || 'User'}
+                              width={40}
+                              height={40}
+                              className="rounded-full w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-center font-medium text-white">{firstChar}</span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Nội dung comment */}
@@ -1233,7 +1311,7 @@ export default function ChapterReader() {
                             </div>
                           )}
                           <div
-                            ref={commentInputRef}
+                            ref={replyCommentInputRef}
                             className={`w-full ${theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-800'} rounded p-3 focus:outline-none focus:ring-1 focus:ring-red-500 min-h-[60px] relative ${theme === 'dark' ? '' : 'border border-gray-300'}`}
                             contentEditable
                             onInput={handleInput}
@@ -1241,14 +1319,10 @@ export default function ChapterReader() {
                             onFocus={() => {
                               setIsReplyFocused(true);
                               if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-                                focusContentEditableForMobile(commentInputRef.current);
+                                focusContentEditableForMobile(replyCommentInputRef.current);
                               }
                             }}
-                            onBlur={() => {
-                              if (!commentHtml.trim()) {
-                                setIsReplyFocused(false);
-                              }
-                            }}
+                            onBlur={onBlurHandler}
                           >
                             {commentHtml === "" && !isReplyFocused && <span className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} absolute left-3 top-3 opacity-70 pointer-events-none`}>Viết trả lời của bạn...</span>}
                           </div>
@@ -1303,8 +1377,8 @@ export default function ChapterReader() {
                                   </div>
                                 )}
                               </div>
-                              {/* GIF Picker Button for Reply */}
-                              <div className="relative">
+                              
+                              <div className="relative" ref={gifPickerRef}>
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1315,9 +1389,8 @@ export default function ChapterReader() {
                                 >
                                   <span className="font-bold">GIF</span>
                                 </button>
-
                                 {showGifPicker && (
-                                  <div className={`block p-2 ${theme === 'dark' ? 'bg-gray-700' : 'bg-white border border-gray-200'} rounded shadow-lg absolute z-10 left-0 w-[300px]`}>
+                                  <div className={`block p-2 ${theme === 'dark' ? 'bg-gray-700' : 'bg-white border border-gray-200'} rounded shadow-lg absolute z-50 bottom-full left-0 mb-2 w-[300px]`}>
                                     {/* GIF Search */}
                                     <div className="mb-2">
                                       <input
@@ -1437,10 +1510,10 @@ export default function ChapterReader() {
                                 )}
                               </div>
                             </div>
-
+                            
                             <button
                               type="submit"
-                              disabled={isSubmitting || (!commentHtml.trim() && selectedStickers.length === 0)}
+                              disabled={isSubmitting || ((!commentHtml.trim() || !commentInputRef.current?.textContent?.trim()) && selectedStickers.length === 0)}
                               className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {isSubmitting && (
@@ -1463,29 +1536,40 @@ export default function ChapterReader() {
                           <div key={reply.id} className="flex">
                             {/* Avatar của reply */}
                             <div className="mr-2 flex-shrink-0">
-                              <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center overflow-hidden">
-                                {reply.user && reply.user.avatar ? (
-                                  <Image
-                                    src={reply.user.avatar}
-                                    alt={reply.user.username || 'User'}
-                                    width={32}
-                                    height={32}
-                                    className="rounded-full w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  reply.user_id && getUserInfo(reply.user_id).avatar ? (
-                                    <Image
-                                      src={getUserInfo(reply.user_id).avatar}
-                                      alt={getUserInfo(reply.user_id).username || 'User'}
-                                      width={32}
-                                      height={32}
-                                      className="rounded-full w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <span className="text-xs">{reply.user && reply.user.username ? reply.user.username.charAt(0).toUpperCase() : (reply.user_id ? getUserInfo(reply.user_id).username.charAt(0).toUpperCase() : '?')}</span>
-                                  )
-                                )}
-                              </div>
+                              {(() => {
+                                const username = reply.user ? reply.user.username : (reply.user_id ? getUserInfo(reply.user_id).username : 'User');
+                                const firstChar = username.charAt(0).toUpperCase();
+                                // Tạo màu ngẫu nhiên nhưng nhất quán dựa trên tên người dùng
+                                const colors = ['bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-red-500', 'bg-purple-500', 'bg-pink-500', 'bg-indigo-500'];
+                                const colorIndex = username.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0) % colors.length;
+                                const bgColor = colors[colorIndex];
+                                
+                                return (
+                                  <div className={`w-8 h-8 rounded-full ${bgColor} flex items-center justify-center overflow-hidden`}>
+                                    {reply.user && reply.user.avatar ? (
+                                      <Image
+                                        src={reply.user.avatar}
+                                        alt={reply.user.username || 'User'}
+                                        width={32}
+                                        height={32}
+                                        className="rounded-full w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      reply.user_id && getUserInfo(reply.user_id).avatar ? (
+                                        <Image
+                                          src={getUserInfo(reply.user_id).avatar}
+                                          alt={getUserInfo(reply.user_id).username || 'User'}
+                                          width={32}
+                                          height={32}
+                                          className="rounded-full w-full h-full object-cover"
+                                        />
+                                      ) : (
+                                        <span className="text-xs text-white font-medium">{firstChar}</span>
+                                      )
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </div>
 
                             {/* Nội dung reply */}
@@ -1512,27 +1596,40 @@ export default function ChapterReader() {
 
                                 {/* Hiển thị tên user cha màu xanh dương ở đầu reply */}
                                 <div className="mt-1">
-                                  <span className="text-blue-500 font-semibold mr-1">@{comment.user?.username}</span>
+                                  {(() => {
+                                    // Trích xuất username từ nội dung reply nếu có @mention
+                                    const mentionMatch = reply.content ? reply.content.match(/@([a-zA-Z0-9_]+)/) : null;
+                                    const mentionedUsername = mentionMatch ? mentionMatch[1] : null;
+                                    
+                                    // Nếu có @mention trong nội dung, hiển thị username từ @mention
+                                    // Nếu không, hiển thị username của comment gốc
+                                    const displayUsername = mentionedUsername || 
+                                      (comment.user?.username || (comment.user_id ? getUserInfo(comment.user_id).username : 'Unknown'));
+                                    
+                                    return (
+                                      <span className="text-blue-500 font-semibold mr-1">@{displayUsername}</span>
+                                    );
+                                  })()}
                                   {Array.isArray(reply.stickers) && reply.stickers.length > 0 ? (
                                     <div className="inline-flex items-center gap-2">
                                       {reply.stickers.map((st, idx) => (
                                         <img key={idx} src={st} alt={`Sticker ${idx}`} className="h-12 w-12" />
                                       ))}
-                                      {reply.content && <span className="text-xs">{renderCommentContent(reply.content)}</span>}
+                                      {reply.content && <span className="text-xs">{renderCommentContent(reply.content, true)}</span>}
                                     </div>
                                   ) : reply.sticker ? (
                                     <img src={reply.sticker} alt="Sticker" className="h-12 w-12 inline-block align-middle" />
                                   ) : (
-                                    <span className="text-xs align-middle">{renderCommentContent(reply.content)}</span>
+                                    <span className="text-xs align-middle">{renderCommentContent(reply.content, true)}</span>
                                   )}
                                 </div>
                               </div>
 
                           {/* Hiển thị form trả lời dưới reply comment nếu đang trả lời reply này */}
                           {isAuthenticated && replyingToReply && replyingToReply.commentId === comment.id && replyingToReply.replyId === reply.id && (
-                            <div className="mt-3 ml-10">
+                            <div className="mt-3 ml-0 w-full">
                               <form onSubmit={handleSubmitComment}>
-                                <div className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-200"} p-2 mb-2 rounded flex justify-between items-center`}>
+                                <div className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-200"} p-2 mb-2 rounded flex justify-between items-center w-full`}>
                                   <div className="text-sm">
                                     Đang trả lời <span className="font-semibold text-blue-500">{reply.user ? reply.user.username : (reply.user_id ? getUserInfo(reply.user_id).username : "Unknown")}</span>
                                   </div>
@@ -1549,23 +1646,205 @@ export default function ChapterReader() {
                                 <div
                                   className={`w-full ${theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-100 text-gray-800"} rounded p-3 focus:outline-none focus:ring-1 focus:ring-red-500 min-h-[60px] relative ${theme === "dark" ? "" : "border border-gray-300"}`}
                                   contentEditable
+                                  ref={replyToReplyCommentInputRef}
                                   onInput={handleInput}
                                   suppressContentEditableWarning={true}
                                   onFocus={() => {
                                     setIsReplyFocused(true);
                                   }}
-                                  onBlur={() => {
-                                    if (!commentHtml.trim()) {
-                                      setIsReplyFocused(false);
-                                    }
-                                  }}
+                                  onBlur={onBlurHandler}
                                 >
                                   {commentHtml === "" && !isReplyFocused && <span className={`${theme === "dark" ? "text-gray-400" : "text-gray-500"} absolute left-3 top-3 opacity-70 pointer-events-none`}>Viết trả lời của bạn...</span>}
                                 </div>
                                 <div className="mt-2 flex justify-between items-center">
+                                  <div className="flex space-x-2">
+                                    <div className="relative" ref={stickerPickerRef}>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setShowStickerPicker(!showStickerPicker);
+                                          setShowGifPicker(false);
+                                        }}
+                                        className={`${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} ${theme === 'dark' ? 'text-white' : 'text-gray-800'} p-2 rounded`}
+                                      >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-7.536 5.879a1 1 0 001.414 0 3 3 0 014.242 0 1 1 0 001.414-1.414 5 5 0 00-7.07 0 1 1 0 000 1.414z" clipRule="evenodd" />
+                                        </svg>
+                                      </button>
+                                      {showStickerPicker && (
+                                        <div className={`block p-2 ${theme === 'dark' ? 'bg-gray-700' : 'bg-white border border-gray-200'} rounded shadow-lg grid grid-cols-4 gap-2`}>
+                                          {/* Stickers */}
+                                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742760.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                                            <Image
+                                              src="https://cdn-icons-png.flaticon.com/128/742/742760.png"
+                                              alt="Sticker 1"
+                                              width={32}
+                                              height={32}
+                                              className="w-8 h-8"
+                                            />
+                                          </button>
+                                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742751.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                                            <img src="https://cdn-icons-png.flaticon.com/128/742/742751.png" alt="Sticker 2" className="w-8 h-8" />
+                                          </button>
+                                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742784.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                                            <img src="https://cdn-icons-png.flaticon.com/128/742/742784.png" alt="Sticker 3" className="w-8 h-8" />
+                                          </button>
+                                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742750.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                                            <img src="https://cdn-icons-png.flaticon.com/128/742/742750.png" alt="Sticker 4" className="w-8 h-8" />
+                                          </button>
+                                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742745.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                                            <img src="https://cdn-icons-png.flaticon.com/128/742/742745.png" alt="Sticker 5" className="w-8 h-8" />
+                                          </button>
+                                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742821.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                                            <img src="https://cdn-icons-png.flaticon.com/128/742/742821.png" alt="Sticker 6" className="w-8 h-8" />
+                                          </button>
+                                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742752.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                                            <img src="https://cdn-icons-png.flaticon.com/128/742/742752.png" alt="Sticker 7" className="w-8 h-8" />
+                                          </button>
+                                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742920.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                                            <img src="https://cdn-icons-png.flaticon.com/128/742/742920.png" alt="Sticker 8" className="w-8 h-8" />
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    <div className="relative" ref={gifPickerRef}>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setShowGifPicker(!showGifPicker);
+                                          setShowStickerPicker(false);
+                                        }}
+                                        className={`${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} ${theme === 'dark' ? 'text-white' : 'text-gray-800'} p-2 rounded`}
+                                      >
+                                        <span className="font-bold">GIF</span>
+                                      </button>
+                                      
+                                      {showGifPicker && (
+                                        <div className={`block p-2 ${theme === 'dark' ? 'bg-gray-700' : 'bg-white border border-gray-200'} rounded shadow-lg absolute z-50 bottom-full left-0 mb-2 w-[300px]`}>
+                                          {/* GIF Search */}
+                                          <div className="mb-2">
+                                            <input
+                                              type="text"
+                                              placeholder="Tìm kiếm GIF..."
+                                              value={gifSearchTerm}
+                                              onChange={(e) => setGifSearchTerm(e.target.value)}
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                  e.preventDefault();
+                                                  fetchGifs(selectedCategory, gifSearchTerm);
+                                                }
+                                              }}
+                                              className={`w-full p-2 rounded ${theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-800'} mb-2`}
+                                            />
+                                          </div>
+
+                                          {/* GIF Categories */}
+                                          <div className="flex mb-2 space-x-2 flex-wrap gap-y-2">
+                                            <button
+                                              onClick={() => {
+                                                setSelectedCategory("trending");
+                                                fetchGifs("trending", gifSearchTerm);
+                                              }}
+                                              className={`px-2 py-1 rounded text-xs ${selectedCategory === "trending"
+                                                ? 'bg-red-600 text-white'
+                                                : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                                            >
+                                              Xu hướng
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                setSelectedCategory("qoobee");
+                                                fetchGifs("qoobee", gifSearchTerm);
+                                              }}
+                                              className={`px-2 py-1 rounded text-xs ${selectedCategory === "qoobee"
+                                                ? 'bg-red-600 text-white'
+                                                : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                                            >
+                                              Qoobee
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                setSelectedCategory("capoo");
+                                                fetchGifs("capoo", gifSearchTerm);
+                                              }}
+                                              className={`px-2 py-1 rounded text-xs ${selectedCategory === "capoo"
+                                                ? 'bg-red-600 text-white'
+                                                : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                                            >
+                                              Capoo
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                setSelectedCategory("pepe");
+                                                fetchGifs("pepe", gifSearchTerm);
+                                              }}
+                                              className={`px-2 py-1 rounded text-xs ${selectedCategory === "pepe"
+                                                ? 'bg-red-600 text-white'
+                                                : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                                            >
+                                              Pepe
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                setSelectedCategory("onion");
+                                                fetchGifs("onion", gifSearchTerm);
+                                              }}
+                                              className={`px-2 py-1 rounded text-xs ${selectedCategory === "onion"
+                                                ? 'bg-red-600 text-white'
+                                                : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                                            >
+                                              Onion Head
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                setSelectedCategory("anime");
+                                                fetchGifs("anime", gifSearchTerm);
+                                              }}
+                                              className={`px-2 py-1 rounded text-xs ${selectedCategory === "anime"
+                                                ? 'bg-red-600 text-white'
+                                                : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                                            >
+                                              Anime
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                setSelectedCategory("reactions");
+                                                fetchGifs("reactions", gifSearchTerm);
+                                              }}
+                                              className={`px-2 py-1 rounded text-xs ${selectedCategory === "reactions"
+                                                ? 'bg-red-600 text-white'
+                                                : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                                            >
+                                              Biểu cảm
+                                            </button>
+                                          </div>
+
+                                          {/* GIF Results */}
+                                          <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
+                                            {gifResults.map((gif, index) => (
+                                              <div
+                                                key={index}
+                                                className="cursor-pointer hover:opacity-80 transition-opacity"
+                                                onClick={() => handleSelectGif(gif)}
+                                              >
+                                                <img src={gif} alt={`GIF ${index}`} className="w-full h-auto rounded" />
+                                              </div>
+                                            ))}
+                                            {gifResults.length === 0 && (
+                                              <div className="col-span-2 text-center py-4 text-sm text-gray-500">
+                                                Không tìm thấy GIF nào
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  
                                   <button
                                     type="submit"
-                                    disabled={isSubmitting || (!commentHtml.trim() && selectedStickers.length === 0)}
+                                    disabled={isSubmitting || ((!commentHtml.trim() || !commentInputRef.current?.textContent?.trim()) && selectedStickers.length === 0)}
                                     className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
                                     {isSubmitting && (
