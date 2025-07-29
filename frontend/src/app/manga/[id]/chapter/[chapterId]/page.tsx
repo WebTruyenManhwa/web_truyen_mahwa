@@ -106,6 +106,8 @@ export default function ChapterReader() {
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isErrorReportOpen, setIsErrorReportOpen] = useState(false);
   const [replyingToReply, setReplyingToReply] = useState<{commentId: number, replyId: number} | null>(null);
+  // Thêm state để theo dõi khi nào hiển thị nút scroll to top
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
 
   const formatTimeAgo = (dateString: string) => {
     const now = new Date();
@@ -153,6 +155,13 @@ export default function ChapterReader() {
 
   useEffect(() => {
     const handleScroll = () => {
+      const scrollY = window.scrollY;
+      const showNavThreshold = 200;
+      const showScrollTopThreshold = 500; // Hiển thị nút khi scroll xuống 500px
+      
+      setShowBottomNav(scrollY > showNavThreshold);
+      setShowScrollToTop(scrollY > showScrollTopThreshold);
+      
       const scrollPosition = window.scrollY;
       const windowHeight = window.innerHeight;
 
@@ -163,8 +172,6 @@ export default function ChapterReader() {
       }
 
       setLastScrollY(scrollPosition);
-
-      setShowBottomNav(scrollPosition > windowHeight * 0.2);
 
       const images = document.querySelectorAll('.chapter-image');
       let currentImageIndex = 0;
@@ -766,6 +773,14 @@ export default function ChapterReader() {
         setIsMainCommentFocused(false);
       }
     }
+  };
+
+  // Hàm để cuộn lên đầu trang
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
   };
 
   if (isLoading) {
@@ -1881,6 +1896,21 @@ export default function ChapterReader() {
         chapterId={chapterId}
         chapterNumber={chapter?.number}
       />
+
+      {/* Scroll to Top Button */}
+      {showScrollToTop && (
+        <div className="fixed bottom-20 right-4">
+          <button
+            onClick={scrollToTop}
+            className={`${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-white hover:bg-gray-100 border border-gray-200'} p-3 rounded-full shadow-lg flex items-center justify-center`}
+            aria-label="Lên đầu trang"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
