@@ -131,7 +131,7 @@ module Api
         end
 
         def comment_params
-          params.require(:comment).permit(:content, :sticker, stickers: [])
+          params.require(:comment).permit(:content, :sticker, :parent_id, stickers: [])
         end
       end
     end
