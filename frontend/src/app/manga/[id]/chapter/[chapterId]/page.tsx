@@ -12,6 +12,8 @@ import { useParams } from "next/navigation";
 import { useTheme } from "../../../../../hooks/useTheme";
 import ThemeToggle from "../../../../../components/ThemeToggle";
 import ErrorReportDialog from "../../../../../components/ErrorReportDialog";
+import { useCommentContext } from "../../../../../contexts/CommentContext";
+import { useActionCableComments } from "../../../../../hooks/useActionCableComments";
 
 interface ChapterImage {
   position: number;
@@ -59,7 +61,8 @@ interface Comment {
   content: string;
   sticker?: string;
   stickers?: string[];
-  createdAt: string;
+  createdAt?: string;
+  created_at?: string;
   has_replies?: boolean;
   replies?: Comment[];
   user?: {
@@ -68,6 +71,10 @@ interface Comment {
     avatar?: string;
   };
   user_id?: number;
+  parent_id?: number;
+  commentable_type?: string;
+  commentable_id?: number;
+  updated_at?: string;
 }
 
 export default function ChapterReader() {
@@ -85,6 +92,7 @@ export default function ChapterReader() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedStickers, setSelectedStickers] = useState<string[]>([]);
   const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
+  const [replyingToReply, setReplyingToReply] = useState<{commentId: number, replyId: number} | null>(null);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [gifSearchTerm, setGifSearchTerm] = useState("");
@@ -105,11 +113,48 @@ export default function ChapterReader() {
   const [showTopNav, setShowTopNav] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isErrorReportOpen, setIsErrorReportOpen] = useState(false);
-  const [replyingToReply, setReplyingToReply] = useState<{commentId: number, replyId: number} | null>(null);
-  // Thêm state để theo dõi khi nào hiển thị nút scroll to top
   const [showScrollToTop, setShowScrollToTop] = useState(false);
+  
+  // Sử dụng CommentContext
+  const { state: commentState, setComments: setContextComments } = useCommentContext();
+  
+  // Kích hoạt socket cho comments
+  const { isConnected } = useActionCableComments({ chapterId });
+  
+  // Đồng bộ comments từ context
+  useEffect(() => {
+    if (commentState.comments.length > 0) {
+      console.log('Using existing comments from context:', commentState.comments);
+      setComments(commentState.comments); // Cập nhật state comments từ context
+    }
+  }, [commentState.comments]);
 
-  const formatTimeAgo = (dateString: string) => {
+  // Lưu chapter ID vào DOM để useActionCableComments có thể truy cập
+  useEffect(() => {
+    if (chapter?.id) {
+      // Tạo một element ẩn để lưu chapter ID
+      let dataElement = document.getElementById('chapter-data');
+      if (!dataElement) {
+        dataElement = document.createElement('div');
+        dataElement.id = 'chapter-data';
+        dataElement.style.display = 'none';
+        document.body.appendChild(dataElement);
+      }
+      dataElement.dataset.chapterId = chapter.id.toString();
+      console.log(`Stored chapter ID in DOM: ${chapter.id}`);
+    }
+  }, [chapter]);
+  
+  // Log khi kết nối socket thành công
+  useEffect(() => {
+    if (isConnected) {
+      console.log(`Real-time comments connected for chapter ${chapterId}`);
+    }
+  }, [isConnected, chapterId]);
+
+  const formatTimeAgo = (dateString: string | undefined) => {
+    if (!dateString) return "vừa xong";
+    
     const now = new Date();
     const date = new Date(dateString);
     const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
@@ -276,6 +321,9 @@ export default function ChapterReader() {
         try {
           const commentsData = await commentApi.getChapterComments(actualMangaId, chapterId);
           setComments(commentsData);
+          
+          // Cập nhật comments vào context
+          setContextComments(commentsData);
 
           try {
             const totalCommentsData = await commentApi.getMangaComments(actualMangaId);
@@ -333,7 +381,20 @@ export default function ChapterReader() {
     };
 
     fetchChapter();
-  }, [mangaId, chapterId, isAuthenticated]);
+  }, [mangaId, chapterId, isAuthenticated, setContextComments]);
+
+  // Cập nhật totalComments khi comments thay đổi
+  useEffect(() => {
+    // Tính tổng số comment bao gồm cả replies
+    let total = comments.length;
+    comments.forEach(comment => {
+      if (comment.replies && Array.isArray(comment.replies)) {
+        total += comment.replies.length;
+      }
+    });
+    setTotalComments(total);
+    console.log(`Updated total comments: ${total}`);
+  }, [comments]);
 
   const insertStickerAtCursor = (stickerUrl: string) => {
     // Xác định input nào đang được sử dụng dựa vào trạng thái reply
@@ -440,11 +501,13 @@ export default function ChapterReader() {
     e.preventDefault();
     const { text, stickers } = extractStickersAndTextFromHtml(commentHtml);
 
-    // Kiểm tra nếu không có nội dung thực sự hoặc sticker
+    // Kiểm tra nếu không có nội dung thực sự và không có sticker
     const placeholders = ["Viết bình luận của bạn...", "Viết trả lời của bạn..."];
     const hasRealText = text && !placeholders.includes(text.trim());
+    const hasStickers = stickers.length > 0;
 
-    if (!hasRealText && stickers.length === 0) return;
+    // Cho phép gửi nếu có text hoặc có stickers
+    if (!hasRealText && !hasStickers) return;
 
     try {
       setIsSubmitting(true);
@@ -1205,7 +1268,7 @@ export default function ChapterReader() {
 
                   <button
                     type="submit"
-                    disabled={isSubmitting || ((!commentHtml.trim() || !commentInputRef.current?.textContent?.trim()) && selectedStickers.length === 0)}
+                    disabled={isSubmitting || (!extractStickersAndTextFromHtml(commentHtml).text.trim() && extractStickersAndTextFromHtml(commentHtml).stickers.length === 0)}
                     className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSubmitting && (
@@ -1263,7 +1326,7 @@ export default function ChapterReader() {
                         <div>
                           <p className="font-medium text-sm">{comment.user ? comment.user.username : (comment.user_id ? getUserInfo(comment.user_id).username : 'Unknown User')} <span className="text-blue-500 text-xs">Chapter {chapter?.number}</span></p>
                           <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                            {formatTimeAgo(comment.createdAt)}
+                            {formatTimeAgo(comment.createdAt || comment.created_at || "")}
                           </p>
                         </div>
                         {isAuthenticated && (
@@ -1528,7 +1591,7 @@ export default function ChapterReader() {
                             
                             <button
                               type="submit"
-                              disabled={isSubmitting || ((!commentHtml.trim() || !replyCommentInputRef.current?.textContent?.trim()) && selectedStickers.length === 0)}
+                              disabled={isSubmitting || (!extractStickersAndTextFromHtml(commentHtml).text.trim() && extractStickersAndTextFromHtml(commentHtml).stickers.length === 0)}
                               className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {isSubmitting && (
@@ -1594,7 +1657,7 @@ export default function ChapterReader() {
                                   <div>
                                     <p className="font-medium text-xs">{reply.user ? reply.user.username : (reply.user_id ? getUserInfo(reply.user_id).username : 'Unknown User')} <span className="text-blue-500 text-xs">Chapter {chapter?.number}</span></p>
                                     <p className="text-xs text-gray-400">
-                                      {formatTimeAgo(reply.createdAt)}
+                                      {formatTimeAgo(reply.createdAt || reply.created_at || "")}
                                     </p>
                                   </div>
 
@@ -1859,7 +1922,7 @@ export default function ChapterReader() {
                                   
                                   <button
                                     type="submit"
-                                    disabled={isSubmitting || ((!commentHtml.trim() || !replyToReplyCommentInputRef.current?.textContent?.trim()) && selectedStickers.length === 0)}
+                                    disabled={isSubmitting || (!extractStickersAndTextFromHtml(commentHtml).text.trim() && extractStickersAndTextFromHtml(commentHtml).stickers.length === 0)}
                                     className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
                                     {isSubmitting && (

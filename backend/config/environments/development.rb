@@ -76,4 +76,10 @@ Rails.application.configure do
     end
   end
   config.hosts << "http://localhost:3000"
+
+  # Cấu hình ActionCable
+  config.action_cable.mount_path = '/cable'
+  config.action_cable.disable_request_forgery_protection = true
+  config.action_cable.allowed_request_origins = [/http:\/\/localhost:*/]
 end
+

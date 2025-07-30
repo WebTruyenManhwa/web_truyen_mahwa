@@ -5,6 +5,9 @@ Rails.application.routes.draw do
     omniauth_callbacks: 'api/v1/omniauth_callbacks'
   }
 
+  # Mount ActionCable server
+  mount ActionCable.server => '/cable'
+
   # Health check routes
   get '/healthcheck', to: 'health#check'
   get '/', to: 'health#check', constraints: ->(req) { req.format.json? }

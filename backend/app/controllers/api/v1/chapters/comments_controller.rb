@@ -19,6 +19,17 @@ module Api
           @comment.user = current_user
 
           if @comment.save
+            # Broadcast comment qua ActionCable
+            channel = "chapter_#{@chapter.id}_comments"
+            Rails.logger.info "Broadcasting to channel: #{channel} with comment ID: #{@comment.id}"
+            ActionCable.server.broadcast(
+              channel, 
+              {
+                event: 'new_comment',
+                data: @comment.as_json(include: :user)
+              }
+            )
+            
             render json: @comment, status: :created
           else
             render json: { errors: @comment.errors.full_messages }, status: :unprocessable_entity
@@ -32,6 +43,16 @@ module Api
           @reply.parent = parent_comment
 
           if @reply.save
+            # Broadcast reply qua ActionCable
+            channel = "chapter_#{@chapter.id}_comments"
+            ActionCable.server.broadcast(
+              channel,
+              {
+                event: 'new_comment',
+                data: @reply.as_json(include: :user)
+              }
+            )
+            
             render json: @reply, status: :created
           else
             render json: { errors: @reply.errors.full_messages }, status: :unprocessable_entity

@@ -116,3 +116,5 @@ gem 'rufus-scheduler'
 
 # Use Kaminari for pagination
 gem "kaminari", "~> 1.2"
+
+gem 'anycable-rails'

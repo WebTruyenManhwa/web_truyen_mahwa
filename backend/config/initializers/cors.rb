@@ -16,11 +16,15 @@ Rails.application.config.middleware.insert_before 0, Rack::Cors do
       credentials: false
   end
 
-  # Production origins can be added here
-  # allow do
-  #   origins "example.com"
-  #   resource "*",
-  #     headers: :any,
-  #     methods: [:get, :post, :put, :patch, :delete, :options, :head]
-  # end
+  # Thêm cấu hình riêng cho WebSocket
+  allow do
+    origins '*'
+    
+    # Cấu hình riêng cho WebSocket
+    resource '/cable',
+      headers: :any,
+      methods: [:get, :post, :options],
+      expose: ['Authorization'],
+      credentials: false
+  end
 end

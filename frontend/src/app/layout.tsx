@@ -5,6 +5,8 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { AuthProvider } from "../hooks/useAuth";
 import { ThemeProvider } from "../hooks/useTheme";
+import { ActionCableProvider } from "../contexts/ActionCableContext";
+import { CommentProvider } from "../contexts/CommentContext";
 import React from "react";
 
 const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
@@ -133,11 +135,15 @@ export default function RootLayout({
       <body className={`${inter.className} bg-gray-900 text-white min-h-screen flex flex-col`}>
         <AuthProvider>
           <ThemeProvider>
-            <Header />
-            <main className="flex-grow container mx-auto px-4 py-6">
-              {children}
-            </main>
-            <Footer />
+            <ActionCableProvider>
+              <CommentProvider>
+                <Header />
+                <main className="flex-grow container mx-auto px-4 py-6">
+                  {children}
+                </main>
+                <Footer />
+              </CommentProvider>
+            </ActionCableProvider>
           </ThemeProvider>
         </AuthProvider>
       </body>

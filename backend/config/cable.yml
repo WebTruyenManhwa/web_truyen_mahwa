@@ -4,11 +4,17 @@
 # to make the web console appear.
 development:
   adapter: async
+  allow_same_origin_as_host: true
 
 test:
   adapter: test
 
 production:
-  adapter: async
   polling_interval: 0.1.seconds
   message_retention: 1.day
+  adapter: postgres
+  url: <%= ENV['DATABASE_URL'] %>
+  channel_prefix: web_truyen_manga_production
+  # Các cài đặt bổ sung cho Postgres adapter
+  pool_size: 5
+  timeout: 5

@@ -140,17 +140,22 @@ Rails.application.configure do
     config.active_record.cache_versioning = false
     config.active_record.collection_cache_versioning = false
     
-    # # Tối ưu Active Storage (nếu sử dụng)
+    # Tối ưu Active Storage (nếu sử dụng)
     # if defined?(ActiveStorage)
     #   config.active_storage.service = :local
     #   config.active_storage.queue = :active_storage
     #   config.active_storage.variant_processor = :mini_magick
     # end
     
+    # Cấu hình Action Cable
+    config.action_cable.mount_path = '/cable'
+    config.action_cable.allowed_request_origins = ['https://web-truyen-manhwa.vercel.app', /http:\/\/localhost:*/]
+    config.action_cable.disable_request_forgery_protection = true
+    
     # # Tối ưu Action Cable (nếu sử dụng)
     # if defined?(ActionCable)
     #   config.action_cable.mount_path = nil
-    #   config.action_cable.allowed_request_origins = ['https://webtruyen.mahwa.vn']
+    #   config.action_cable.allowed_request_origins = ['https://web-truyen-manhwa.vercel.app']
     # end
   end
 end
