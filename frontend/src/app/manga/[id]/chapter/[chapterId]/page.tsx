@@ -1528,7 +1528,7 @@ export default function ChapterReader() {
                             
                             <button
                               type="submit"
-                              disabled={isSubmitting || ((!commentHtml.trim() || !commentInputRef.current?.textContent?.trim()) && selectedStickers.length === 0)}
+                              disabled={isSubmitting || ((!commentHtml.trim() || !replyCommentInputRef.current?.textContent?.trim()) && selectedStickers.length === 0)}
                               className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {isSubmitting && (
@@ -1859,7 +1859,7 @@ export default function ChapterReader() {
                                   
                                   <button
                                     type="submit"
-                                    disabled={isSubmitting || ((!commentHtml.trim() || !commentInputRef.current?.textContent?.trim()) && selectedStickers.length === 0)}
+                                    disabled={isSubmitting || ((!commentHtml.trim() || !replyToReplyCommentInputRef.current?.textContent?.trim()) && selectedStickers.length === 0)}
                                     className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
                                     {isSubmitting && (
