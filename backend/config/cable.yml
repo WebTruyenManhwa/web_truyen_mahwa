@@ -12,9 +12,11 @@ test:
 production:
   polling_interval: 0.1.seconds
   message_retention: 1.day
-  adapter: postgres
-  url: <%= ENV['DATABASE_URL'] %>
+  adapter: solid_cable
+  connects_to:
+    database:
+      writing: primary
   channel_prefix: web_truyen_manga_production
-  # Các cài đặt bổ sung cho Postgres adapter
+  # Các cài đặt bổ sung cho Solid Cable
   pool_size: 5
   timeout: 5
