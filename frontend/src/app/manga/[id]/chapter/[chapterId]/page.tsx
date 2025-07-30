@@ -928,12 +928,21 @@ export default function ChapterReader() {
             </button> */}
 
             <div className="flex flex-1 min-w-0 gap-2 flex-wrap sm:flex-nowrap">
-              <Link
-                href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.prev_chapter?.slug || chapter.prev_chapter?.id}`}
-                className="bg-red-700 hover:bg-red-600 px-3 py-1 rounded text-sm whitespace-nowrap text-white"
-              >
-                Chương trước
-              </Link>
+              {chapter.prev_chapter ? (
+                <Link
+                  href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.prev_chapter?.slug || chapter.prev_chapter?.id}`}
+                  className="bg-red-700 hover:bg-red-600 px-3 py-1 rounded text-sm whitespace-nowrap text-white"
+                >
+                  Chương trước
+                </Link>
+              ) : (
+                <button
+                  disabled
+                  className="bg-gray-500 cursor-not-allowed px-3 py-1 rounded text-sm whitespace-nowrap text-white opacity-50"
+                >
+                  Chương trước
+                </button>
+              )}
 
               <div className="relative flex-1 min-w-0 w-full" ref={dropdownRef}>
                 <button
@@ -975,12 +984,21 @@ export default function ChapterReader() {
                 )}
               </div>
 
-              <Link
-                href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.next_chapter?.slug || chapter.next_chapter?.id}`}
-                className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm whitespace-nowrap text-white"
-              >
-                Chương sau
-              </Link>
+              {chapter.next_chapter ? (
+                <Link
+                  href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.next_chapter?.slug || chapter.next_chapter?.id}`}
+                  className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm whitespace-nowrap text-white"
+                >
+                  Chương sau
+                </Link>
+              ) : (
+                <button
+                  disabled
+                  className="bg-gray-500 cursor-not-allowed px-3 py-1 rounded text-sm whitespace-nowrap text-white opacity-50"
+                >
+                  Chương sau
+                </button>
+              )}
             </div>
           </div>
         </div>

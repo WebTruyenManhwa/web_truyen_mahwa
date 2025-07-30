@@ -57,10 +57,10 @@ class ChapterService
       # Initialize cache if needed
       @first_images_cache ||= {}
 
-      # Giới hạn số lượng chapter_ids để tránh truy vấn quá lớn
-      if chapter_ids.size > 100
-        Rails.logger.warn "Large number of chapter_ids (#{chapter_ids.size}) in preload_first_images_for_chapters, limiting to 100"
-        chapter_ids = chapter_ids.take(100)
+      # Giới hạn số lượng chapter_ids để tránh truy vấn quá lớn và sử dụng quá nhiều bộ nhớ
+      if chapter_ids.size > 50
+        Rails.logger.warn "Large number of chapter_ids (#{chapter_ids.size}) in preload_first_images_for_chapters, limiting to 50"
+        chapter_ids = chapter_ids.take(50)
       end
 
       # Create a cache key for this specific set of chapter_ids
@@ -94,7 +94,7 @@ class ChapterService
       end
 
       # Giới hạn kích thước cache để tránh memory leak
-      if @first_images_cache.size > 20
+      if @first_images_cache.size > 10
         Rails.logger.info "Clearing first_images_cache to prevent memory growth (size: #{@first_images_cache.size})"
         @first_images_cache = {}
       end
@@ -112,10 +112,10 @@ class ChapterService
       # Initialize cache if needed
       @images_cache ||= {}
 
-      # Giới hạn số lượng chapter_ids để tránh truy vấn quá lớn
-      if chapter_ids.size > 50
-        Rails.logger.warn "Large number of chapter_ids (#{chapter_ids.size}) in preload_images_for_chapters, limiting to 50"
-        chapter_ids = chapter_ids.take(50)
+      # Giới hạn số lượng chapter_ids để tránh truy vấn quá lớn và sử dụng quá nhiều bộ nhớ
+      if chapter_ids.size > 20
+        Rails.logger.warn "Large number of chapter_ids (#{chapter_ids.size}) in preload_images_for_chapters, limiting to 20"
+        chapter_ids = chapter_ids.take(20)
       end
 
       # Create a cache key for this specific set of chapter_ids
@@ -139,7 +139,7 @@ class ChapterService
       end
 
       # Giới hạn kích thước cache để tránh memory leak
-      if @images_cache.size > 10
+      if @images_cache.size > 5
         Rails.logger.info "Clearing images_cache to prevent memory growth (size: #{@images_cache.size})"
         @images_cache = {}
       end

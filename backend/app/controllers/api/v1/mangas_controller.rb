@@ -197,14 +197,15 @@ module Api
         # Lấy tất cả chapter IDs
         all_chapter_ids = chapters_by_manga.values.flatten.map(&:id)
 
-        # Chỉ preload ảnh đầu tiên cho mỗi chapter để tối ưu hóa hiệu suất
-        images_by_chapter = ChapterService.preload_first_images_for_chapters(all_chapter_ids)
+        # Bỏ việc preload ảnh đầu tiên cho mỗi chapter vì không cần thiết khi hiển thị danh sách manga
+        # Điều này giúp tiết kiệm bộ nhớ và tăng hiệu suất
+        # images_by_chapter = ChapterService.preload_first_images_for_chapters(all_chapter_ids)
 
         {
           latest_chapters: latest_chapters,
           chapters_count: chapters_count,
           chapters_by_manga: chapters_by_manga,
-          images_by_chapter: images_by_chapter
+          images_by_chapter: {} # Trả về đối tượng rỗng để tránh lỗi nếu có code khác sử dụng
         }
       end
 

@@ -46,6 +46,7 @@ type Props = {
 export default function MangaDetail(props: Props) {
   // Trích xuất id từ params và lưu vào biến riêng để tránh cảnh báo
   const { id: mangaId } = React.use(props.params);
+  const [showAllChapters, setShowAllChapters] = useState(false);
   const { isAuthenticated } = useAuth();
   const { theme } = useTheme();
   const [isFavorite, setIsFavorite] = useState(false);
@@ -430,7 +431,7 @@ export default function MangaDetail(props: Props) {
         <h2 className={`text-xl font-bold mb-4 pb-2 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-300'}`}>Danh sách chương</h2>
 
         <div className="space-y-2">
-          {manga.chapters.map((chapter: { id: React.Key | null | undefined; slug: any; number: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; title: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; view_count: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; created_at: string | number | Date; }) => (
+          {(showAllChapters ? manga.chapters : manga.chapters.slice(0, 15)).map((chapter: { id: React.Key | null | undefined; slug: any; number: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; title: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; view_count: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; created_at: string | number | Date; }) => (
             <Link
               key={chapter.id}
               href={`/manga/${manga.slug || manga.id}/chapter/${chapter.slug || chapter.id}`}
@@ -473,6 +474,26 @@ export default function MangaDetail(props: Props) {
               </div>
             </Link>
           ))}
+          
+          {manga.chapters.length > 15 && (
+            <div className="text-center mt-4">
+              <button 
+                onClick={() => setShowAllChapters(!showAllChapters)}
+                className={`${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} px-4 py-2 rounded-md text-sm flex items-center justify-center w-full`}
+              >
+                <span className="mr-1">{showAllChapters ? 'Thu gọn' : 'Xem thêm'}</span>
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  className={`h-4 w-4 transition-transform ${showAllChapters ? 'rotate-180' : ''}`} 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
