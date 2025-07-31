@@ -102,6 +102,8 @@ export default function ChapterReader() {
   const [allChapters, setAllChapters] = useState<ChapterSummary[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [commentsLoaded, setCommentsLoaded] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const stickerPickerRef = useRef<HTMLDivElement>(null);
   const gifPickerRef = useRef<HTMLDivElement>(null);
@@ -114,20 +116,33 @@ export default function ChapterReader() {
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isErrorReportOpen, setIsErrorReportOpen] = useState(false);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
-  
+
   // Sử dụng CommentContext
   const { state: commentState, setComments: setContextComments } = useCommentContext();
   
   // Kích hoạt socket cho comments
   const { isConnected } = useActionCableComments({ chapterId });
   
+  // Đọc trạng thái hiển thị bình luận từ localStorage khi component mount
+  useEffect(() => {
+    const savedShowComments = localStorage.getItem('showComments');
+    if (savedShowComments !== null) {
+      setShowComments(savedShowComments === 'true');
+    }
+  }, []);
+  
+  // Lưu trạng thái hiển thị bình luận vào localStorage khi thay đổi
+  useEffect(() => {
+    localStorage.setItem('showComments', showComments.toString());
+  }, [showComments]);
+  
   // Đồng bộ comments từ context
   useEffect(() => {
-    if (commentState.comments.length > 0) {
+    if (commentState.comments.length > 0 && showComments) {
       console.log('Using existing comments from context:', commentState.comments);
       setComments(commentState.comments); // Cập nhật state comments từ context
     }
-  }, [commentState.comments]);
+  }, [commentState.comments, showComments]);
 
   // Lưu chapter ID vào DOM để useActionCableComments có thể truy cập
   useEffect(() => {
@@ -318,22 +333,12 @@ export default function ChapterReader() {
           }
         }
 
-        try {
-          const commentsData = await commentApi.getChapterComments(actualMangaId, chapterId);
-          setComments(commentsData);
-          
-          // Cập nhật comments vào context
-          setContextComments(commentsData);
-
-          try {
-            const totalCommentsData = await commentApi.getMangaComments(actualMangaId);
-            setTotalComments(totalCommentsData.length || 0);
-          } catch (err) {
-            console.error("Failed to fetch total comments:", err);
-            setTotalComments(commentsData.length || 0);
-          }
-        } catch (err) {
-          console.error("Failed to fetch comments:", err);
+        // Chỉ tải bình luận khi showComments là true
+        if (showComments) {
+          await loadComments(actualMangaId, chapterId);
+        } else {
+          // Đặt commentsLoaded thành false để biết rằng chúng ta cần tải lại nếu showComments thay đổi
+          setCommentsLoaded(false);
         }
 
         fetchGifs("trending");
@@ -351,21 +356,12 @@ export default function ChapterReader() {
           manga: {
             id: parseInt(mangaId),
             title: "One Piece",
+            slug: mangaId
           },
-          prev_chapter: {
-            id: 2,
-            number: 1087,
-          },
-          next_chapter: undefined,
           images: [
             {
-              position: 0,
-              url: "https://m.media-amazon.com/images/I/51FVFCrSp0L._AC_UF1000,1000_QL80_.jpg",
-              is_external: false
-            },
-            {
               position: 1,
-              url: "https://m.media-amazon.com/images/I/81qb4I6rbsL._AC_UF1000,1000_QL80_.jpg",
+              url: "https://m.media-amazon.com/images/I/51FVFCrSp0L._AC_UF1000,1000_QL80_.jpg",
               is_external: false
             },
             {
@@ -381,7 +377,31 @@ export default function ChapterReader() {
     };
 
     fetchChapter();
-  }, [mangaId, chapterId, isAuthenticated, setContextComments]);
+  }, [mangaId, chapterId, isAuthenticated, setContextComments, showComments]);
+
+  // Hàm tải bình luận
+  const loadComments = async (mangaId: string, chapterId: string) => {
+    try {
+      const commentsData = await commentApi.getChapterComments(mangaId, chapterId);
+      setComments(commentsData);
+      
+      // Cập nhật comments vào context
+      setContextComments(commentsData);
+
+      try {
+        const totalCommentsData = await commentApi.getMangaComments(mangaId);
+        setTotalComments(totalCommentsData.length || 0);
+      } catch (err) {
+        console.error("Failed to fetch total comments:", err);
+        setTotalComments(commentsData.length || 0);
+      }
+      
+      setCommentsLoaded(true);
+    } catch (err) {
+      console.error("Failed to fetch comments:", err);
+      setCommentsLoaded(false);
+    }
+  };
 
   // Cập nhật totalComments khi comments thay đổi
   useEffect(() => {
@@ -395,6 +415,15 @@ export default function ChapterReader() {
     setTotalComments(total);
     console.log(`Updated total comments: ${total}`);
   }, [comments]);
+
+  // Tải bình luận khi showComments thay đổi từ false sang true
+  useEffect(() => {
+    if (showComments && !commentsLoaded && chapter) {
+      const mangaId = chapter.manga?.id.toString() || params.id as string;
+      const chapterId = chapter.id.toString() || params.chapterId as string;
+      loadComments(mangaId, chapterId);
+    }
+  }, [showComments, commentsLoaded, chapter, params.id, params.chapterId]);
 
   const insertStickerAtCursor = (stickerUrl: string) => {
     // Xác định input nào đang được sử dụng dựa vào trạng thái reply
@@ -929,12 +958,12 @@ export default function ChapterReader() {
 
             <div className="flex flex-1 min-w-0 gap-2 flex-wrap sm:flex-nowrap">
               {chapter.prev_chapter ? (
-                <Link
-                  href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.prev_chapter?.slug || chapter.prev_chapter?.id}`}
-                  className="bg-red-700 hover:bg-red-600 px-3 py-1 rounded text-sm whitespace-nowrap text-white"
-                >
-                  Chương trước
-                </Link>
+              <Link
+                href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.prev_chapter?.slug || chapter.prev_chapter?.id}`}
+                className="bg-red-700 hover:bg-red-600 px-3 py-1 rounded text-sm whitespace-nowrap text-white"
+              >
+                Chương trước
+              </Link>
               ) : (
                 <button
                   disabled
@@ -985,12 +1014,12 @@ export default function ChapterReader() {
               </div>
 
               {chapter.next_chapter ? (
-                <Link
-                  href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.next_chapter?.slug || chapter.next_chapter?.id}`}
-                  className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm whitespace-nowrap text-white"
-                >
-                  Chương sau
-                </Link>
+              <Link
+                href={`/manga/${chapter.manga?.slug || mangaId}/chapter/${chapter.next_chapter?.slug || chapter.next_chapter?.id}`}
+                className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm whitespace-nowrap text-white"
+              >
+                Chương sau
+              </Link>
               ) : (
                 <button
                   disabled
@@ -1060,7 +1089,20 @@ export default function ChapterReader() {
             Bình luận
             <span className="ml-2 text-sm font-normal text-gray-500">({totalComments})</span>
           </div>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="show-comments"
+              checked={showComments}
+              onChange={(e) => setShowComments(e.target.checked)}
+              className="mr-2 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+            />
+            <label htmlFor="show-comments" className="text-sm font-normal cursor-pointer">
+              Hiển thị bình luận
+            </label>
+          </div>
         </h2>
+        {showComments && ( 
         <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white border border-gray-200'} rounded p-4`}>
           {/* Form bình luận tổng luôn ở đầu */}
           {isAuthenticated ? (
@@ -1286,7 +1328,7 @@ export default function ChapterReader() {
 
                   <button
                     type="submit"
-                    disabled={isSubmitting || (!extractStickersAndTextFromHtml(commentHtml).text.trim() && extractStickersAndTextFromHtml(commentHtml).stickers.length === 0)}
+                      disabled={isSubmitting || (!extractStickersAndTextFromHtml(commentHtml).text.trim() && extractStickersAndTextFromHtml(commentHtml).stickers.length === 0)}
                     className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSubmitting && (
@@ -1344,7 +1386,7 @@ export default function ChapterReader() {
                         <div>
                           <p className="font-medium text-sm">{comment.user ? comment.user.username : (comment.user_id ? getUserInfo(comment.user_id).username : 'Unknown User')} <span className="text-blue-500 text-xs">Chapter {chapter?.number}</span></p>
                           <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                            {formatTimeAgo(comment.createdAt || comment.created_at || "")}
+                              {formatTimeAgo(comment.createdAt || comment.created_at || "")}
                           </p>
                         </div>
                         {isAuthenticated && (
@@ -1609,7 +1651,7 @@ export default function ChapterReader() {
                             
                             <button
                               type="submit"
-                              disabled={isSubmitting || (!extractStickersAndTextFromHtml(commentHtml).text.trim() && extractStickersAndTextFromHtml(commentHtml).stickers.length === 0)}
+                                disabled={isSubmitting || (!extractStickersAndTextFromHtml(commentHtml).text.trim() && extractStickersAndTextFromHtml(commentHtml).stickers.length === 0)}
                               className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {isSubmitting && (
@@ -1675,7 +1717,7 @@ export default function ChapterReader() {
                                   <div>
                                     <p className="font-medium text-xs">{reply.user ? reply.user.username : (reply.user_id ? getUserInfo(reply.user_id).username : 'Unknown User')} <span className="text-blue-500 text-xs">Chapter {chapter?.number}</span></p>
                                     <p className="text-xs text-gray-400">
-                                      {formatTimeAgo(reply.createdAt || reply.created_at || "")}
+                                        {formatTimeAgo(reply.createdAt || reply.created_at || "")}
                                     </p>
                                   </div>
 
@@ -1967,6 +2009,7 @@ export default function ChapterReader() {
               <p className={`text-center ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} text-sm`}>Chưa có bình luận nào. Hãy là người đầu tiên bình luận!</p>
             )}
         </div>
+        )}
       </div>
 
       {/* Error Report Dialog */}
