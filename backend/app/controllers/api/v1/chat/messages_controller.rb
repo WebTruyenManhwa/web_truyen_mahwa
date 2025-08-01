@@ -47,7 +47,7 @@ module Api
         private
         
         def message_params
-          params.require(:message).permit(:content, :sticker)
+          params.require(:message).permit(:content, :sticker, :is_html, stickers: [])
         end
         
         def set_pagination_params

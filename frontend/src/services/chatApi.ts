@@ -8,11 +8,14 @@ interface Message {
   avatar?: string;
   created_at: string;
   sticker?: string;
+  stickers?: string[];
 }
 
 interface SendMessagePayload {
   content?: string;
   sticker?: string;
+  stickers?: string[];
+  is_html?: boolean;
 }
 
 export const chatApi = {
@@ -46,4 +49,4 @@ export const chatApi = {
       throw error;
     }
   }
-}; 
+};

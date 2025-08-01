@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useActionCableContext } from '../contexts/ActionCableContext';
 
 interface Message {
@@ -9,25 +9,46 @@ interface Message {
   avatar?: string;
   created_at: string;
   sticker?: string;
+  stickers?: string[];
 }
 
 interface UseActionCableChatOptions {
   onReceiveMessage?: (message: Message) => void;
 }
 
+interface ChatSubscription {
+  unsubscribe: () => void;
+  perform: (action: string, data?: Record<string, unknown>) => void;
+}
+
 export const useActionCableChat = (options?: UseActionCableChatOptions) => {
   const { consumer, isConnected } = useActionCableContext();
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [lastMessage, setLastMessage] = useState<Message | null>(null);
+  const subscriptionRef = useRef<ChatSubscription | null>(null);
+  const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const subscribeToChat = useCallback(() => {
+  // Hàm xử lý nhận tin nhắn
+  const handleReceiveMessage = useCallback((message: Message) => {
+    setLastMessage(message);
+    options?.onReceiveMessage?.(message);
+  }, [options]);
+
+  useEffect(() => {
+    // Chỉ tạo kết nối khi consumer sẵn sàng và đã kết nối
     if (!consumer || !isConnected) {
-      console.log('Cannot subscribe to chat: consumer not ready or not connected');
-      return null;
+      setIsSubscribed(false);
+      return;
+    }
+
+    // Nếu đã có subscription, không tạo mới
+    if (subscriptionRef.current) {
+      return;
     }
 
     console.log('Subscribing to chat channel');
     
+    // Tạo subscription mới
     const subscription = consumer.subscriptions.create(
       { 
         channel: 'ChatChannel'
@@ -48,46 +69,40 @@ export const useActionCableChat = (options?: UseActionCableChatOptions) => {
           
           if (data.event === 'new_message' && data.data) {
             const message = data.data as Message;
-            setLastMessage(message);
-            
-            if (options?.onReceiveMessage) {
-              options.onReceiveMessage(message);
-            }
+            handleReceiveMessage(message);
           }
         }
       }
     );
     
+    // Lưu subscription vào ref
+    subscriptionRef.current = subscription;
+    
     // Gửi ping định kỳ để giữ kết nối
-    const pingInterval = setInterval(() => {
+    pingIntervalRef.current = setInterval(() => {
       if (subscription) {
         subscription.perform('ping', { timestamp: Date.now() });
       }
     }, 30000); // 30 giây
     
-    return { subscription, pingInterval };
-  }, [consumer, isConnected, options]);
-
-  useEffect(() => {
-    if (!consumer || !isConnected) return;
-    
-    const { subscription, pingInterval } = subscribeToChat() || {};
-    
+    // Cleanup khi component unmount
     return () => {
-      if (subscription) {
-        console.log('Unsubscribing from chat channel');
-        subscription.unsubscribe();
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+        pingIntervalRef.current = null;
       }
       
-      if (pingInterval) {
-        clearInterval(pingInterval);
+      if (subscriptionRef.current) {
+        console.log('Unsubscribing from chat channel');
+        subscriptionRef.current.unsubscribe();
+        subscriptionRef.current = null;
       }
     };
-  }, [consumer, isConnected, subscribeToChat]);
+  }, [consumer, isConnected, handleReceiveMessage]);
 
   return {
     isConnected,
     isSubscribed,
     lastMessage
   };
-}; 
+};

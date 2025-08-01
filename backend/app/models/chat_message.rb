@@ -1,12 +1,12 @@
 class ChatMessage < ApplicationRecord
   belongs_to :user
   
-  validates :content, presence: true, unless: :sticker?
+  validates :content, presence: true, unless: :has_stickers?
   validates :content, length: { maximum: 1000 }
   
   # Kiểm tra xem message có sticker không
-  def sticker?
-    sticker.present?
+  def has_stickers?
+    sticker.present? || (stickers.present? && stickers.any?)
   end
   
   # Chuẩn hóa dữ liệu trước khi lưu

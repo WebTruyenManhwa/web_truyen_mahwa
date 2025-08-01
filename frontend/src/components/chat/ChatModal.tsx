@@ -13,6 +13,8 @@ interface Message {
   avatar?: string;
   created_at: string;
   sticker?: string;
+  stickers?: string[];
+  is_html?: boolean;
 }
 
 interface ChatModalProps {
@@ -22,21 +24,40 @@ interface ChatModalProps {
 
 export default function ChatModal({ isOpen, onClose }: ChatModalProps) {
   const { theme } = useTheme();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedSticker, setSelectedSticker] = useState<string | null>(null);
+  const [selectedStickers, setSelectedStickers] = useState<string[]>([]);
   const [showStickers, setShowStickers] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLDivElement>(null);
   const stickersRef = useRef<HTMLDivElement>(null);
+
+  // CSS cho placeholder
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      [data-placeholder]:empty:before {
+        content: attr(data-placeholder);
+        color: #888;
+        font-style: italic;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   // Kết nối với ActionCable
   const { isSubscribed } = useActionCableChat({
     onReceiveMessage: (message) => {
-      setMessages(prev => [...prev, message]);
+      // Chỉ thêm tin nhắn từ người khác, tin nhắn của mình đã được thêm khi gửi
+      if (user && message.user_id !== user.id) {
+        setMessages(prev => [...prev, message]);
+      }
     }
   });
 
@@ -89,6 +110,26 @@ export default function ChatModal({ isOpen, onClose }: ChatModalProps) {
     };
   }, []);
 
+  const handleInputChange = () => {
+    if (inputRef.current) {
+      setInputMessage(inputRef.current.innerText);
+    }
+  };
+
+  // Xử lý phím Enter và Shift+Enter
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter') {
+      // Nếu nhấn Shift+Enter thì xuống dòng bình thường
+      if (e.shiftKey) {
+        return;
+      }
+      
+      // Nếu chỉ nhấn Enter thì gửi tin nhắn và ngăn xuống dòng
+      e.preventDefault();
+      sendMessage(e);
+    }
+  };
+
   const fetchMessages = async () => {
     setIsLoading(true);
     try {
@@ -101,19 +142,82 @@ export default function ChatModal({ isOpen, onClose }: ChatModalProps) {
     }
   };
 
+  // Thêm sticker vào vị trí con trỏ
+  const addSticker = (sticker: string) => {
+    if (!inputRef.current || !isAuthenticated) return;
+    
+    // Lưu vị trí con trỏ hiện tại
+    const selection = window.getSelection();
+    const range = selection?.getRangeAt(0);
+    
+    if (range) {
+      // Tạo phần tử img cho sticker
+      const img = document.createElement('img');
+      img.src = sticker;
+      img.alt = 'sticker';
+      img.className = 'h-6 w-6 inline-block';
+      img.style.verticalAlign = 'middle';
+      
+      // Chèn sticker vào vị trí con trỏ
+      range.insertNode(img);
+      
+      // Di chuyển con trỏ sau sticker
+      range.setStartAfter(img);
+      range.setEndAfter(img);
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      
+      // Thêm sticker vào danh sách
+      setSelectedStickers(prev => [...prev, sticker]);
+      
+      // Cập nhật nội dung input
+      handleInputChange();
+    }
+    
+    // Focus lại input
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 0);
+  };
+
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if ((!inputMessage.trim() && !selectedSticker) || !isAuthenticated) return;
+    if (!inputRef.current || !isAuthenticated || !user) return;
+    
+    const messageHTML = inputRef.current.innerHTML;
+    const messageText = inputRef.current.innerText.trim();
+    
+    // Không gửi tin nhắn trống
+    if (!messageText && selectedStickers.length === 0) return;
     
     try {
-      await chatApi.sendMessage({
-        content: inputMessage.trim(),
-        sticker: selectedSticker || undefined
-      });
+      // Nếu chỉ có 1 sticker và không có text, gửi như sticker lớn
+      let sentMessage;
+      if (selectedStickers.length === 1 && !messageText) {
+        sentMessage = await chatApi.sendMessage({
+          sticker: selectedStickers[0]
+        });
+      } else {
+        // Gửi nội dung HTML và danh sách stickers
+        sentMessage = await chatApi.sendMessage({
+          content: messageHTML, // Gửi HTML thay vì text
+          stickers: selectedStickers.length > 0 ? selectedStickers : undefined,
+          is_html: true // Thêm flag để backend biết đây là HTML
+        });
+      }
       
+      // Thêm tin nhắn vừa gửi vào danh sách tin nhắn hiển thị ngay lập tức
+      if (sentMessage) {
+        setMessages(prev => [...prev, sentMessage]);
+      }
+      
+      // Xóa nội dung input và danh sách stickers
+      if (inputRef.current) {
+        inputRef.current.innerHTML = '';
+      }
       setInputMessage('');
-      setSelectedSticker(null);
+      setSelectedStickers([]);
     } catch (error) {
       console.error('Error sending message:', error);
     }
@@ -146,6 +250,38 @@ export default function ChatModal({ isOpen, onClose }: ChatModalProps) {
     return (
       <div className={`w-8 h-8 rounded-full ${bgColor} flex items-center justify-center`}>
         <span className="text-white font-medium">{message.username.charAt(0).toUpperCase()}</span>
+      </div>
+    );
+  };
+
+  // Render message content with stickers
+  const renderMessageContent = (message: Message) => {
+    // Nếu chỉ có 1 sticker và không có text
+    if (message.sticker && !message.content) {
+      return <img src={message.sticker} alt="Sticker" className="h-16 w-16" />;
+    }
+    
+    // Nếu là nội dung HTML
+    if (message.is_html) {
+      return <div dangerouslySetInnerHTML={{ __html: message.content }} />;
+    }
+    
+    // Nếu có text và có thể có nhiều stickers nhỏ (cách cũ)
+    return (
+      <div className="flex flex-wrap items-center">
+        {message.content && <p className="text-sm break-words mr-1">{message.content}</p>}
+        {message.stickers && message.stickers.length > 0 && (
+          <div className="flex flex-wrap gap-1 inline-flex">
+            {message.stickers.map((sticker, index) => (
+              <img 
+                key={index} 
+                src={sticker} 
+                alt={`Sticker ${index}`} 
+                className="h-6 w-6 inline-block" 
+              />
+            ))}
+          </div>
+        )}
       </div>
     );
   };
@@ -214,10 +350,7 @@ export default function ChatModal({ isOpen, onClose }: ChatModalProps) {
                   <div className={`mt-1 p-2 rounded-lg ${
                     theme === 'dark' ? 'bg-gray-800' : 'bg-white border border-gray-200'
                   }`}>
-                    {message.sticker && (
-                      <img src={message.sticker} alt="Sticker" className="h-12 w-12 mb-1" />
-                    )}
-                    {message.content && <p className="text-sm break-words">{message.content}</p>}
+                    {renderMessageContent(message)}
                   </div>
                 </div>
               </div>
@@ -253,7 +386,7 @@ export default function ChatModal({ isOpen, onClose }: ChatModalProps) {
                       key={index}
                       type="button"
                       onClick={() => {
-                        setSelectedSticker(sticker);
+                        addSticker(sticker);
                         setShowStickers(false);
                       }}
                       className={`p-1 rounded hover:bg-opacity-20 ${
@@ -267,41 +400,31 @@ export default function ChatModal({ isOpen, onClose }: ChatModalProps) {
               )}
             </div>
             
-            <div className={`flex-1 flex items-center py-1 px-3 rounded-full ${
+            <div className={`flex-1 flex items-center py-2 px-3 rounded-full ${
               theme === 'dark' 
                 ? 'bg-gray-700 text-white' 
                 : 'bg-gray-100 text-gray-900'
             }`}>
-              {selectedSticker && (
-                <div className="flex items-center mr-2">
-                  <img src={selectedSticker} alt="Selected sticker" className="h-6 w-6" />
-                  <button
-                    type="button"
-                    onClick={() => setSelectedSticker(null)}
-                    className="ml-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-              <input
+              {/* Input field */}
+              <div
                 ref={inputRef}
-                type="text"
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                placeholder={isAuthenticated ? "Nhập tin nhắn..." : "Đăng nhập để chat"}
-                disabled={!isAuthenticated}
-                className="flex-1 bg-transparent focus:outline-none focus:ring-0"
+                contentEditable={isAuthenticated}
+                onInput={handleInputChange}
+                onKeyDown={handleKeyDown}
+                suppressContentEditableWarning={true}
+                className="flex-1 bg-transparent focus:outline-none min-h-[24px] max-h-[80px] overflow-y-auto"
+                data-placeholder={isAuthenticated ? "Nhập tin nhắn..." : "Đăng nhập để chat"}
+                style={{
+                  wordBreak: 'break-word',
+                }}
               />
             </div>
             
             <button
               type="submit"
-              disabled={(!inputMessage.trim() && !selectedSticker) || !isAuthenticated}
+              disabled={(!inputMessage.trim() && selectedStickers.length === 0) || !isAuthenticated}
               className={`ml-2 p-2 rounded-full ${
-                (!inputMessage.trim() && !selectedSticker) || !isAuthenticated
+                (!inputMessage.trim() && selectedStickers.length === 0) || !isAuthenticated
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-red-600 text-white hover:bg-red-700'
               }`}
