@@ -318,7 +318,74 @@ export default function Header() {
             </div>
           </div>
         )}
-                </div>
+      </div>
+    );
+  };
+
+  // Dropdown menu "Thêm"
+  const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
+  const moreDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Xử lý hover cho dropdown "Thêm"
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    const handleMouseEnter = () => {
+      clearTimeout(timeoutId);
+      setIsMoreDropdownOpen(true);
+    };
+
+    const handleMouseLeave = () => {
+      timeoutId = setTimeout(() => {
+        setIsMoreDropdownOpen(false);
+      }, 300); // 300ms delay before hiding the dropdown
+    };
+
+    const moreDropdownElement = moreDropdownRef.current;
+    if (moreDropdownElement) {
+      moreDropdownElement.addEventListener('mouseenter', handleMouseEnter);
+      moreDropdownElement.addEventListener('mouseleave', handleMouseLeave);
+    }
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (moreDropdownElement) {
+        moreDropdownElement.removeEventListener('mouseenter', handleMouseEnter);
+        moreDropdownElement.removeEventListener('mouseleave', handleMouseLeave);
+      }
+    };
+  }, []);
+
+  // Render dropdown "Thêm"
+  const renderMoreDropdown = () => {
+    return (
+      <div className="relative" ref={moreDropdownRef}>
+        <button
+          className={`${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-700 hover:text-red-500'} font-medium flex items-center`}
+          onMouseEnter={() => setIsMoreDropdownOpen(true)}
+        >
+          Thêm
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4 ml-1"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fillRule="evenodd"
+              d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </button>
+        {isMoreDropdownOpen && (
+          <div className="absolute left-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-lg py-2 z-20 border border-gray-700">
+            <Link href="/chat" className="block px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-red-500 text-sm">
+              Chat
+            </Link>
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -516,6 +583,7 @@ export default function Header() {
             Truyện chữ
           </Link>
           {renderCategoryDropdown()}
+          {renderMoreDropdown()}
         </nav>
       </div>
 
@@ -639,6 +707,7 @@ export default function Header() {
             <Link href="/genres" className={`${theme === 'dark' ? 'text-gray-300 hover:text-red-500' : 'text-gray-700 hover:text-red-500'} font-medium`}>
               Thể loại
             </Link>
+            {renderMoreDropdown()}
           </div>
         </div>
       </div>

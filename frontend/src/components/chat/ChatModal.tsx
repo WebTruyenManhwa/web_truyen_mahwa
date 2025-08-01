@@ -20,9 +20,11 @@ interface Message {
 interface ChatModalProps {
   isOpen: boolean;
   onClose: () => void;
+  isFullPage?: boolean;
+  preventScroll?: boolean;
 }
 
-export default function ChatModal({ isOpen, onClose }: ChatModalProps) {
+export default function ChatModal({ isOpen, onClose, isFullPage = false }: ChatModalProps) {
   const { theme } = useTheme();
   const { isAuthenticated, user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -34,6 +36,7 @@ export default function ChatModal({ isOpen, onClose }: ChatModalProps) {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLDivElement>(null);
   const stickersRef = useRef<HTMLDivElement>(null);
+  const scrollPositionRef = useRef<number>(0);
 
   // CSS cho placeholder
   useEffect(() => {
@@ -50,6 +53,45 @@ export default function ChatModal({ isOpen, onClose }: ChatModalProps) {
       document.head.removeChild(style);
     };
   }, []);
+
+  // Ngăn scroll trang khi gửi tin nhắn
+  useEffect(() => {
+    // Lưu vị trí scroll hiện tại
+    const handleBeforeSubmit = () => {
+      scrollPositionRef.current = window.scrollY;
+    };
+
+    // Khôi phục vị trí scroll
+    const handleAfterSubmit = () => {
+      setTimeout(() => {
+        window.scrollTo(0, scrollPositionRef.current);
+      }, 0);
+    };
+
+    // Thêm sự kiện cho form và nút submit
+    const form = document.querySelector('form');
+    const submitButton = document.querySelector('button[type="submit"]');
+
+    if (form) {
+      form.addEventListener('submit', handleBeforeSubmit, true);
+      form.addEventListener('submit', handleAfterSubmit);
+    }
+
+    if (submitButton) {
+      submitButton.addEventListener('click', handleBeforeSubmit, true);
+    }
+
+    return () => {
+      if (form) {
+        form.removeEventListener('submit', handleBeforeSubmit, true);
+        form.removeEventListener('submit', handleAfterSubmit);
+      }
+
+      if (submitButton) {
+        submitButton.removeEventListener('click', handleBeforeSubmit, true);
+      }
+    };
+  }, [isOpen]);
 
   // Kết nối với ActionCable
   const { isSubscribed } = useActionCableChat({
@@ -126,7 +168,22 @@ export default function ChatModal({ isOpen, onClose }: ChatModalProps) {
       
       // Nếu chỉ nhấn Enter thì gửi tin nhắn và ngăn xuống dòng
       e.preventDefault();
-      sendMessage(e);
+      e.stopPropagation(); // Ngăn scroll page
+      
+      // Chỉ lưu vị trí scroll của page khi ở chế độ full page
+      if (isFullPage) {
+        scrollPositionRef.current = window.scrollY;
+      }
+      
+      // Gọi hàm gửi tin nhắn
+      void sendMessage(e);
+      
+      // Khôi phục vị trí scroll của page khi ở chế độ full page
+      if (isFullPage) {
+        setTimeout(() => {
+          window.scrollTo(0, scrollPositionRef.current);
+        }, 10);
+      }
     }
   };
 
@@ -182,6 +239,12 @@ export default function ChatModal({ isOpen, onClose }: ChatModalProps) {
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation(); // Luôn ngăn scroll page khi gửi tin nhắn
+    
+    // Chỉ lưu vị trí scroll của page khi ở chế độ full page
+    if (isFullPage) {
+      scrollPositionRef.current = window.scrollY;
+    }
     
     if (!inputRef.current || !isAuthenticated || !user) return;
     
@@ -218,6 +281,13 @@ export default function ChatModal({ isOpen, onClose }: ChatModalProps) {
       }
       setInputMessage('');
       setSelectedStickers([]);
+      
+      // Khôi phục vị trí scroll của page khi ở chế độ full page
+      if (isFullPage) {
+        setTimeout(() => {
+          window.scrollTo(0, scrollPositionRef.current);
+        }, 10);
+      }
     } catch (error) {
       console.error('Error sending message:', error);
     }
@@ -289,9 +359,11 @@ export default function ChatModal({ isOpen, onClose }: ChatModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div className={`${!isFullPage ? 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50' : ''}`}>
       <div 
-        className={`w-full max-w-lg max-h-[80vh] rounded-lg shadow-lg overflow-hidden ${
+        className={`${isFullPage 
+          ? 'w-full h-full' 
+          : 'w-full max-w-lg max-h-[80vh]'} rounded-lg shadow-lg overflow-hidden ${
           theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'
         }`}
       >
@@ -306,21 +378,23 @@ export default function ChatModal({ isOpen, onClose }: ChatModalProps) {
             ) : (
               <span className="mr-2 text-xs bg-gray-500 text-white px-2 py-0.5 rounded-full">Offline</span>
             )}
-            <button
-              onClick={onClose}
-              className="rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-700"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            {!isFullPage && (
+              <button
+                onClick={onClose}
+                className="rounded-full p-1 hover:bg-gray-200 dark:hover:bg-gray-700"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
         
         {/* Messages */}
         <div 
           ref={chatContainerRef}
-          className={`p-4 overflow-y-auto h-96 ${
+          className={`p-4 overflow-y-auto ${isFullPage ? 'h-[calc(100vh-180px)]' : 'h-96'} ${
             theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'
           }`}
         >
@@ -422,6 +496,7 @@ export default function ChatModal({ isOpen, onClose }: ChatModalProps) {
             
             <button
               type="submit"
+              onClick={(e) => sendMessage(e)}
               disabled={(!inputMessage.trim() && selectedStickers.length === 0) || !isAuthenticated}
               className={`ml-2 p-2 rounded-full ${
                 (!inputMessage.trim() && selectedStickers.length === 0) || !isAuthenticated

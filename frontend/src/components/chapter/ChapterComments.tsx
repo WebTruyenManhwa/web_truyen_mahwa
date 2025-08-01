@@ -41,8 +41,8 @@ interface ChapterCommentsProps {
 }
 
 export default function ChapterComments({
-  mangaId,
-  chapterId,
+  // mangaId,
+  // chapterId,
   theme,
   comments,
   totalComments,
