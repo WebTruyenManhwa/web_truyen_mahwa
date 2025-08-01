@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Tạo instance của axios với cấu hình cơ bản
 export const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api',
   headers: {
     'Content-Type': 'application/json',
   }
@@ -11,9 +11,12 @@ export const apiClient = axios.create({
 // Thêm interceptor để tự động thêm token vào header
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    // Trong môi trường client-side, lấy token từ localStorage
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
     return config;
   },
@@ -31,6 +34,12 @@ apiClient.interceptors.response.use(
       // Có thể thêm logic để redirect đến trang login
       console.log('Unauthorized, please login again');
     }
+    
+    // Xử lý lỗi mạng
+    if (error.message === 'Network Error') {
+      console.error('Network error occurred. Please check your connection or the API server might be down.');
+    }
+    
     return Promise.reject(error);
   }
 );
