@@ -8,6 +8,8 @@ import Link from "next/link";
 import React from "react";
 import { useMangas, useRankings, useGenres } from '../services/swrApi';
 import { useTheme } from '../hooks/useTheme';
+import ChatIcon from '../components/chat/ChatIcon';
+import ChatButton from '../components/chat/ChatButton';
 
 interface Manga {
   id: number;
@@ -702,6 +704,10 @@ export default function Home() {
       <section className="mt-12">
         <h2 className={`text-2xl font-bold mb-4 pb-2 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} font-nunito`}>Thể loại</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          {/* Chat icon at the beginning */}
+          <ChatIcon />
+          
+          {/* Existing genres */}
           {(genres.length > 0 ? genres : defaultGenres).map((genre: { id: React.Key | null | undefined; name: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; }, index: number) => (
             <Link
               key={genre.id || `genre-${index}`}
@@ -713,6 +719,9 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* Floating Chat Button */}
+      <ChatButton />
 
       {/* Add CSS for hiding scrollbar */}
       <style jsx global>{`

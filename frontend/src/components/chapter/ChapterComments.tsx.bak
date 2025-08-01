@@ -1,0 +1,553 @@
+/* eslint-disable @next/next/no-img-element */
+"use client";
+
+import React, { useState, useRef, useEffect } from "react";
+import Link from "next/link";
+import { useAuth } from "../../hooks/useAuth";
+import Image from "next/image";
+
+interface TenorGifResult {
+  media_formats: {
+    gif: {
+      url: string;
+    };
+  };
+}
+
+interface Comment {
+  id: number;
+  content: string;
+  sticker?: string;
+  stickers?: string[];
+  createdAt?: string;
+  created_at?: string;
+  has_replies?: boolean;
+  replies?: Comment[];
+  user?: {
+    id: number;
+    username: string;
+    avatar?: string;
+  };
+  user_id?: number;
+  parent_id?: number;
+  commentable_type?: string;
+  commentable_id?: number;
+  updated_at?: string;
+}
+
+interface ChapterCommentsProps {
+  mangaId: string;
+  chapterId: string;
+  theme: string;
+  comments: Comment[];
+  totalComments: number;
+  onLoadComments: () => void;
+  formatTimeAgo: (dateString: string | undefined) => string;
+  handleSubmitComment: (e: React.FormEvent) => Promise<void>;
+  commentHtml: string;
+  setCommentHtml: (html: string) => void;
+}
+
+export default function ChapterComments({
+  mangaId,
+  chapterId,
+  theme,
+  comments,
+  totalComments,
+  onLoadComments,
+  formatTimeAgo,
+  handleSubmitComment,
+  commentHtml,
+  setCommentHtml
+}: ChapterCommentsProps) {
+  const { isAuthenticated } = useAuth();
+  const [showComments, setShowComments] = useState(false);
+  const [isMainCommentFocused, setIsMainCommentFocused] = useState(false);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [gifSearchTerm, setGifSearchTerm] = useState("");
+  const [gifResults, setGifResults] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState("trending");
+  const commentInputRef = useRef<HTMLDivElement>(null);
+  const stickerPickerRef = useRef<HTMLDivElement>(null);
+  const gifPickerRef = useRef<HTMLDivElement>(null);
+  
+  // Đọc trạng thái hiển thị bình luận từ localStorage khi component mount
+  useEffect(() => {
+    const savedShowComments = localStorage.getItem('showComments');
+    if (savedShowComments !== null) {
+      setShowComments(savedShowComments === 'true');
+    }
+  }, []);
+  
+  // Lưu trạng thái hiển thị bình luận vào localStorage khi thay đổi
+  useEffect(() => {
+    localStorage.setItem('showComments', showComments.toString());
+    
+    // Khi bật hiển thị bình luận, gọi hàm tải bình luận
+    if (showComments) {
+      onLoadComments();
+    }
+  }, [showComments, onLoadComments]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (stickerPickerRef.current && !stickerPickerRef.current.contains(event.target as Node)) {
+        setShowStickerPicker(false);
+      }
+      if (gifPickerRef.current && !gifPickerRef.current.contains(event.target as Node)) {
+        setShowGifPicker(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
+    setCommentHtml((e.target as HTMLDivElement).innerHTML);
+  };
+
+  const onBlurHandler = () => {
+    setTimeout(() => {
+      setIsMainCommentFocused(false);
+    }, 100);
+  };
+
+  const handleSelectSticker = (sticker: string) => {
+    if (commentInputRef.current) {
+      const selection = window.getSelection();
+      if (!selection || !selection.rangeCount) return;
+      const range = selection.getRangeAt(0);
+      const img = document.createElement("img");
+      img.src = sticker;
+      img.alt = "Sticker";
+      img.className = "inline h-8 w-8 align-middle mx-1";
+      range.insertNode(img);
+      range.setStartAfter(img);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      setCommentHtml(commentInputRef.current.innerHTML);
+      setShowStickerPicker(false);
+    }
+  };
+
+  const fetchGifs = async (category: string = "trending", search: string = "") => {
+    try {
+      const apiKey = process.env.NEXT_PUBLIC_API_KEY_TENOR || "LIVDSRZULELA";
+      const limit = 15;
+      let url = "";
+
+      if (search) {
+        url = `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(search)}&key=${apiKey}&limit=${limit}`;
+      } else if (category === "trending") {
+        url = `https://tenor.googleapis.com/v2/featured?key=${apiKey}&limit=${limit}`;
+      } else {
+        let searchTerm = "";
+        switch(category) {
+          case "qoobee":
+            searchTerm = "qoobee agapi";
+            break;
+          case "capoo":
+            searchTerm = "capoo cat";
+            break;
+          case "pepe":
+            searchTerm = "pepe frog funny";
+            break;
+          case "onion":
+            searchTerm = "onion head";
+            break;
+          case "anime":
+            searchTerm = "anime reaction";
+            break;
+          case "reactions":
+            searchTerm = "reaction gif";
+            break;
+          default:
+            searchTerm = category;
+        }
+        url = `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(searchTerm)}&key=${apiKey}&limit=${limit}`;
+      }
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data && data.results) {
+        const gifs = data.results.map((item: TenorGifResult) => {
+          return item.media_formats.gif.url;
+        });
+        setGifResults(gifs);
+      } else {
+        setGifResults([]);
+      }
+    } catch (error) {
+      console.error("Error fetching GIFs:", error);
+      setGifResults([]);
+    }
+  };
+
+  const handleSelectGif = (gifUrl: string) => {
+    if (commentInputRef.current) {
+      const selection = window.getSelection();
+      if (!selection || !selection.rangeCount) return;
+      const range = selection.getRangeAt(0);
+      const img = document.createElement("img");
+      img.src = gifUrl;
+      img.alt = "GIF";
+      img.className = "inline h-24 w-auto align-middle mx-1";
+      range.insertNode(img);
+      range.setStartAfter(img);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      setCommentHtml(commentInputRef.current.innerHTML);
+      setShowGifPicker(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showGifPicker && gifResults.length === 0) {
+      fetchGifs("trending");
+    }
+  }, [showGifPicker, gifResults.length]);
+
+  const renderCommentContent = (content: string) => {
+    if (!content || content === "") return null;
+    return <div dangerouslySetInnerHTML={{ __html: content }} />;
+  };
+
+  return (
+    <div className="mt-8">
+      <h2 className={`text-xl font-bold mb-4 pb-2 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-300'} flex items-center justify-between`}>
+        <div>
+          Bình luận
+          <span className="ml-2 text-sm font-normal text-gray-500">({totalComments})</span>
+        </div>
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            id="show-comments"
+            checked={showComments}
+            onChange={(e) => setShowComments(e.target.checked)}
+            className="mr-2 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+          />
+          <label htmlFor="show-comments" className="text-sm font-normal cursor-pointer">
+            Hiển thị bình luận
+          </label>
+        </div>
+      </h2>
+      
+      {showComments && (
+        <div className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white border border-gray-200'} rounded p-4`}>
+          {/* Form bình luận tổng luôn ở đầu */}
+          {isAuthenticated ? (
+            <div className="mb-4">
+              <form id="comment-form" onSubmit={handleSubmitComment}>
+                <div
+                  ref={commentInputRef}
+                  className={`w-full ${theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-800'} rounded p-3 focus:outline-none focus:ring-1 focus:ring-red-500 min-h-[60px] relative ${theme === 'dark' ? '' : 'border border-gray-300'}`}
+                  contentEditable
+                  onInput={handleInput}
+                  suppressContentEditableWarning={true}
+                  onFocus={() => setIsMainCommentFocused(true)}
+                  onBlur={onBlurHandler}
+                >
+                  {commentHtml === "" && !isMainCommentFocused && (
+                    <span className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} absolute left-3 top-3 opacity-70`}>
+                      Viết bình luận của bạn...
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2 flex justify-between items-center">
+                  <div className="flex space-x-2">
+                    {/* Sticker Button */}
+                    <div className="relative" ref={stickerPickerRef}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowStickerPicker(!showStickerPicker);
+                          setShowGifPicker(false);
+                        }}
+                        className={`${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'} p-2 rounded`}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-7.536 5.879a1 1 0 001.414 0 3 3 0 014.242 0 1 1 0 001.414-1.414 5 5 0 00-7.07 0 1 1 0 000 1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                      {showStickerPicker && (
+                        <div className={`block p-2 ${theme === 'dark' ? 'bg-gray-700' : 'bg-white border border-gray-200'} rounded shadow-lg grid grid-cols-4 gap-2 absolute z-10`}>
+                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742760.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                            <Image
+                              src="https://cdn-icons-png.flaticon.com/128/742/742760.png"
+                              alt="Sticker 1"
+                              width={32}
+                              height={32}
+                              className="w-8 h-8"
+                            />
+                          </button>
+                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742751.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                            <img src="https://cdn-icons-png.flaticon.com/128/742/742751.png" alt="Sticker 2" className="w-8 h-8" />
+                          </button>
+                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742784.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                            <img src="https://cdn-icons-png.flaticon.com/128/742/742784.png" alt="Sticker 3" className="w-8 h-8" />
+                          </button>
+                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742750.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                            <img src="https://cdn-icons-png.flaticon.com/128/742/742750.png" alt="Sticker 4" className="w-8 h-8" />
+                          </button>
+                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742745.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                            <img src="https://cdn-icons-png.flaticon.com/128/742/742745.png" alt="Sticker 5" className="w-8 h-8" />
+                          </button>
+                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742821.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                            <img src="https://cdn-icons-png.flaticon.com/128/742/742821.png" alt="Sticker 6" className="w-8 h-8" />
+                          </button>
+                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742752.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                            <img src="https://cdn-icons-png.flaticon.com/128/742/742752.png" alt="Sticker 7" className="w-8 h-8" />
+                          </button>
+                          <button type="button" onClick={() => handleSelectSticker('https://cdn-icons-png.flaticon.com/128/742/742920.png')} className={`p-1 ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-100'} rounded`}>
+                            <img src="https://cdn-icons-png.flaticon.com/128/742/742920.png" alt="Sticker 8" className="w-8 h-8" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* GIF Button */}
+                    <div className="relative" ref={gifPickerRef}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowGifPicker(!showGifPicker);
+                          setShowStickerPicker(false);
+                        }}
+                        className={`${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'} p-2 rounded`}
+                      >
+                        <span className="font-bold">GIF</span>
+                      </button>
+                      {showGifPicker && (
+                        <div className={`block p-2 ${theme === 'dark' ? 'bg-gray-700' : 'bg-white border border-gray-200'} rounded shadow-lg absolute z-10 left-0 w-[300px]`}>
+                          {/* GIF Search */}
+                          <div className="mb-2">
+                            <input
+                              type="text"
+                              placeholder="Tìm kiếm GIF..."
+                              value={gifSearchTerm}
+                              onChange={(e) => setGifSearchTerm(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  fetchGifs(selectedCategory, gifSearchTerm);
+                                }
+                              }}
+                              className={`w-full p-2 rounded ${theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-800'} mb-2`}
+                            />
+                          </div>
+
+                          {/* GIF Categories */}
+                          <div className="flex mb-2 space-x-2 flex-wrap gap-y-2">
+                            <button
+                              onClick={() => {
+                                setSelectedCategory("trending");
+                                fetchGifs("trending", gifSearchTerm);
+                              }}
+                              className={`px-2 py-1 rounded text-xs ${selectedCategory === "trending"
+                                ? 'bg-red-600 text-white'
+                                : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                            >
+                              Xu hướng
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedCategory("qoobee");
+                                fetchGifs("qoobee", gifSearchTerm);
+                              }}
+                              className={`px-2 py-1 rounded text-xs ${selectedCategory === "qoobee"
+                                ? 'bg-red-600 text-white'
+                                : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                            >
+                              Qoobee
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedCategory("capoo");
+                                fetchGifs("capoo", gifSearchTerm);
+                              }}
+                              className={`px-2 py-1 rounded text-xs ${selectedCategory === "capoo"
+                                ? 'bg-red-600 text-white'
+                                : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                            >
+                              Capoo
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedCategory("anime");
+                                fetchGifs("anime", gifSearchTerm);
+                              }}
+                              className={`px-2 py-1 rounded text-xs ${selectedCategory === "anime"
+                                ? 'bg-red-600 text-white'
+                                : theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800'}`}
+                            >
+                              Anime
+                            </button>
+                          </div>
+
+                          {/* GIF Results */}
+                          <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
+                            {gifResults.map((gif, index) => (
+                              <div
+                                key={index}
+                                className="cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => handleSelectGif(gif)}
+                              >
+                                <img src={gif} alt={`GIF ${index}`} className="w-full h-auto rounded" />
+                              </div>
+                            ))}
+                            {gifResults.length === 0 && (
+                              <div className="col-span-2 text-center py-4 text-sm text-gray-500">
+                                Không tìm thấy GIF nào
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
+                  >
+                    Gửi bình luận
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            <div className={`mb-4 p-3 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} rounded text-center ${theme === 'dark' ? '' : 'border border-gray-300'}`}>
+              <p>Vui lòng <Link href="/auth/login" className="text-red-400 hover:underline">đăng nhập</Link> để bình luận</p>
+            </div>
+          )}
+          
+          {/* Danh sách bình luận */}
+          {comments.length > 0 ? (
+            comments.map((comment) => (
+              <div key={comment.id} className={`mb-4 p-3 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} rounded ${theme === 'dark' ? '' : 'border border-gray-300'}`}>
+                <div className="flex items-start">
+                  <div className="flex-shrink-0 mr-3">
+                    {/* Avatar */}
+                    <Link href={`/user/${comment.user?.id}`}>
+                      <img 
+                        src={comment.user?.avatar || `/images/default-avatar.png`} 
+                        alt={comment.user?.username || "User"} 
+                        className="h-10 w-10 rounded-full object-cover"
+                      />
+                    </Link>
+                  </div>
+                  <div className="flex-grow">
+                    <div className="flex items-center mb-1">
+                      <span className="font-bold">{comment.user?.username}</span>
+                      <span className="ml-2 text-xs text-gray-500">{formatTimeAgo(comment.created_at || comment.createdAt)}</span>
+                    </div>
+                    <div className="mb-2">
+                      {/* Comment content */}
+                      {comment.sticker ? (
+                        <img src={comment.sticker} alt="Sticker" className="max-h-24" />
+                      ) : Array.isArray(comment.stickers) && comment.stickers.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {comment.stickers.map((sticker, idx) => (
+                            <img key={idx} src={sticker} alt="Sticker" className="h-16 w-16" />
+                          ))}
+                          {comment.content && <div className="ml-2">{renderCommentContent(comment.content)}</div>}
+                        </div>
+                      ) : (
+                        <div dangerouslySetInnerHTML={{ __html: comment.content }} />
+                      )}
+                    </div>
+                    {/* Reply button */}
+                    <div className="flex items-center space-x-4">
+                      <button 
+                        className={`text-sm ${theme === 'dark' ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-black'}`}
+                        onClick={() => {
+                          // Reply functionality would use mangaId and chapterId
+                          console.log(`Reply to comment on manga ${mangaId}, chapter ${chapterId}`);
+                        }}
+                      >
+                        Trả lời
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                {/* Replies */}
+                {comment.has_replies && comment.replies && comment.replies.length > 0 && (
+                  <div className="ml-12 mt-3 space-y-3">
+                    {comment.replies.map(reply => (
+                      <div key={reply.id} className={`p-3 ${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-50'} rounded`}>
+                        <div className="flex items-start">
+                          <div className="flex-shrink-0 mr-3">
+                            <Link href={`/user/${reply.user?.id}`}>
+                              <img 
+                                src={reply.user?.avatar || `/images/default-avatar.png`} 
+                                alt={reply.user?.username || "User"} 
+                                className="h-8 w-8 rounded-full object-cover"
+                              />
+                            </Link>
+                          </div>
+                          <div className="flex-grow">
+                            <div className="flex items-center mb-1">
+                              <span className="font-bold">{reply.user?.username}</span>
+                              <span className="ml-2 text-xs text-gray-500">{formatTimeAgo(reply.created_at || reply.createdAt)}</span>
+                            </div>
+                            <div>
+                              {(() => {
+                                // Trích xuất username từ nội dung reply nếu có @mention
+                                const mentionMatch = reply.content ? reply.content.match(/@([a-zA-Z0-9_]+)/) : null;
+                                const mentionedUsername = mentionMatch ? mentionMatch[1] : null;
+                                
+                                if (mentionedUsername) {
+                                  return (
+                                    <>
+                                      <span className="text-blue-500 font-semibold mr-1">@{mentionedUsername}</span>
+                                      {reply.sticker ? (
+                                        <img src={reply.sticker} alt="Sticker" className="max-h-20" />
+                                      ) : Array.isArray(reply.stickers) && reply.stickers.length > 0 ? (
+                                        <div className="flex flex-wrap gap-2">
+                                          {reply.stickers.map((sticker, idx) => (
+                                            <img key={idx} src={sticker} alt="Sticker" className="h-12 w-12" />
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <div dangerouslySetInnerHTML={{ __html: reply.content.replace(/@[a-zA-Z0-9_]+\s?/, '') }} />
+                                      )}
+                                    </>
+                                  );
+                                } else {
+                                  return reply.sticker ? (
+                                    <img src={reply.sticker} alt="Sticker" className="max-h-20" />
+                                  ) : Array.isArray(reply.stickers) && reply.stickers.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2">
+                                      {reply.stickers.map((sticker, idx) => (
+                                        <img key={idx} src={sticker} alt="Sticker" className="h-12 w-12" />
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div dangerouslySetInnerHTML={{ __html: reply.content }} />
+                                  );
+                                }
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))
+          ) : (
+            <p className={`text-center ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} text-sm`}>Chưa có bình luận nào. Hãy là người đầu tiên bình luận!</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+} 

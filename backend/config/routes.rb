@@ -27,6 +27,11 @@ Rails.application.routes.draw do
 
       post 'auth/google_token', to: 'auth#google_token'
 
+      # Chat routes
+      namespace :chat do
+        resources :messages, only: [:index, :create]
+      end
+
       # Admin routes
       namespace :admin do
         get 'dashboard/stats', to: 'dashboard#stats'
