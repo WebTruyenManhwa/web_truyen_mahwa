@@ -10,7 +10,9 @@ const nextConfig = {
       'cdn-icons-png.flaticon.com',
       '10.50.80.163'
     ],
+    unoptimized: true,
   },
+  trailingSlash: true,
 }
 
 module.exports = nextConfig 
