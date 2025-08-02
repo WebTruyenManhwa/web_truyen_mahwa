@@ -105,4 +105,21 @@ export const CHAPTER_FRAGMENT = `
   }
 `;
 
+export const NOTIFICATION_FRAGMENT = `
+  fragment NotificationFields on Notification {
+    id
+    title
+    content
+    notificationType
+    read
+    targetUrl
+    createdAt
+    user {
+      id
+      username
+      avatar
+    }
+  }
+`;
+
 export default client;

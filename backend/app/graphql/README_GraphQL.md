@@ -30,6 +30,12 @@ Một số API REST đã được chuyển đổi sang GraphQL để tối ưu h
 | POST /api/v1/favorites | mutation { toggleFavorite } | Hợp nhất thêm/xóa favorite thành 1 mutation |
 | DELETE /api/v1/favorites/:id | mutation { toggleFavorite } | Hợp nhất thêm/xóa favorite thành 1 mutation |
 | POST /api/v1/comments | mutation { createComment } | Cùng chức năng nhưng với cú pháp GraphQL |
+| GET /api/v1/notifications | query { notifications } | Giảm overfetching, client chỉ lấy những trường cần thiết |
+| GET /api/v1/notifications/unread_count | query { unreadNotificationsCount } | Có thể kết hợp với query notifications trong 1 request |
+| POST /api/v1/notifications/:id/mark_as_read | mutation { markNotificationAsRead } | Cùng chức năng nhưng với cú pháp GraphQL |
+| POST /api/v1/notifications/mark_all_as_read | mutation { markAllNotificationsAsRead } | Cùng chức năng nhưng với cú pháp GraphQL |
+| DELETE /api/v1/notifications/:id | mutation { deleteNotification } | Cùng chức năng nhưng với cú pháp GraphQL |
+| DELETE /api/v1/notifications/clear_all | mutation { clearAllNotifications } | Cùng chức năng nhưng với cú pháp GraphQL |
 
 ## Authentication
 
@@ -90,6 +96,33 @@ curl -X POST \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your_jwt_token" \
   -d '{"query": "mutation { toggleFavorite(input: { mangaId: \"20\" }) { isFavorite errors } }"}' \
+  http://localhost:3001/graphql
+```
+
+### Get notifications (requires authentication)
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your_jwt_token" \
+  -d '{"query": "query { notifications { id title content read createdAt } unreadNotificationsCount }"}' \
+  http://localhost:3001/graphql
+```
+
+### Mark notification as read (requires authentication)
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your_jwt_token" \
+  -d '{"query": "mutation { markNotificationAsRead(input: { id: \"1\" }) { success errors } }"}' \
+  http://localhost:3001/graphql
+```
+
+### Mark all notifications as read (requires authentication)
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your_jwt_token" \
+  -d '{"query": "mutation { markAllNotificationsAsRead(input: {}) { success errors } }"}' \
   http://localhost:3001/graphql
 ```
 
@@ -240,6 +273,56 @@ mutation CreateComment($commentableId: ID!, $commentableType: String!, $content:
 }
 ```
 
+### Notifications
+
+```graphql
+# Get notifications with pagination and filtering
+query GetNotifications($page: Int, $perPage: Int, $read: Boolean) {
+  notifications(page: $page, perPage: $perPage, read: $read) {
+    id
+    title
+    content
+    notificationType
+    read
+    targetUrl
+    createdAt
+  }
+  unreadNotificationsCount
+}
+
+# Mark a notification as read
+mutation MarkNotificationAsRead($id: ID!) {
+  markNotificationAsRead(input: { id: $id }) {
+    success
+    errors
+  }
+}
+
+# Mark all notifications as read
+mutation MarkAllNotificationsAsRead {
+  markAllNotificationsAsRead(input: {}) {
+    success
+    errors
+  }
+}
+
+# Delete a notification
+mutation DeleteNotification($id: ID!) {
+  deleteNotification(input: { id: $id }) {
+    success
+    errors
+  }
+}
+
+# Clear all notifications
+mutation ClearAllNotifications {
+  clearAllNotifications(input: {}) {
+    success
+    errors
+  }
+}
+```
+
 ## Using the GraphQL Test UI
 
 The application provides a simple GraphQL testing UI at http://localhost:3001/graphql-test. This interface allows you to:
@@ -284,6 +367,26 @@ query {
     viewCount
   }
 }
+
+# Get notifications with unread count
+query {
+  notifications(page: 1, perPage: 10) {
+    id
+    title
+    content
+    read
+    createdAt
+  }
+  unreadNotificationsCount
+}
+
+# Mark a notification as read
+mutation {
+  markNotificationAsRead(input: { id: "1" }) {
+    success
+    errors
+  }
+}
 ```
 
 ## Example Usage with Apollo Client
@@ -326,6 +429,87 @@ client.query({
     }
   `
 }).then(result => console.log(result));
+```
+
+## Example Usage with Notifications API
+
+```javascript
+import { gql, useQuery } from '@apollo/client';
+
+const GET_NOTIFICATIONS = gql`
+  query {
+    notifications {
+      id
+      title
+      content
+      read
+      createdAt
+    }
+    unreadNotificationsCount
+  }
+`;
+
+function NotificationsComponent() {
+  const { loading, error, data } = useQuery(GET_NOTIFICATIONS);
+
+  if (loading) return <p>Loading...</p>;
+  if (error) return <p>Error: {error.message}</p>;
+
+  return (
+    <div>
+      <h2>Notifications ({data.unreadNotificationsCount} unread)</h2>
+      <ul>
+        {data.notifications.map(notification => (
+          <li key={notification.id}>
+            <h3>{notification.title}</h3>
+            <p>{notification.content}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+## Example Usage with Mutations for Notifications API
+
+```javascript
+import { gql, useMutation } from '@apollo/client';
+
+const MARK_NOTIFICATION_AS_READ = gql`
+  mutation MarkNotificationAsRead($id: ID!) {
+    markNotificationAsRead(input: { id: $id }) {
+      success
+      errors
+    }
+  }
+`;
+
+function NotificationItem({ notification, onMarkAsRead }) {
+  const [markAsRead, { loading }] = useMutation(MARK_NOTIFICATION_AS_READ, {
+    variables: { id: notification.id },
+    onCompleted: (data) => {
+      if (data.markNotificationAsRead.success) {
+        onMarkAsRead(notification.id);
+      }
+    }
+  });
+
+  return (
+    <div>
+      <h3>{notification.title}</h3>
+      <p>{notification.content}</p>
+      {!notification.read && (
+        <button
+          onClick={() => markAsRead()}
+          disabled={loading}
+        >
+          {loading ? 'Marking...' : 'Mark as read'}
+        </button>
+      )}
+    </div>
+  );
+}
 ```
 
 ## Additional Resources

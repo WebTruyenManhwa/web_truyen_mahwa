@@ -1,5 +1,5 @@
 import { gql } from '@apollo/client';
-import { MANGA_FRAGMENT, CHAPTER_FRAGMENT } from './graphqlClient';
+import { MANGA_FRAGMENT, CHAPTER_FRAGMENT, NOTIFICATION_FRAGMENT } from './graphqlClient';
 
 // QUERIES
 
@@ -143,6 +143,23 @@ export const GET_GENRES = gql`
   }
 `;
 
+// Lấy danh sách thông báo
+export const GET_NOTIFICATIONS = gql`
+  query GetNotifications($page: Int, $perPage: Int, $read: Boolean) {
+    notifications(page: $page, perPage: $perPage, read: $read) {
+      ...NotificationFields
+    }
+  }
+  ${NOTIFICATION_FRAGMENT}
+`;
+
+// Lấy số lượng thông báo chưa đọc
+export const GET_UNREAD_NOTIFICATIONS_COUNT = gql`
+  query GetUnreadNotificationsCount {
+    unreadNotificationsCount
+  }
+`;
+
 // MUTATIONS
 
 // Thêm/xóa manga vào danh sách yêu thích
@@ -214,6 +231,46 @@ export const CREATE_COMMENT = gql`
         }
         createdAt
       }
+      errors
+    }
+  }
+`;
+
+// Đánh dấu thông báo đã đọc
+export const MARK_NOTIFICATION_AS_READ = gql`
+  mutation MarkNotificationAsRead($id: ID!) {
+    markNotificationAsRead(input: { id: $id }) {
+      success
+      errors
+    }
+  }
+`;
+
+// Đánh dấu tất cả thông báo đã đọc
+export const MARK_ALL_NOTIFICATIONS_AS_READ = gql`
+  mutation MarkAllNotificationsAsRead {
+    markAllNotificationsAsRead(input: {}) {
+      success
+      errors
+    }
+  }
+`;
+
+// Xóa một thông báo
+export const DELETE_NOTIFICATION = gql`
+  mutation DeleteNotification($id: ID!) {
+    deleteNotification(input: { id: $id }) {
+      success
+      errors
+    }
+  }
+`;
+
+// Xóa tất cả thông báo
+export const CLEAR_ALL_NOTIFICATIONS = gql`
+  mutation ClearAllNotifications {
+    clearAllNotifications(input: {}) {
+      success
       errors
     }
   }

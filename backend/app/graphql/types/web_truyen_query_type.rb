@@ -133,6 +133,35 @@ module Types
     def genres
       Genre.all
     end
+
+    # Notifications queries
+    field :notifications, [Types::NotificationType], null: false do
+      description "Lấy danh sách thông báo của người dùng hiện tại"
+      argument :page, Integer, required: false, default_value: 1
+      argument :per_page, Integer, required: false, default_value: 20
+      argument :read, Boolean, required: false
+    end
+
+    def notifications(page: 1, per_page: 20, read: nil)
+      return [] unless context[:current_user]
+
+      per_page = [per_page.to_i, 100].min
+      query = context[:current_user].notifications.order(created_at: :desc)
+
+      # Filter by read status if specified
+      query = query.where(read: read) unless read.nil?
+
+      query.page(page).per(per_page)
+    end
+
+    field :unread_notifications_count, Integer, null: false do
+      description "Lấy số lượng thông báo chưa đọc của người dùng hiện tại"
+    end
+
+    def unread_notifications_count
+      return 0 unless context[:current_user]
+      context[:current_user].notifications.where(read: false).count
+    end
   end
 end
 
