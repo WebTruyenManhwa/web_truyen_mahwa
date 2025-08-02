@@ -9,6 +9,22 @@ interface NotificationListProps {
   limit?: number;
 }
 
+interface Notification {
+  id: string;
+  title: string;
+  content?: string;
+  notificationType: string;
+  read: boolean;
+  targetUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+  user?: {
+    id: string;
+    username: string;
+    avatar?: string;
+  };
+}
+
 const NotificationList: React.FC<NotificationListProps> = ({ limit = 10 }) => {
   const [page, setPage] = useState(1);
   const { data, loading, error, refetch } = useNotifications(page, limit);
@@ -61,7 +77,7 @@ const NotificationList: React.FC<NotificationListProps> = ({ limit = 10 }) => {
   if (loading) return <div className="p-4 text-center">Đang tải thông báo...</div>;
   if (error) return <div className="p-4 text-center text-red-500">Lỗi: {error.message}</div>;
 
-  const notifications = data?.notifications || [];
+  const notifications = data?.notifications || [] as Notification[];
   const unreadCount = countData?.unreadNotificationsCount || 0;
 
   return (
@@ -91,7 +107,7 @@ const NotificationList: React.FC<NotificationListProps> = ({ limit = 10 }) => {
           <div className="p-4 text-center text-gray-500">Không có thông báo nào</div>
         ) : (
           <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-            {notifications.map((notification: any) => (
+            {notifications.map((notification: Notification) => (
               <li
                 key={notification.id}
                 className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-700 ${!notification.read ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
