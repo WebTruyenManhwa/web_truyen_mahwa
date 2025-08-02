@@ -52,8 +52,13 @@ Rails.application.configure do
     compress: true
   }
 
+  # Nếu muốn sử dụng solid_cache thay vì memory_store, bỏ comment dòng dưới
+  # config.cache_store = :solid_cache_store
+  # config.solid_cache.connects_to = { database: { writing: :production_cache } }
+
   # Use database for Active Job queue adapter
   config.active_job.queue_adapter = :solid_queue
+  # Sử dụng database queue riêng đã được cấu hình
   config.solid_queue.connects_to = { database: { writing: :queue } }
 
   # Session store configuration
@@ -101,6 +106,7 @@ Rails.application.configure do
 
   # Giới hạn số lượng worker processes để giảm sử dụng RAM
   config.active_job.queue_adapter = :solid_queue
+  # Sử dụng database queue riêng đã được cấu hình
   config.solid_queue.connects_to = { database: { writing: :queue } }
 
   # Thêm cấu hình tối ưu bộ nhớ cho môi trường ít tài nguyên
@@ -110,48 +116,51 @@ Rails.application.configure do
     ENV['RUBY_GC_MALLOC_LIMIT_MAX'] = '16000000'
     ENV['RUBY_GC_OLDMALLOC_LIMIT'] = '8000000'
     ENV['RUBY_GC_OLDMALLOC_LIMIT_MAX'] = '16000000'
-    
+
     # Chạy GC thường xuyên hơn
     GC::Profiler.enable
-    
+
     # Thực hiện GC ngay lập tức để giải phóng bộ nhớ
     GC.start
-    
+
     # Giảm kích thước của các bộ đệm
     config.action_controller.default_url_options = { protocol: 'https' }
     config.action_mailer.default_url_options = { protocol: 'https' }
-    
+
     # Tắt các tính năng không cần thiết
     config.log_level = :warn
     config.log_tags = [:request_id]
     config.logger = ActiveSupport::Logger.new(STDOUT)
     config.logger.formatter = ::Logger::Formatter.new
-    
+
     # Tối ưu bộ nhớ cache
     config.cache_store = :memory_store, { size: 16.megabytes }
-    
+
     # Nén response để giảm kích thước
     config.middleware.use Rack::Deflater
-    
+
     # Tắt các tính năng debug không cần thiết
     config.active_record.verbose_query_logs = false
-    
+
     # Tối ưu Active Record
     config.active_record.cache_versioning = false
     config.active_record.collection_cache_versioning = false
-    
+
     # Tối ưu Active Storage (nếu sử dụng)
     # if defined?(ActiveStorage)
     #   config.active_storage.service = :local
     #   config.active_storage.queue = :active_storage
     #   config.active_storage.variant_processor = :mini_magick
     # end
-    
+
     # Cấu hình Action Cable
     config.action_cable.mount_path = '/cable'
     config.action_cable.allowed_request_origins = ['https://web-truyen-manhwa.vercel.app', /http:\/\/localhost:*/]
     config.action_cable.disable_request_forgery_protection = true
-    
+
+    # Nếu sử dụng database cho ActionCable, bỏ comment dòng dưới
+    # config.action_cable.database_configuration = :production_cable
+
     # # Tối ưu Action Cable (nếu sử dụng)
     # if defined?(ActionCable)
     #   config.action_cable.mount_path = nil

@@ -92,5 +92,5 @@ ENTRYPOINT ["sh", "/rails/entrypoint.sh"]
 # Expose port
 EXPOSE 80
 
-# Start Nginx and Rails server
-CMD ["sh", "-c", "/usr/sbin/nginx && ./bin/thrust ./bin/rails server -p 3000"]
+# Start Rails server (Nginx được khởi động trong entrypoint.sh)
+CMD ["./bin/rails", "server", "-p", "3000"]
