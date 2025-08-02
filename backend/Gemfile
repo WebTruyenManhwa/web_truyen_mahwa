@@ -119,3 +119,15 @@ gem 'rufus-scheduler'
 gem "kaminari", "~> 1.2"
 
 gem 'anycable-rails'
+
+# Thêm vào Gemfile
+gem 'graphql', '~> 2.0'
+gem 'graphql-batch', '~> 0.5'  # Giải quyết vấn đề N+1 queries
+gem 'apollo_upload_server', '~> 2.1'  # Hỗ trợ upload file qua GraphQL
+gem 'sprockets', '~> 4.2.0'  # Thêm sprockets để hỗ trợ GraphiQL
+gem 'sprockets-rails'  # Thêm sprockets-rails để hỗ trợ GraphiQL
+gem 'graphiql-rails'  # IDE để test GraphQL
+
+group :development do
+  # Các gem khác trong development...
+end

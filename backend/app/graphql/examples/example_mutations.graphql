@@ -1,0 +1,73 @@
+# Các ví dụ về GraphQL Mutations
+
+# Thêm/xóa manga vào danh sách yêu thích
+mutation ToggleFavorite {
+  toggleFavorite(input: { mangaId: "20" }) {
+    isFavorite
+    errors
+  }
+}
+
+# Tạo lịch sử đọc truyện
+mutation CreateReadingHistory {
+  createReadingHistory(input: { mangaId: "20", chapterId: "217" }) {
+    readingHistory {
+      id
+      manga {
+        id
+        title
+      }
+      chapter {
+        id
+        number
+        title
+      }
+      createdAt
+    }
+    errors
+  }
+}
+
+# Thêm bình luận vào manga
+mutation CreateMangaComment {
+  createComment(
+    input: {
+      commentableId: "20",
+      commentableType: "Manga",
+      content: "Truyện này rất hay!"
+    }
+  ) {
+    comment {
+      id
+      content
+      user {
+        id
+        username
+      }
+      createdAt
+    }
+    errors
+  }
+}
+
+# Thêm bình luận vào chapter
+mutation CreateChapterComment {
+  createComment(
+    input: {
+      commentableId: "217",
+      commentableType: "Chapter",
+      content: "Chapter này rất hay!"
+    }
+  ) {
+    comment {
+      id
+      content
+      user {
+        id
+        username
+      }
+      createdAt
+    }
+    errors
+  }
+}

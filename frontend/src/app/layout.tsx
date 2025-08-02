@@ -1,12 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import Header from "../components/Header";
-import Footer from "../components/Footer";
-import { AuthProvider } from "../hooks/useAuth";
-import { ThemeProvider } from "../hooks/useTheme";
-import { ActionCableProvider } from "../contexts/ActionCableContext";
-import { CommentProvider } from "../contexts/CommentContext";
+import ClientProviders from "../components/ClientProviders";
 import React from "react";
 
 const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
@@ -34,7 +29,7 @@ export default function RootLayout({
             function isMobileDevice() {
               return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             }
-            
+
             // Chỉ áp dụng bảo vệ cho thiết bị desktop
             const isDesktop = !isMobileDevice();
 
@@ -133,19 +128,7 @@ export default function RootLayout({
         )}
       </head>
       <body className={`${inter.className} bg-gray-900 text-white min-h-screen flex flex-col`}>
-        <AuthProvider>
-          <ThemeProvider>
-            <ActionCableProvider>
-              <CommentProvider>
-                <Header />
-                <main className="flex-grow container mx-auto px-4 py-6">
-                  {children}
-                </main>
-                <Footer />
-              </CommentProvider>
-            </ActionCableProvider>
-          </ThemeProvider>
-        </AuthProvider>
+        <ClientProviders>{children}</ClientProviders>
       </body>
     </html>
   )

@@ -6,7 +6,11 @@ import { useState, createRef } from "react";
 import Link from "next/link";
 // import { mangaApi, genreApi } from "../services/api";
 import React from "react";
-import { useMangas, useRankings, useGenres } from '../services/swrApi';
+// Import GraphQL hooks thay vì SWR hooks
+import { useMangas, useRankings } from '../services/graphqlHooks';
+// Xóa dòng import GET_GENRES
+// import { useQuery } from '@apollo/client';
+// import { GET_GENRES } from '../services/graphql';
 import { useTheme } from '../hooks/useTheme';
 import ChatIcon from '../components/chat/ChatIcon';
 import ChatButton from '../components/chat/ChatButton';
@@ -16,12 +20,17 @@ interface Manga {
   title: string;
   coverImage?: string;
   description?: string;
-  latestChapter?: number;
+  latestChapter?: {
+    id: string | number;
+    number: number;
+    title?: string;
+  };
   latest_chapter?: {
     number: number;
     title?: string;
   };
   view_count?: number;
+  viewCount?: number;
   period_views?: number;
   chapter?: number;
   updatedAt?: string;
@@ -45,84 +54,50 @@ export default function Home() {
   const INITIAL_VISIBLE_ROWS = 3;
   const MAX_ROWS_BEFORE_PAGINATION = 9;
 
-  // Sử dụng SWR hooks
-  const { data: popularData, error: popularError, isLoading: popularLoading } = useMangas({
-    sort: 'popularity',
-    limit: 100 // Tăng giới hạn để có nhiều dữ liệu hơn
+  // Sử dụng GraphQL hooks
+  const { data: popularData, loading: popularLoading, error: popularError } = useMangas({
+    sortBy: 'popularity',
+    perPage: 100 // Tăng giới hạn để có nhiều dữ liệu hơn
   });
 
-  const { data: latestData, error: latestError, isLoading: latestLoading } = useMangas({
-    sort: 'updatedAt',
-    limit: 20
+  const { data: latestData, loading: latestLoading, error: latestError } = useMangas({
+    sortBy: 'updatedAt',
+    perPage: 20
   });
 
-  const { data: genresData } = useGenres();
+  // Xóa useQuery(GET_GENRES) và sử dụng trực tiếp defaultGenres
+  // const { data: genresData } = useQuery(GET_GENRES);
 
-  const { data: dayRankings } = useRankings('day', 6);
-  const { data: weekRankings } = useRankings('week', 6);
-  const { data: monthRankings } = useRankings('month', 6);
+  const { data: dayRankingsData } = useRankings('day', 6);
+  const { data: weekRankingsData } = useRankings('week', 6);
+  const { data: monthRankingsData } = useRankings('month', 6);
+
+  // Debug logs
+  console.log('popularData:', popularData);
+  console.log('popularError:', popularError);
+  console.log('latestData:', latestData);
+  console.log('latestError:', latestError);
+  console.log('dayRankingsData:', dayRankingsData);
+  console.log('weekRankingsData:', weekRankingsData);
+  console.log('monthRankingsData:', monthRankingsData);
 
   // Xử lý dữ liệu
   const popularMangas = popularData?.mangas?.map((m: any) => ({
     ...m,
-    coverImage: m.cover_image?.url || "/placeholder-manga.jpg"
+    coverImage: m.coverImage || "/placeholder-manga.jpg",
+    latest_chapter: m.latestChapter, // Ánh xạ latestChapter từ GraphQL sang latest_chapter cho tương thích ngược
   })) || [];
 
   const latestUpdates = latestData?.mangas?.map((m: any) => ({
     ...m,
-    coverImage: m.cover_image?.url || "/placeholder-manga.jpg"
+    coverImage: m.coverImage || "/placeholder-manga.jpg",
+    latest_chapter: m.latestChapter, // Ánh xạ latestChapter từ GraphQL sang latest_chapter cho tương thích ngược
   })) || [];
 
   const featuredManga = popularMangas.length > 0 ? {
     ...popularMangas[0],
-    coverImage: popularMangas[0].cover_image?.url || "/placeholder-manga.jpg",
+    coverImage: popularMangas[0].coverImage || "/placeholder-manga.jpg",
   } : null;
-
-  const genres: Genre[] = genresData || [];
-
-  // Xử lý rankings - đảm bảo có coverImage
-  const processedRankings = {
-    day: dayRankings?.mangas?.map((m: any) => ({
-      ...m,
-      // Xử lý cả hai trường hợp: cover_image.url hoặc cover_image_url
-      coverImage: m.cover_image?.url || m.cover_image_url || "/placeholder-manga.jpg"
-    })) || [],
-    week: weekRankings?.mangas?.map((m: any) => ({
-      ...m,
-      coverImage: m.cover_image?.url || m.cover_image_url || "/placeholder-manga.jpg"
-    })) || [],
-    month: monthRankings?.mangas?.map((m: any) => ({
-      ...m,
-      coverImage: m.cover_image?.url || m.cover_image_url || "/placeholder-manga.jpg"
-    })) || []
-  };
-
-  // Tính toán phân trang cho Popular Manga
-  const totalPopularMangas = popularMangas.length;
-  const totalRows = Math.ceil(totalPopularMangas / MANGAS_PER_ROW);
-  const totalPages = Math.ceil(totalRows / MAX_ROWS_BEFORE_PAGINATION);
-  
-  // Xác định số dòng hiển thị dựa trên trạng thái hiện tại
-  const visibleRows = showAllRows 
-    ? Math.min(MAX_ROWS_BEFORE_PAGINATION, totalRows) 
-    : Math.min(INITIAL_VISIBLE_ROWS, totalRows);
-  
-  // Tính toán manga hiển thị dựa trên trang hiện tại
-  const startRowIndex = (currentPage - 1) * MAX_ROWS_BEFORE_PAGINATION;
-  const endRowIndex = Math.min(startRowIndex + visibleRows, totalRows);
-  const startMangaIndex = startRowIndex * MANGAS_PER_ROW;
-  const endMangaIndex = Math.min(endRowIndex * MANGAS_PER_ROW, totalPopularMangas);
-  
-  // Manga hiển thị trong trang hiện tại
-  const visiblePopularMangas = popularMangas.slice(startMangaIndex, endMangaIndex);
-  
-  // Chia manga thành các dòng
-  const popularMangaRows = [];
-  for (let i = 0; i < visibleRows; i++) {
-    const startIdx = i * MANGAS_PER_ROW;
-    const endIdx = Math.min(startIdx + MANGAS_PER_ROW, visiblePopularMangas.length);
-    popularMangaRows.push(visiblePopularMangas.slice(startIdx, endIdx));
-  }
 
   // Danh sách thể loại mặc định (fallback)
   const defaultGenres = [
@@ -147,15 +122,70 @@ export default function Home() {
     { id: 19, name: "Shoujo Ai" }
   ];
 
+  // Sử dụng trực tiếp defaultGenres thay vì genresData?.genres
+  const genres: Genre[] = defaultGenres;
+
+  // Xử lý rankings - đảm bảo có coverImage
+  const processedRankings = {
+    day: dayRankingsData?.rankings?.map((m: any) => ({
+      ...m,
+      coverImage: m.coverImage || "/placeholder-manga.jpg",
+      view_count: m.viewCount, // Map GraphQL viewCount to view_count for compatibility
+      latest_chapter: m.latestChapter || { number: 1 } // Sử dụng latestChapter từ GraphQL nếu có
+    })) || [],
+    week: weekRankingsData?.rankings?.map((m: any) => ({
+      ...m,
+      coverImage: m.coverImage || "/placeholder-manga.jpg",
+      view_count: m.viewCount,
+      latest_chapter: m.latestChapter || { number: 1 } // Sử dụng latestChapter từ GraphQL nếu có
+    })) || [],
+    month: monthRankingsData?.rankings?.map((m: any) => ({
+      ...m,
+      coverImage: m.coverImage || "/placeholder-manga.jpg",
+      view_count: m.viewCount,
+      latest_chapter: m.latestChapter || { number: 1 } // Sử dụng latestChapter từ GraphQL nếu có
+    })) || []
+  };
+
+  // Debug logs
+  console.log('processedRankings:', processedRankings);
+
+  // Tính toán phân trang cho Popular Manga
+  const totalPopularMangas = popularMangas.length;
+  const totalRows = Math.ceil(totalPopularMangas / MANGAS_PER_ROW);
+  const totalPages = Math.ceil(totalRows / MAX_ROWS_BEFORE_PAGINATION);
+
+  // Xác định số dòng hiển thị dựa trên trạng thái hiện tại
+  const visibleRows = showAllRows
+    ? Math.min(MAX_ROWS_BEFORE_PAGINATION, totalRows)
+    : Math.min(INITIAL_VISIBLE_ROWS, totalRows);
+
+  // Tính toán manga hiển thị dựa trên trang hiện tại
+  const startRowIndex = (currentPage - 1) * MAX_ROWS_BEFORE_PAGINATION;
+  const endRowIndex = Math.min(startRowIndex + visibleRows, totalRows);
+  const startMangaIndex = startRowIndex * MANGAS_PER_ROW;
+  const endMangaIndex = Math.min(endRowIndex * MANGAS_PER_ROW, totalPopularMangas);
+
+  // Manga hiển thị trong trang hiện tại
+  const visiblePopularMangas = popularMangas.slice(startMangaIndex, endMangaIndex);
+
+  // Chia manga thành các dòng
+  const popularMangaRows = [];
+  for (let i = 0; i < visibleRows; i++) {
+    const startIdx = i * MANGAS_PER_ROW;
+    const endIdx = Math.min(startIdx + MANGAS_PER_ROW, visiblePopularMangas.length);
+    popularMangaRows.push(visiblePopularMangas.slice(startIdx, endIdx));
+  }
+
   // Tạo refs cho các dòng trong tab Latest
   const latestRowCount = Math.ceil(latestUpdates.length / MANGAS_PER_ROW);
-  const latestRowRefs = React.useMemo(() => 
+  const latestRowRefs = React.useMemo(() =>
     Array.from({ length: latestRowCount }).map(() => createRef<HTMLDivElement>()),
   [latestRowCount]);
-  
+
   // Theo dõi hướng scroll của mỗi dòng (true = right, false = left)
   const [rowScrollDirections, setRowScrollDirections] = React.useState<boolean[]>([]);
-  
+
   // Khởi tạo hướng scroll cho mỗi dòng
   React.useEffect(() => {
     setRowScrollDirections(Array(latestRowCount).fill(true));
@@ -173,7 +203,7 @@ export default function Home() {
       latestRowRefs[index].current?.scrollBy({ left: 300, behavior: 'smooth' });
     }
   };
-  
+
   // Kiểm tra xem có thể scroll tiếp theo hướng hiện tại không
   const canScrollMore = (element: HTMLDivElement, isRight: boolean): boolean => {
     if (isRight) {
@@ -324,11 +354,11 @@ export default function Home() {
           {/* Chia truyện thành các dòng, mỗi dòng 8 truyện có thể scroll */}
           {Array.from({ length: Math.ceil(latestUpdates.length / MANGAS_PER_ROW) }).map((_, rowIndex) => {
             const rowMangas = latestUpdates.slice(rowIndex * MANGAS_PER_ROW, (rowIndex + 1) * MANGAS_PER_ROW);
-            
+
             return (
               <div key={`latest-row-${rowIndex}`} className="relative">
                 {/* Left scroll button */}
-                <button 
+                <button
                   onClick={() => scrollRowLeft(rowIndex)}
                   className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 ${theme === 'dark' ? 'bg-gray-900/80 hover:bg-gray-800' : 'bg-white/80 hover:bg-gray-100'} text-red-500 rounded-full p-2 shadow-lg`}
                   aria-label="Scroll left"
@@ -337,9 +367,9 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                
+
                 {/* Scrollable container cho dòng này */}
-                <div 
+                <div
                   ref={latestRowRefs[rowIndex]}
                   className="flex overflow-x-auto pb-4 hide-scrollbar snap-x snap-mandatory"
                   style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
@@ -360,10 +390,16 @@ export default function Home() {
                           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-2">
                             <div className="flex justify-between items-center text-xs">
                               <span className="bg-red-600 text-white px-2 py-1 rounded text-xs font-medium">
-                                Chapter {manga.latest_chapter?.number || manga.latestChapter || manga.chapter || "?"}
+                                Chapter {
+                                  typeof manga.latestChapter === 'object' && manga.latestChapter?.number
+                                    ? manga.latestChapter.number
+                                    : typeof manga.latest_chapter === 'object' && manga.latest_chapter?.number
+                                    ? manga.latest_chapter.number
+                                    : "?"
+                                }
                               </span>
 
-                              {manga.view_count && (
+                              {manga.viewCount && (
                                 <span className="flex items-center text-white text-xs">
                                   <svg
                                     xmlns="http://www.w3.org/2000/svg"
@@ -385,15 +421,15 @@ export default function Home() {
                                       d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                                     />
                                   </svg>
-                                  {manga.view_count >= 1000000
-                                    ? `${(manga.view_count / 1000000).toFixed(1)}M`
-                                    : manga.view_count >= 1000
-                                    ? `${(manga.view_count / 1000).toFixed(0)}K`
-                                    : manga.view_count}
+                                  {manga.viewCount >= 1000000
+                                    ? `${(manga.viewCount / 1000000).toFixed(1)}M`
+                                    : manga.viewCount >= 1000
+                                    ? `${(manga.viewCount / 1000).toFixed(0)}K`
+                                    : manga.viewCount}
                                 </span>
                               )}
                             </div>
-                            
+
                             {/* Hover description */}
                             <div className="hidden group-hover:block mt-1">
                               <p className="text-white text-xs line-clamp-2 opacity-90">{manga.description || "Không có mô tả"}</p>
@@ -410,9 +446,9 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
-                
+
                 {/* Right scroll button */}
-                <button 
+                <button
                   onClick={() => scrollRowRight(rowIndex)}
                   className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 ${theme === 'dark' ? 'bg-gray-900/80 hover:bg-gray-800' : 'bg-white/80 hover:bg-gray-100'} text-red-500 rounded-full p-2 shadow-lg`}
                   aria-label="Scroll right"
@@ -449,7 +485,13 @@ export default function Home() {
                       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-2">
                         <div className="flex justify-between items-center text-xs">
                           <span className="bg-red-600 text-white px-2 py-1 rounded text-xs font-medium">
-                            Chapter {manga.latest_chapter?.number || manga.latestChapter || manga.chapter || "?"}
+                            Chapter {
+                              typeof manga.latestChapter === 'object' && manga.latestChapter?.number
+                                ? manga.latestChapter.number
+                                : typeof manga.latest_chapter === 'object' && manga.latest_chapter?.number
+                                ? manga.latest_chapter.number
+                                : "?"
+                            }
                           </span>
 
                           {manga.view_count && (
@@ -482,7 +524,7 @@ export default function Home() {
                             </span>
                           )}
                         </div>
-                        
+
                         {/* Hover description */}
                         <div className="hidden group-hover:block mt-1">
                           <p className="text-white text-xs line-clamp-2 opacity-90">{manga.description || "Không có mô tả"}</p>
@@ -520,14 +562,14 @@ export default function Home() {
                 onClick={() => goToPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
                 className={`px-3 py-1 rounded-md ${
-                  currentPage === 1 
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                  currentPage === 1
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : theme === 'dark' ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
                 &lt;
               </button>
-              
+
               {/* Hiển thị các nút trang */}
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                 // Tính toán số trang để hiển thị, đảm bảo trang hiện tại nằm ở giữa nếu có thể
@@ -541,7 +583,7 @@ export default function Home() {
                 } else {
                   pageNum = currentPage - 2 + i;
                 }
-                
+
                 return (
                   <button
                     key={`page-${pageNum}`}
@@ -556,12 +598,12 @@ export default function Home() {
                   </button>
                 );
               })}
-              
+
               {/* Hiển thị dấu ... nếu có nhiều trang */}
               {totalPages > 5 && currentPage < totalPages - 2 && (
                 <span className="px-2">...</span>
               )}
-              
+
               {/* Luôn hiển thị trang cuối cùng nếu có nhiều hơn 5 trang và không nằm trong 5 trang đầu tiên */}
               {totalPages > 5 && currentPage < totalPages - 2 && (
                 <button
@@ -573,13 +615,13 @@ export default function Home() {
                   {totalPages}
                 </button>
               )}
-              
+
               <button
                 onClick={() => goToPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
                 className={`px-3 py-1 rounded-md ${
-                  currentPage === totalPages 
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                  currentPage === totalPages
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : theme === 'dark' ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
@@ -636,9 +678,9 @@ export default function Home() {
                 }`}>
                   {/* Ranking number badge with special styling for top 3 */}
                   <div className={`absolute top-0 right-0 px-2 py-1 text-sm z-10 font-bold ${
-                    index === 0 ? 'bg-yellow-500 text-black' : 
-                    index === 1 ? 'bg-gray-300 text-black' : 
-                    index === 2 ? 'bg-amber-700 text-white' : 
+                    index === 0 ? 'bg-yellow-500 text-black' :
+                    index === 1 ? 'bg-gray-300 text-black' :
+                    index === 2 ? 'bg-amber-700 text-white' :
                     theme === 'dark' ? 'bg-gray-900/80 text-red-500' : 'bg-white/80 text-red-500'
                   }`}>
                     #{index + 1}
@@ -655,7 +697,13 @@ export default function Home() {
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-2">
                     <div className="flex justify-between items-center text-xs">
                       <span className="bg-red-600 text-white px-2 py-1 rounded text-xs font-medium">
-                        Chapter {manga.latest_chapter?.number || manga.latestChapter || manga.chapter || 1}
+                        Chapter {
+                          typeof manga.latestChapter === 'object' && manga.latestChapter?.number
+                            ? manga.latestChapter.number
+                            : typeof manga.latest_chapter === 'object' && manga.latest_chapter?.number
+                            ? manga.latest_chapter.number
+                            : "?"
+                        }
                       </span>
 
                       <span className="flex items-center text-white text-xs">
@@ -686,7 +734,7 @@ export default function Home() {
                           : manga.period_views || manga.view_count || 0}
                       </span>
                     </div>
-                    
+
                     {/* Hover description */}
                     <div className="hidden group-hover:block mt-1">
                       <p className="text-white text-xs line-clamp-2 opacity-90">{manga.description || "Không có mô tả"}</p>
@@ -706,9 +754,9 @@ export default function Home() {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {/* Chat icon at the beginning */}
           <ChatIcon />
-          
+
           {/* Existing genres */}
-          {(genres.length > 0 ? genres : defaultGenres).map((genre: { id: React.Key | null | undefined; name: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; }, index: number) => (
+          {genres.map((genre: { id: React.Key | null | undefined; name: string | number | bigint | boolean | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined; }, index: number) => (
             <Link
               key={genre.id || `genre-${index}`}
               href={`/genres/${String(genre.name).toLowerCase()}`}
@@ -729,7 +777,7 @@ export default function Home() {
         .hide-scrollbar::-webkit-scrollbar {
           display: none;
         }
-        
+
         /* Hide scrollbar for IE, Edge and Firefox */
         .hide-scrollbar {
           -ms-overflow-style: none;  /* IE and Edge */

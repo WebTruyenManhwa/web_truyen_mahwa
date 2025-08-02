@@ -1,4 +1,13 @@
+require 'graphiql/rails' if Rails.env.development?
+
 Rails.application.routes.draw do
+  # Mount GraphiQL IDE
+  if Rails.env.development?
+    mount GraphiQL::Rails::Engine, at: "/graphiql", graphql_path: "/graphql"
+  end
+
+  post "/graphql", to: "graphql#execute"
+  get "/graphql-test", to: "graphql#test" # Thêm route này
   devise_for :users, controllers: {
     sessions: 'api/v1/sessions',
     registrations: 'api/v1/registrations',

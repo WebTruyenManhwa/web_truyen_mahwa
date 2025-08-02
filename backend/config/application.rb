@@ -12,6 +12,7 @@ require "action_mailbox/engine"
 require "action_text/engine"
 require "action_view/railtie"
 require "action_cable/engine"
+require "sprockets/railtie" # Thêm dòng này để hỗ trợ GraphiQL
 # require "rails/test_unit/railtie"
 
 # Require the gems listed in Gemfile, including any gems
@@ -20,6 +21,15 @@ Bundler.require(*Rails.groups)
 
 module Backend
   class Application < Rails::Application
+    config.active_record.query_log_tags_enabled = true
+    config.active_record.query_log_tags = [
+      # Rails query log tags:
+      :application, :controller, :action, :job,
+      # GraphQL-Ruby query log tags:
+      current_graphql_operation: -> { GraphQL::Current.operation_name },
+      current_graphql_field: -> { GraphQL::Current.field&.path },
+      current_dataloader_source: -> { GraphQL::Current.dataloader_source_class },
+    ]
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.0
 
@@ -50,7 +60,7 @@ module Backend
     # Only loads a smaller set of middleware suitable for API only apps.
     # Middleware like session, flash, cookies can be added back manually.
     # Skip views, helpers and assets when generating a new resource.
-    config.api_only = true
+    config.api_only = false
 
     # Thêm middleware session cho OmniAuth
     config.session_store :cookie_store, key: '_interslice_session'

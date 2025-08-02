@@ -1,0 +1,148 @@
+# Các ví dụ về GraphQL Queries
+
+# Lấy danh sách manga với phân trang
+query GetMangas {
+  mangas(page: 1, perPage: 10) {
+    id
+    title
+    coverImage
+    status
+    author
+    artist
+    releaseYear
+    rating
+    viewCount
+  }
+}
+
+# Lấy thông tin chi tiết của một manga
+query GetMangaDetail {
+  manga(id: 20) {
+    id
+    title
+    description
+    coverImage
+    status
+    author
+    artist
+    releaseYear
+    rating
+    viewCount
+    totalVotes
+    genres {
+      id
+      name
+    }
+    chaptersCount
+    latestChapter {
+      id
+      number
+      title
+      createdAt
+    }
+  }
+}
+
+# Lấy danh sách chapter của một manga
+query GetMangaChapters {
+  manga(id: 20) {
+    id
+    title
+    chapters {
+      id
+      number
+      title
+      createdAt
+    }
+  }
+}
+
+# Lấy thông tin chi tiết của một chapter
+query GetChapterDetail {
+  chapter(id: 217) {
+    id
+    number
+    title
+    createdAt
+    images
+    manga {
+      id
+      title
+    }
+    nextChapter {
+      id
+      number
+    }
+    prevChapter {
+      id
+      number
+    }
+  }
+}
+
+# Lấy bảng xếp hạng manga theo ngày
+query GetRankings {
+  rankings_day(limit: 10) {
+    id
+    title
+    coverImage
+    viewCount
+    rating
+  }
+}
+
+# Lấy thông tin người dùng hiện tại
+query GetCurrentUser {
+  current_user {
+    id
+    email
+    username
+    avatar
+  }
+}
+
+# Tìm kiếm manga
+query SearchMangas {
+  mangas(
+    page: 1
+    perPage: 20
+    search: "Tà Đế"
+    sortBy: "view_count"
+    sortDirection: "desc"
+  ) {
+    id
+    title
+    coverImage
+    status
+  }
+}
+
+# Lọc manga theo thể loại
+query FilterMangasByGenre {
+  mangas(
+    page: 1
+    perPage: 20
+    filterByGenre: ["1", "2"]
+    sortBy: "created_at"
+    sortDirection: "desc"
+  ) {
+    id
+    title
+    coverImage
+    status
+  }
+}
+
+# Lọc manga theo trạng thái
+query FilterMangasByStatus {
+  mangas(
+    page: 1
+    perPage: 20
+    filterByStatus: "ongoing"
+  ) {
+    id
+    title
+    coverImage
+    status
+  }
+}

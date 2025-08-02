@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_07_27_103924) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_01_024531) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -47,6 +47,18 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_27_103924) do
     t.index ["manga_id", "number"], name: "idx_chapters_on_manga_id_number"
     t.index ["manga_id"], name: "index_chapters_on_manga_id"
     t.index ["slug"], name: "index_chapters_on_slug"
+  end
+
+  create_table "chat_messages", force: :cascade do |t|
+    t.text "content"
+    t.string "sticker"
+    t.bigint "user_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.boolean "is_html", default: false
+    t.string "stickers", default: [], array: true
+    t.index ["created_at"], name: "index_chat_messages_on_created_at"
+    t.index ["user_id"], name: "index_chat_messages_on_user_id"
   end
 
   create_table "comments", force: :cascade do |t|
@@ -167,6 +179,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_27_103924) do
     t.string "slug"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "source_url"
     t.index "lower((title)::text)", name: "index_novel_series_on_lower_title"
   end
 
@@ -243,6 +256,16 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_27_103924) do
     t.datetime "locked_at", null: false
     t.datetime "heartbeat_at"
     t.index ["name"], name: "index_scheduler_locks_on_name", unique: true
+  end
+
+  create_table "solid_cable_messages", force: :cascade do |t|
+    t.binary "channel", null: false
+    t.binary "payload", null: false
+    t.datetime "created_at", null: false
+    t.bigint "channel_hash", null: false
+    t.index ["channel"], name: "index_solid_cable_messages_on_channel"
+    t.index ["channel_hash"], name: "index_solid_cable_messages_on_channel_hash"
+    t.index ["created_at"], name: "index_solid_cable_messages_on_created_at"
   end
 
   create_table "solid_cache_entries", force: :cascade do |t|
@@ -398,6 +421,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_27_103924) do
   add_foreign_key "chapter_error_reports", "users"
   add_foreign_key "chapter_image_collections", "chapters"
   add_foreign_key "chapters", "mangas"
+  add_foreign_key "chat_messages", "users"
   add_foreign_key "comments", "users"
   add_foreign_key "favorites", "mangas"
   add_foreign_key "favorites", "users"

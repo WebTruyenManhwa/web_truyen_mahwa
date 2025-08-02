@@ -44,3 +44,5 @@ GEMINI_API_KEY=AIzaxxxxxxxxxxxxxxxxxxxxxxx  # Bắt buộc
 ### Cách hoạt động
 
 Hệ thống sử dụng Gemini API để phân tích dữ liệu và đưa ra các đề xuất. Nếu không có API key, hệ thống sẽ trả về thông báo lỗi.
+
+-- docker-compose exec backend bundle exec rails db:migrate

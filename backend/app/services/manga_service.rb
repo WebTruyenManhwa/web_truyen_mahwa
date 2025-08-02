@@ -45,7 +45,7 @@ class MangaService
       end
 
       latest_chapters = {}
-      
+
       # Sử dụng prepared statement để tránh SQL injection
       placeholders = manga_ids.map.with_index { |_, i| "$#{i+1}" }.join(',')
       latest_chapters_sql = <<-SQL
@@ -77,7 +77,7 @@ class MangaService
       rescue => e
         Rails.logger.error "Error in get_latest_chapters: #{e.message}"
       end
-      
+
       latest_chapters
     end
 
@@ -94,16 +94,16 @@ class MangaService
       # Sử dụng prepared statement để tránh SQL injection
       placeholders = manga_ids.map.with_index { |_, i| "$#{i+1}" }.join(',')
       count_sql = "SELECT manga_id, COUNT(*) as count FROM chapters WHERE manga_id IN (#{placeholders}) GROUP BY manga_id"
-      
+
       chapters_count = {}
-      
+
       begin
         result = ActiveRecord::Base.connection.exec_query(
           count_sql,
           'Get chapters count',
           manga_ids.map { |id| id }
         )
-        
+
         result.each do |row|
           chapters_count[row['manga_id']] = row['count']
         end
@@ -141,10 +141,25 @@ class MangaService
         # Lấy lượt xem từ dữ liệu đã tính toán trước đó
         period_views = period_views_data[manga_id] || manga.view_count || 0
 
+        # Lấy chapter mới nhất
+        latest_chapter_data = preloaded_data[:latest_chapters][manga_id]
+
+        # Tạo đối tượng Chapter từ dữ liệu latest_chapter nếu có
+        latest_chapter = nil
+        if latest_chapter_data.present?
+          latest_chapter = Chapter.new(
+            id: latest_chapter_data[:id],
+            number: latest_chapter_data[:number],
+            title: latest_chapter_data[:title],
+            slug: latest_chapter_data[:slug],
+            manga_id: manga_id
+          )
+        end
+
         # Sử dụng serializer để định dạng dữ liệu
         serializer = MangaRankingSerializer.new(manga, {
           period_views: period_views,
-          latest_chapter: preloaded_data[:latest_chapters][manga_id],
+          latest_chapter: latest_chapter,
           chapters_count: preloaded_data[:chapters_count][manga_id] || 0,
           chapters_by_manga: preloaded_data[:chapters_by_manga],
           images_by_chapter: preloaded_data[:images_by_chapter]
@@ -152,10 +167,22 @@ class MangaService
 
         # Chuyển đổi thành JSON
         manga_data = serializer.as_json
-        manga_data['cover_image'] = { url: manga.cover_image_url } if manga.cover_image.present?
+        manga_data['cover_image'] = manga.cover_image_url if manga.cover_image.present?
 
         # Không bao gồm chapters trong kết quả rankings để tránh lỗi serializer
         manga_data.delete('chapters')
+
+        # Thêm trường latestChapter cho GraphQL - Đảm bảo đúng định dạng
+        if latest_chapter
+          manga_data['latestChapter'] = {
+            'id' => latest_chapter.id,
+            'number' => latest_chapter.number,
+            'title' => latest_chapter.title
+          }
+        end
+
+        # Debug log
+        Rails.logger.info "DEBUG RANKINGS - manga_id: #{manga_id}, latestChapter: #{manga_data['latestChapter'].inspect}"
 
         manga_data
       end.compact
@@ -209,7 +236,7 @@ class MangaService
         # Truy vấn SQL để lấy tổng lượt xem cho mỗi manga trong khoảng thời gian
         # Sử dụng format chuỗi ISO 8601 cho thời gian để tránh lỗi
         formatted_date = start_date.strftime('%Y-%m-%d %H:%M:%S')
-        
+
         # Sử dụng truy vấn SQL đơn giản với tham số được nhúng trực tiếp
         # Vì formatted_date đã được định dạng đúng và không có nguy cơ SQL injection
         sql = "SELECT manga_id, SUM(view_count) as total_views FROM manga_views WHERE created_at >= '#{formatted_date}' GROUP BY manga_id LIMIT 100"
@@ -218,7 +245,7 @@ class MangaService
         views_data = {}
         begin
           result = ActiveRecord::Base.connection.execute(sql)
-          
+
           result.each do |row|
             views_data[row['manga_id'].to_i] = row['total_views'].to_i
           end
