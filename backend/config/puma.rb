@@ -12,43 +12,73 @@
 # application spends waiting for IO operations and on how much you wish to
 # prioritize throughput over latency.
 
-# Giảm số lượng workers và threads cho môi trường ít RAM
-if ENV["LOW_MEMORY_ENV"] == "true" || ENV["RENDER"] == "true"
-  # Cho môi trường ít RAM như Render (512MB), chỉ dùng 1 worker và ít threads
-  workers ENV.fetch("WEB_CONCURRENCY", 1)
-  threads_count = ENV.fetch("RAILS_MAX_THREADS", 2)
-else
-  # Cho môi trường có nhiều RAM hơn
-  workers ENV.fetch("WEB_CONCURRENCY", 2)
-  threads_count = ENV.fetch("RAILS_MAX_THREADS", 3)
-end
+# Puma can serve each request in a thread from an internal thread pool.
+# The `threads` method setting takes two numbers: a minimum and maximum.
+# Any libraries that use thread pools should be configured to match
+# the maximum value specified for Puma. Default is set to 5 threads for minimum
+# and maximum; this matches the default thread size of Active Record.
+#
+max_threads_count = ENV.fetch("RAILS_MAX_THREADS") { 5 }
+min_threads_count = ENV.fetch("RAILS_MIN_THREADS") { max_threads_count }
+threads min_threads_count, max_threads_count
 
-threads threads_count, threads_count
+# Specifies the `worker_timeout` threshold that Puma will use to wait before
+# terminating a worker in development environments.
+#
+worker_timeout 3600 if ENV.fetch("RAILS_ENV", "development") == "development"
 
 # Specifies the `port` that Puma will listen on to receive requests; default is 3000.
-port ENV.fetch("PORT", 3000)
+#
+port ENV.fetch("PORT") { 3000 }
+
+# Specifies the `environment` that Puma will run in.
+#
+environment ENV.fetch("RAILS_ENV") { "development" }
+
+# Specifies the `pidfile` that Puma will use.
+pidfile ENV.fetch("PIDFILE") { "tmp/pids/server.pid" }
+
+# Specifies the number of `workers` to boot in clustered mode.
+# Workers are forked web server processes. If using threads and workers together
+# the concurrency of the application would be max `threads` * `workers`.
+# Workers do not work on JRuby or Windows (both of which do not support
+# processes).
+#
+workers ENV.fetch("WEB_CONCURRENCY") { 2 }
+
+# Use the `preload_app!` method when specifying a `workers` number.
+# This directive tells Puma to first boot the application and load code
+# before forking the application. This takes advantage of Copy On Write
+# process behavior so workers use less memory.
+#
+preload_app!
 
 # Allow puma to be restarted by `bin/rails restart` command.
 plugin :tmp_restart
 
+# Tối ưu cho môi trường ít tài nguyên
+if ENV["RAILS_ENV"] == "production" || ENV["LOW_MEMORY_ENV"] == "true"
+  # Giảm số lượng worker và thread khi ít tài nguyên
+  if ENV["RENDER"] == "true"
+    workers ENV.fetch("WEB_CONCURRENCY") { 1 }
+    threads ENV.fetch("RAILS_MIN_THREADS") { 1 }, ENV.fetch("RAILS_MAX_THREADS") { 5 }
+  end
+
+  # Giảm memory footprint
+  before_fork do
+    GC.compact if defined?(GC) && GC.respond_to?(:compact)
+  end
+
+  # Cấu hình timeout để tránh worker treo
+  worker_timeout ENV.fetch("WORKER_TIMEOUT") { 60 }
+  worker_shutdown_timeout ENV.fetch("WORKER_SHUTDOWN_TIMEOUT") { 30 }
+
+  # Tắt request logging trong Puma (đã có trong Rails)
+  quiet
+end
+
 # Run the Solid Queue supervisor inside of Puma for single-server deployments
 plugin :solid_queue if ENV["SOLID_QUEUE_IN_PUMA"]
-
-# Specify the PID file. Defaults to tmp/pids/server.pid in development.
-# In other environments, only set the PID file if requested.
-pidfile ENV["PIDFILE"] if ENV["PIDFILE"]
-
-# Thêm timeout cho worker shutdown để tránh mất kết nối đột ngột
-worker_shutdown_timeout 30
-
-# Giảm thời gian boot để tiết kiệm bộ nhớ trong quá trình khởi động
-worker_boot_timeout 30
-
-# Thêm phục hồi khi worker bị crash
-worker_timeout 60
-
-# Kích hoạt chế độ phục hồi sau lỗi
-restart_command ['--restart', 'on-failure', '--']
 
 # Thêm log khi nhận tín hiệu TERM
 trap 'TERM' do

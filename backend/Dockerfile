@@ -1,7 +1,7 @@
 # check=error=true
 
 # This Dockerfile is designed for production deployment on Render
-# It runs the Rails web server
+# It runs the Rails web server with Nginx
 
 # Make sure RUBY_VERSION matches the Ruby version in .ruby-version
 ARG RUBY_VERSION=3.3.0
@@ -23,7 +23,9 @@ RUN apt-get update -qq && \
       libjemalloc2 \
       libvips \
       postgresql-client \
-      imagemagick && \
+      imagemagick \
+      nginx \
+      procps && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 # Set production environment
@@ -32,7 +34,8 @@ ENV RAILS_ENV="production" \
     BUNDLE_PATH="/usr/local/bundle" \
     BUNDLE_WITHOUT="development" \
     RAILS_LOG_TO_STDOUT="true" \
-    TZ=Asia/Ho_Chi_Minh
+    TZ=Asia/Ho_Chi_Minh \
+    PATH="/usr/sbin:${PATH}"
 
 # Throw-away build stage to reduce size of final image
 FROM base AS build
@@ -68,22 +71,26 @@ COPY --from=build /rails /rails
 RUN getent group rails >/dev/null || groupadd --system --gid 1000 rails \
  && id -u rails >/dev/null 2>&1 || useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash rails
 
-# Tạo thư mục cần thiết và chown đúng path: /rails chứ không phải /app
-RUN mkdir -p /rails/public/uploads /rails/tmp/sockets /rails/tmp/pids \
- && chown -R rails:rails /rails /rails/public/uploads /rails/tmp /rails/log /rails/storage
+# Tạo thư mục cần thiết và chown đúng path
+RUN mkdir -p /rails/public/uploads /rails/tmp/sockets /rails/tmp/pids /var/cache/nginx/graphql \
+ && chown -R rails:rails /rails /rails/public/uploads /rails/tmp /rails/log /rails/storage \
+ && chown -R www-data:www-data /var/cache/nginx
 
 # Set timezone to Vietnam (Asia/Ho_Chi_Minh)
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# Chuyển xuống chạy dưới user rails
-USER rails
+# Kiểm tra và đảm bảo nginx đã được cài đặt
+RUN which nginx || (echo "Nginx not found, installing..." && apt-get update && apt-get install -y nginx && rm -rf /var/lib/apt/lists/*)
 
-# Entrypoint chuẩn bị DB
+# Copy Nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Entrypoint chuẩn bị DB và khởi động Nginx + Rails
 COPY --chown=root:root --chmod=755 entrypoint.sh /rails/entrypoint.sh
 ENTRYPOINT ["sh", "/rails/entrypoint.sh"]
 
 # Expose port
 EXPOSE 80
 
-# Start Rails server
-CMD ["./bin/thrust", "./bin/rails", "server"]
+# Start Nginx and Rails server
+CMD ["sh", "-c", "/usr/sbin/nginx && ./bin/thrust ./bin/rails server -p 3000"]

@@ -10,38 +10,59 @@ services:
     environment:
       - NODE_ENV=development
       - NEXT_PUBLIC_API_URL=http://localhost:3001/api
+      - NEXT_PUBLIC_GRAPHQL_URL=http://localhost:3001/graphql
+    depends_on:
+      - nginx
+    command: /bin/sh -c "npm install && npm run dev"
+
+  nginx:
+    image: nginx:stable-alpine  # Sử dụng phiên bản Alpine nhẹ hơn
+    volumes:
+      - ./backend/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./backend/public:/rails/public
+    ports:
+      - "3001:8080"
     depends_on:
       - backend
-    command: npm run dev
 
   backend:
     build: ./backend
+    user: root
     volumes:
       - ./backend:/rails
       - ./backend/tmp:/rails/tmp
-      
       - ./backend/log:/rails/log
-    ports:
-      - "3001:3000"
+    expose:
+      - "3000"
     stdin_open: true
-    tty: true 
+    tty: true
     environment:
       - RAILS_ENV=development
       - DATABASE_USERNAME=postgres
       - DATABASE_PASSWORD=postgres
       - DATABASE_HOST=db
+      - MALLOC_ARENA_MAX=2  # Giới hạn bộ nhớ heap của Ruby
+      - RAILS_MAX_THREADS=10  # Tăng số lượng thread để xử lý nhiều kết nối
+      - RAILS_MIN_THREADS=5   # Số lượng thread tối thiểu
+      - WEB_CONCURRENCY=1     # Giảm số lượng worker để tiết kiệm bộ nhớ
+      - LOW_MEMORY_ENV=true   # Bật chế độ ít bộ nhớ
     depends_on:
       - db
-    command: bash -c "bundle install && ./bin/rails server -b 0.0.0.0"
+    command: bash -c "bundle install && ./bin/rails server -b 0.0.0.0 -p 3000"
 
   db:
-    image: postgres:15
+    image: postgres:15-alpine  # Sử dụng phiên bản Alpine nhẹ hơn
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_DB=manga_reader_development
+      # Tối ưu PostgreSQL cho môi trường ít tài nguyên
+      - POSTGRES_INITDB_ARGS=--data-checksums
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_MAX_CONNECTIONS=50
+    command: postgres -c shared_buffers=64MB -c effective_cache_size=128MB -c work_mem=4MB -c maintenance_work_mem=16MB -c max_connections=50
     ports:
       - "5432:5432"
 
