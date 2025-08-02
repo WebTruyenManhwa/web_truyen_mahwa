@@ -7,7 +7,13 @@ Rails.application.routes.draw do
   end
 
   post "/graphql", to: "graphql#execute"
+  # Thêm route /api/graphql để tương thích với frontend
+  post "/api/graphql", to: "graphql#execute"
   get "/graphql-test", to: "graphql#test" # Thêm route này
+
+  # Cấu hình cho uploads
+  get "/uploads/*path", to: "uploads#show"
+
   devise_for :users, controllers: {
     sessions: 'api/v1/sessions',
     registrations: 'api/v1/registrations',

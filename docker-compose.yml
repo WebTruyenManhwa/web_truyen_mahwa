@@ -13,10 +13,11 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:3001/api
     depends_on:
       - backend
-    command: npm run dev
+    command: /bin/sh -c "npm install && npm run dev"
 
   backend:
     build: ./backend
+    user: root
     volumes:
       - ./backend:/rails
       - ./backend/tmp:/rails/tmp
